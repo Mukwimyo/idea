@@ -40,8 +40,20 @@ export default function Room() {
     const [followShared, setFollowShared] = useState(true)
     const [myThemeId, setMyThemeId] = useState('dark-purple')
     const [isOwner, setIsOwner] = useState(false)
+    // 화수 커스텀 UI
+    const [showChapterInput, setShowChapterInput] = useState(false)
+    const [chapterName, setChapterName] = useState('')
     const fileInputRef = useRef(null)
     const messagesEndRef = useRef(null)
+    const inputRef = useRef(null)
+
+    // 패널 하나만 열리도록
+    const openPanel = (panel) => {
+        setShowInvite(panel === 'invite')
+        setShowTheme(panel === 'theme')
+        setShowSearch(panel === 'search')
+        setShowCalendar(panel === 'calendar')
+    }
 
     useEffect(() => {
         let channel
@@ -114,11 +126,13 @@ export default function Room() {
         if (isNarr && messages.length > 0) {
             const last = messages[messages.length - 1]
             if (last.type === 'narration' && last.user_id === user.id) {
+                const merged = last.content + '\n' + content
                 setMessages(prev => prev.map(m =>
-                    m.id === last.id ? { ...m, content: m.content + '\n' + content } : m
+                    m.id === last.id ? { ...m, content: merged } : m
                 ))
                 setInput('')
-                await supabase.from('messages').update({ content: last.content + '\n' + content }).eq('id', last.id)
+                setTimeout(() => inputRef.current?.focus(), 0)
+                await supabase.from('messages').update({ content: merged }).eq('id', last.id)
                 return
             }
         }
@@ -140,6 +154,7 @@ export default function Room() {
         setMessages(prev => [...prev, tempMsg])
         setInput('')
         if (mode === 'narration') setMode('chat')
+        setTimeout(() => inputRef.current?.focus(), 0)
 
         await supabase.from('messages').insert({
             room_id: roomId, user_id: user.id,
@@ -160,11 +175,19 @@ export default function Room() {
         alert('북마크에 추가됐어요!')
     }
 
-    const addChapter = async () => {
-        const name = prompt('화수 이름을 입력해주세요 (예: 2화 · 균열)')
-        if (!name) return
+    const addChapter = () => {
+        setShowChapterInput(true)
+    }
+
+    const submitChapter = async () => {
+        if (!chapterName.trim()) return
         const { data: { user } } = await supabase.auth.getUser()
-        await supabase.from('messages').insert({ room_id: roomId, user_id: user.id, type: 'chapter', content: name })
+        await supabase.from('messages').insert({
+            room_id: roomId, user_id: user.id,
+            type: 'chapter', content: chapterName.trim()
+        })
+        setChapterName('')
+        setShowChapterInput(false)
     }
 
     const saveSharedTheme = async (id) => {
@@ -221,72 +244,76 @@ export default function Room() {
 
             {/* 헤더 */}
             <div style={{ background: t.panel, borderBottom: `0.5px solid ${t.border}`, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 8, position: 'sticky', top: 0, zIndex: 10 }}>
-                <button onClick={() => navigate('/')} style={{ background: 'none', border: 'none', color: t.subText, fontSize: 20, cursor: 'pointer', padding: 0 }}>‹</button>
+                <button onClick={() => navigate('/')} style={{ background: 'none', border: 'none', color: t.subText, fontSize: 24, cursor: 'pointer', padding: '0 4px' }}>‹</button>
                 <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 14, fontWeight: 500, color: t.theirText }}>{room?.name}</div>
                     <div style={{ fontSize: 10, color: t.subText }}>{room?.chapter}</div>
                 </div>
                 {[
-                    { label: '초대', onClick: () => setShowInvite(!showInvite) },
-                    { label: '+ 화수', onClick: addChapter },
-                    { label: '⚙️', onClick: () => setShowTheme(!showTheme) },
-                    { label: '🔍', onClick: () => setShowSearch(!showSearch) },
-                    { label: '📅', onClick: () => setShowCalendar(!showCalendar) },
+                    { label: '초대', key: 'invite', onClick: () => openPanel(showInvite ? null : 'invite') },
+                    { label: '+ 화수', key: 'chapter', onClick: addChapter },
+                    { label: '⚙️', key: 'theme', onClick: () => openPanel(showTheme ? null : 'theme') },
+                    { label: '🔍', key: 'search', onClick: () => openPanel(showSearch ? null : 'search') },
+                    { label: '📅', key: 'calendar', onClick: () => openPanel(showCalendar ? null : 'calendar') },
                 ].map(btn => (
-                    <button key={btn.label} onClick={btn.onClick} style={{ background: 'none', border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '4px 8px', color: t.subText, fontSize: 11, cursor: 'pointer' }}>{btn.label}</button>
+                    <button key={btn.key} onClick={btn.onClick} style={{ background: 'none', border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '6px 10px', color: t.subText, fontSize: 13, cursor: 'pointer' }}>{btn.label}</button>
                 ))}
             </div>
 
-            {/* 초대 코드 */}
+            {/* 초대 코드 패널 */}
             {showInvite && (
-                <div style={{ background: t.panel, padding: '10px 14px', textAlign: 'center', borderBottom: `0.5px solid ${t.border}` }}>
-                    <div style={{ fontSize: 11, color: t.subText, marginBottom: 4 }}>초대 코드</div>
-                    <div style={{ fontSize: 18, fontWeight: 600, color: t.point, letterSpacing: 3 }}>{room?.invite_code}</div>
-                    <div style={{ fontSize: 10, color: t.subText, marginTop: 4, opacity: 0.6 }}>상대방에게 이 코드를 알려주세요</div>
+                <div style={{ position: 'fixed', top: 49, left: 0, right: 0, bottom: 0, zIndex: 50, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }} onClick={() => setShowInvite(false)}>
+                    <div style={{ background: t.panel, padding: '14px 16px', borderBottom: `0.5px solid ${t.border}`, textAlign: 'center', maxWidth: 480, margin: '0 auto', width: '100%' }} onClick={e => e.stopPropagation()}>
+                        <div style={{ fontSize: 11, color: t.subText, marginBottom: 4 }}>초대 코드</div>
+                        <div style={{ fontSize: 22, fontWeight: 600, color: t.point, letterSpacing: 3 }}>{room?.invite_code}</div>
+                        <div style={{ fontSize: 10, color: t.subText, marginTop: 4, opacity: 0.6 }}>상대방에게 이 코드를 알려주세요</div>
+                    </div>
                 </div>
             )}
 
             {/* 테마 패널 */}
             {showTheme && (
-                <div style={{ background: t.panel, padding: '12px 14px', borderBottom: `0.5px solid ${t.border}` }}>
-                    <div style={{ fontSize: 11, color: t.subText, marginBottom: 10 }}>채팅방 테마 설정</div>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, padding: '8px 10px', background: t.bg, borderRadius: 8, border: `0.5px solid ${t.border}` }}>
-                        <div>
-                            <div style={{ fontSize: 12, color: t.theirText }}>공유 테마 따라가기</div>
-                            <div style={{ fontSize: 10, color: t.subText, marginTop: 2 }}>방장이 설정한 테마로 보기</div>
-                        </div>
-                        <div onClick={() => toggleFollow(!followShared)} style={{ width: 40, height: 22, borderRadius: 11, cursor: 'pointer', transition: 'background 0.2s', background: followShared ? t.point : t.border, position: 'relative', flexShrink: 0 }}>
-                            <div style={{ position: 'absolute', top: 3, left: followShared ? 20 : 3, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
-                        </div>
-                    </div>
-                    {isOwner && (
-                        <div style={{ marginBottom: 12 }}>
-                            <div style={{ fontSize: 11, color: t.subText, marginBottom: 8 }}>공유 테마 <span style={{ fontSize: 10, opacity: 0.6 }}>(방장만 변경 가능)</span></div>
-                            <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
-                                {THEMES.map(th => (
-                                    <div key={th.id} onClick={() => saveSharedTheme(th.id)} style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-                                        <div style={{ width: 44, height: 44, borderRadius: 10, overflow: 'hidden', border: sharedThemeId === th.id ? `2px solid ${th.point}` : `1px solid ${th.border}` }}>
-                                            <div style={{ height: '40%', background: th.panel, borderBottom: `0.5px solid ${th.border}` }} />
-                                            <div style={{ height: '60%', background: th.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
-                                                <div style={{ width: 10, height: 8, borderRadius: '1px 5px 5px 5px', background: th.theirBubble, border: `0.5px solid ${th.theirBorder}` }} />
-                                                <div style={{ width: 10, height: 8, borderRadius: '5px 1px 5px 5px', background: th.myBubble }} />
-                                            </div>
-                                        </div>
-                                        <div style={{ fontSize: 9, color: sharedThemeId === th.id ? th.point : t.subText, whiteSpace: 'nowrap' }}>{th.name}</div>
-                                    </div>
-                                ))}
+                <div style={{ position: 'fixed', top: 49, left: 0, right: 0, bottom: 0, zIndex: 50, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }} onClick={() => setShowTheme(false)}>
+                    <div style={{ background: t.panel, padding: '12px 14px', borderBottom: `0.5px solid ${t.border}`, maxWidth: 480, margin: '0 auto', width: '100%' }} onClick={e => e.stopPropagation()}>
+                        <div style={{ fontSize: 11, color: t.subText, marginBottom: 10 }}>채팅방 테마 설정</div>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, padding: '8px 10px', background: t.bg, borderRadius: 8, border: `0.5px solid ${t.border}` }}>
+                            <div>
+                                <div style={{ fontSize: 12, color: t.theirText }}>공유 테마 따라가기</div>
+                                <div style={{ fontSize: 10, color: t.subText, marginTop: 2 }}>방장이 설정한 테마로 보기</div>
+                            </div>
+                            <div onClick={() => toggleFollow(!followShared)} style={{ width: 40, height: 22, borderRadius: 11, cursor: 'pointer', transition: 'background 0.2s', background: followShared ? t.point : t.border, position: 'relative', flexShrink: 0 }}>
+                                <div style={{ position: 'absolute', top: 3, left: followShared ? 20 : 3, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
                             </div>
                         </div>
-                    )}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <div style={{ fontSize: 12, color: t.subText, width: 70 }}>읽음 확인</div>
-                        <div style={{ display: 'flex', gap: 6 }}>
-                            {['text', 'number', 'none'].map(s => (
-                                <button key={s} onClick={async () => { setReadReceipt(s); await supabase.from('rooms').update({ read_receipt_style: s }).eq('id', roomId) }}
-                                    style={{ padding: '3px 9px', borderRadius: 10, fontSize: 11, cursor: 'pointer', border: readReceipt === s ? `1.5px solid ${t.point}` : `0.5px solid ${t.border}`, background: readReceipt === s ? t.point + '22' : 'none', color: readReceipt === s ? t.point : t.subText }}>
-                                    {s === 'text' ? '읽음' : s === 'number' ? '1' : '없음'}
-                                </button>
-                            ))}
+                        {isOwner && (
+                            <div style={{ marginBottom: 12 }}>
+                                <div style={{ fontSize: 11, color: t.subText, marginBottom: 8 }}>공유 테마 <span style={{ fontSize: 10, opacity: 0.6 }}>(방장만 변경 가능)</span></div>
+                                <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
+                                    {THEMES.map(th => (
+                                        <div key={th.id} onClick={() => saveSharedTheme(th.id)} style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                                            <div style={{ width: 44, height: 44, borderRadius: 10, overflow: 'hidden', border: sharedThemeId === th.id ? `2px solid ${th.point}` : `1px solid ${th.border}` }}>
+                                                <div style={{ height: '40%', background: th.panel, borderBottom: `0.5px solid ${th.border}` }} />
+                                                <div style={{ height: '60%', background: th.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
+                                                    <div style={{ width: 10, height: 8, borderRadius: '1px 5px 5px 5px', background: th.theirBubble, border: `0.5px solid ${th.theirBorder}` }} />
+                                                    <div style={{ width: 10, height: 8, borderRadius: '5px 1px 5px 5px', background: th.myBubble }} />
+                                                </div>
+                                            </div>
+                                            <div style={{ fontSize: 9, color: sharedThemeId === th.id ? th.point : t.subText, whiteSpace: 'nowrap' }}>{th.name}</div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <div style={{ fontSize: 12, color: t.subText, width: 70 }}>읽음 확인</div>
+                            <div style={{ display: 'flex', gap: 6 }}>
+                                {['text', 'number', 'none'].map(s => (
+                                    <button key={s} onClick={async () => { setReadReceipt(s); await supabase.from('rooms').update({ read_receipt_style: s }).eq('id', roomId) }}
+                                        style={{ padding: '3px 9px', borderRadius: 10, fontSize: 11, cursor: 'pointer', border: readReceipt === s ? `1.5px solid ${t.point}` : `0.5px solid ${t.border}`, background: readReceipt === s ? t.point + '22' : 'none', color: readReceipt === s ? t.point : t.subText }}>
+                                        {s === 'text' ? '읽음' : s === 'number' ? '1' : '없음'}
+                                    </button>
+                                ))}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -294,24 +321,45 @@ export default function Room() {
 
             {/* 검색 패널 */}
             {showSearch && (
-                <div style={{ background: t.panel, padding: '10px 14px', borderBottom: `0.5px solid ${t.border}` }}>
-                    <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="대사 검색..." autoFocus
-                        style={{ width: '100%', background: t.bg, border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '8px 12px', color: t.inputText, fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
-                    {searchQuery && <div style={{ marginTop: 8, fontSize: 11, color: t.subText }}>{filteredMessages.length}개 검색됨</div>}
+                <div style={{ position: 'fixed', top: 49, left: 0, right: 0, bottom: 0, zIndex: 50, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }} onClick={() => setShowSearch(false)}>
+                    <div style={{ background: t.panel, padding: '10px 14px', borderBottom: `0.5px solid ${t.border}`, maxWidth: 480, margin: '0 auto', width: '100%' }} onClick={e => e.stopPropagation()}>
+                        <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="대사 검색..." autoFocus
+                            style={{ width: '100%', background: t.bg, border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '8px 12px', color: t.inputText, fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
+                        {searchQuery && <div style={{ marginTop: 8, fontSize: 11, color: t.subText }}>{filteredMessages.length}개 검색됨</div>}
+                    </div>
                 </div>
             )}
 
             {/* 날짜 이동 패널 */}
             {showCalendar && (
-                <div style={{ background: t.panel, padding: '10px 14px', borderBottom: `0.5px solid ${t.border}` }}>
-                    <div style={{ fontSize: 11, color: t.subText, marginBottom: 8 }}>날짜로 이동</div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                        {availableDates.map(date => (
-                            <button key={date} onClick={() => {
-                                const target = messages.find(m => new Date(m.created_at).toLocaleDateString('ko-KR') === date)
-                                if (target) { document.getElementById('msg-' + target.id)?.scrollIntoView({ behavior: 'smooth', block: 'center' }); setShowCalendar(false) }
-                            }} style={{ padding: '4px 10px', borderRadius: 10, fontSize: 11, cursor: 'pointer', border: `0.5px solid ${t.border}`, background: 'none', color: t.subText }}>{date}</button>
-                        ))}
+                <div style={{ position: 'fixed', top: 49, left: 0, right: 0, bottom: 0, zIndex: 50, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }} onClick={() => setShowCalendar(false)}>
+                    <div style={{ background: t.panel, padding: '10px 14px', borderBottom: `0.5px solid ${t.border}`, maxWidth: 480, margin: '0 auto', width: '100%' }} onClick={e => e.stopPropagation()}>
+                        <div style={{ fontSize: 11, color: t.subText, marginBottom: 8 }}>날짜로 이동</div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                            {availableDates.map(date => (
+                                <button key={date} onClick={() => {
+                                    const target = messages.find(m => new Date(m.created_at).toLocaleDateString('ko-KR') === date)
+                                    if (target) { document.getElementById('msg-' + target.id)?.scrollIntoView({ behavior: 'smooth', block: 'center' }); setShowCalendar(false) }
+                                }} style={{ padding: '4px 10px', borderRadius: 10, fontSize: 11, cursor: 'pointer', border: `0.5px solid ${t.border}`, background: 'none', color: t.subText }}>{date}</button>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* 화수 입력 모달 */}
+            {showChapterInput && (
+                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div style={{ background: t.panel, borderRadius: 16, padding: 20, width: 280, border: `0.5px solid ${t.border}` }}>
+                        <div style={{ fontSize: 14, color: t.theirText, fontWeight: 500, marginBottom: 12 }}>화수 이름</div>
+                        <input value={chapterName} onChange={e => setChapterName(e.target.value)}
+                            onKeyDown={e => e.key === 'Enter' && submitChapter()}
+                            placeholder="예) 2화 · 균열" autoFocus
+                            style={{ width: '100%', background: t.bg, border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '9px 12px', color: t.inputText, fontSize: 13, outline: 'none', boxSizing: 'border-box', marginBottom: 12 }} />
+                        <div style={{ display: 'flex', gap: 8 }}>
+                            <button onClick={submitChapter} style={{ flex: 1, background: t.point, border: 'none', borderRadius: 8, padding: 9, color: '#fff', fontSize: 13, cursor: 'pointer' }}>추가</button>
+                            <button onClick={() => { setShowChapterInput(false); setChapterName('') }} style={{ flex: 1, background: 'none', border: `0.5px solid ${t.border}`, borderRadius: 8, padding: 9, color: t.subText, fontSize: 13, cursor: 'pointer' }}>취소</button>
+                        </div>
                     </div>
                 </div>
             )}
@@ -418,16 +466,18 @@ export default function Room() {
                     <button onClick={() => navigate('/characters')} style={{ width: '100%', background: 'none', border: `0.5px dashed ${t.border}`, borderRadius: 10, padding: '8px', color: t.subText, fontSize: 12, cursor: 'pointer', marginBottom: 8 }}>+ 캐릭터 추가하기</button>
                 )}
                 <div style={{ display: 'flex', gap: 7, alignItems: 'flex-end' }}>
-                    <button onClick={() => fileInputRef.current?.click()} style={{ width: 34, height: 34, borderRadius: '50%', border: `0.5px solid ${t.border}`, background: 'none', color: t.subText, fontSize: 20, cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
+                    <button onClick={() => fileInputRef.current?.click()} style={{ width: 36, height: 36, borderRadius: '50%', border: `0.5px solid ${t.border}`, background: 'none', color: t.subText, fontSize: 22, cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
                     <input type="file" accept="image/*,video/*,.gif" ref={fileInputRef} onChange={e => sendImage(e.target.files[0])} style={{ display: 'none' }} />
-                    <textarea value={input}
+                    <textarea
+                        ref={inputRef}
+                        value={input}
                         onChange={e => { setInput(e.target.value); e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 80) + 'px' }}
                         onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() } }}
                         placeholder={isNarrActive ? '나레이션 입력...' : activeChar ? `${activeChar.name}으로 입력...` : '캐릭터를 먼저 추가해주세요'}
                         rows={1}
                         style={{ flex: 1, background: t.inputBg, border: `0.5px solid ${isNarrActive ? t.point : t.border}`, borderRadius: 11, padding: '8px 11px', color: isNarrActive ? t.narrColor : t.inputText, fontSize: 13, outline: 'none', resize: 'none', fontFamily: 'sans-serif', lineHeight: 1.5, fontStyle: isNarrActive ? 'italic' : 'normal' }}
                     />
-                    <button onClick={sendMessage} style={{ width: 34, height: 34, borderRadius: '50%', border: 'none', background: activeChar?.color || t.point, color: '#fff', fontSize: 16, cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>›</button>
+                    <button onClick={sendMessage} style={{ width: 36, height: 36, borderRadius: '50%', border: 'none', background: activeChar?.color || t.point, color: '#fff', fontSize: 18, cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>›</button>
                 </div>
             </div>
         </div>
