@@ -46,6 +46,8 @@ export default function Room() {
     const fileInputRef = useRef(null)
     const messagesEndRef = useRef(null)
     const inputRef = useRef(null)
+    const isAtBottomRef = useRef(true)
+    const messageListRef = useRef(null)
 
     // 패널 하나만 열리도록
     const openPanel = (panel) => {
@@ -102,7 +104,18 @@ export default function Room() {
         return () => { if (channel) supabase.removeChannel(channel) }
     }, [roomId])
 
-    useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
+    // 스크롤: 맨 아래에 있을 때만 자동 스크롤
+    useEffect(() => {
+        if (isAtBottomRef.current) {
+            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+        }
+    }, [messages])
+
+    const handleScroll = () => {
+        const el = messageListRef.current
+        if (!el) return
+        isAtBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 60
+    }
 
     const fetchMessages = async () => {
         const { data } = await supabase
@@ -131,7 +144,7 @@ export default function Room() {
                     m.id === last.id ? { ...m, content: merged } : m
                 ))
                 setInput('')
-                setTimeout(() => inputRef.current?.focus(), 0)
+                inputRef.current?.focus()
                 await supabase.from('messages').update({ content: merged }).eq('id', last.id)
                 return
             }
@@ -151,10 +164,11 @@ export default function Room() {
             content, edited: false,
             created_at: new Date().toISOString()
         }
+        isAtBottomRef.current = true
         setMessages(prev => [...prev, tempMsg])
         setInput('')
         if (mode === 'narration') setMode('chat')
-        setTimeout(() => inputRef.current?.focus(), 0)
+        inputRef.current?.focus()
 
         await supabase.from('messages').insert({
             room_id: roomId, user_id: user.id,
@@ -182,12 +196,21 @@ export default function Room() {
     const submitChapter = async () => {
         if (!chapterName.trim()) return
         const { data: { user } } = await supabase.auth.getUser()
-        await supabase.from('messages').insert({
-            room_id: roomId, user_id: user.id,
-            type: 'chapter', content: chapterName.trim()
-        })
+        const tempChapter = {
+            id: 'temp-' + Date.now(),
+            room_id: roomId,
+            user_id: user.id,
+            type: 'chapter',
+            content: chapterName.trim(),
+            created_at: new Date().toISOString()
+        }
+        setMessages(prev => [...prev, tempChapter])
         setChapterName('')
         setShowChapterInput(false)
+        await supabase.from('messages').insert({
+            room_id: roomId, user_id: user.id,
+            type: 'chapter', content: tempChapter.content
+        })
     }
 
     const saveSharedTheme = async (id) => {
@@ -262,7 +285,7 @@ export default function Room() {
 
             {/* 초대 코드 패널 */}
             {showInvite && (
-                <div style={{ position: 'fixed', top: 49, left: 0, right: 0, bottom: 0, zIndex: 50, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }} onClick={() => setShowInvite(false)}>
+                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 50, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }} onClick={() => setShowInvite(false)}>
                     <div style={{ background: t.panel, padding: '14px 16px', borderBottom: `0.5px solid ${t.border}`, textAlign: 'center', maxWidth: 480, margin: '0 auto', width: '100%' }} onClick={e => e.stopPropagation()}>
                         <div style={{ fontSize: 11, color: t.subText, marginBottom: 4 }}>초대 코드</div>
                         <div style={{ fontSize: 22, fontWeight: 600, color: t.point, letterSpacing: 3 }}>{room?.invite_code}</div>
@@ -273,7 +296,7 @@ export default function Room() {
 
             {/* 테마 패널 */}
             {showTheme && (
-                <div style={{ position: 'fixed', top: 49, left: 0, right: 0, bottom: 0, zIndex: 50, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }} onClick={() => setShowTheme(false)}>
+                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 50, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }} onClick={() => setShowTheme(false)}>
                     <div style={{ background: t.panel, padding: '12px 14px', borderBottom: `0.5px solid ${t.border}`, maxWidth: 480, margin: '0 auto', width: '100%' }} onClick={e => e.stopPropagation()}>
                         <div style={{ fontSize: 11, color: t.subText, marginBottom: 10 }}>채팅방 테마 설정</div>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, padding: '8px 10px', background: t.bg, borderRadius: 8, border: `0.5px solid ${t.border}` }}>
@@ -321,7 +344,7 @@ export default function Room() {
 
             {/* 검색 패널 */}
             {showSearch && (
-                <div style={{ position: 'fixed', top: 49, left: 0, right: 0, bottom: 0, zIndex: 50, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }} onClick={() => setShowSearch(false)}>
+                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 50, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }} onClick={() => setShowSearch(false)}>
                     <div style={{ background: t.panel, padding: '10px 14px', borderBottom: `0.5px solid ${t.border}`, maxWidth: 480, margin: '0 auto', width: '100%' }} onClick={e => e.stopPropagation()}>
                         <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="대사 검색..." autoFocus
                             style={{ width: '100%', background: t.bg, border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '8px 12px', color: t.inputText, fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
@@ -332,7 +355,7 @@ export default function Room() {
 
             {/* 날짜 이동 패널 */}
             {showCalendar && (
-                <div style={{ position: 'fixed', top: 49, left: 0, right: 0, bottom: 0, zIndex: 50, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }} onClick={() => setShowCalendar(false)}>
+                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 50, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }} onClick={() => setShowCalendar(false)}>
                     <div style={{ background: t.panel, padding: '10px 14px', borderBottom: `0.5px solid ${t.border}`, maxWidth: 480, margin: '0 auto', width: '100%' }} onClick={e => e.stopPropagation()}>
                         <div style={{ fontSize: 11, color: t.subText, marginBottom: 8 }}>날짜로 이동</div>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
@@ -365,7 +388,11 @@ export default function Room() {
             )}
 
             {/* 메시지 목록 */}
-            <div style={{ flex: 1, padding: '12px 10px', display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto', background: t.bg }}>
+            <div
+                ref={messageListRef}
+                onScroll={handleScroll}
+                style={{ flex: 1, padding: '12px 10px', display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto', background: t.bg }}
+            >
                 {filteredMessages.map(msg => {
                     const isMine = msg.user_id === userId
                     const char = msg.characters
@@ -390,7 +417,7 @@ export default function Room() {
 
                     if (msg.type === 'image') return (
                         <div key={msg.id} id={'msg-' + msg.id} style={{ display: 'flex', flexDirection: isMine ? 'row-reverse' : 'row', alignItems: 'flex-end', gap: 6 }}>
-                            <div style={{ width: 26, height: 26, borderRadius: '50%', flexShrink: 0, background: char?.color || t.border, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 500, color: char?.text_color || t.subText }}>
+                            <div style={{ width: 36, height: 36, borderRadius: '50%', flexShrink: 0, background: char?.color || t.border, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 500, color: char?.text_color || t.subText }}>
                                 {char?.image_url ? <img src={char.image_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : char?.avatar_letter || '?'}
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMine ? 'flex-end' : 'flex-start' }}>
@@ -406,7 +433,7 @@ export default function Room() {
 
                     return (
                         <div key={msg.id} id={'msg-' + msg.id} style={{ display: 'flex', flexDirection: isMine ? 'row-reverse' : 'row', alignItems: 'flex-end', gap: 6 }}>
-                            <div style={{ width: 26, height: 26, borderRadius: '50%', flexShrink: 0, background: char?.color || t.border, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 500, color: char?.text_color || t.subText }}>
+                            <div style={{ width: 36, height: 36, borderRadius: '50%', flexShrink: 0, background: char?.color || t.border, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 500, color: char?.text_color || t.subText }}>
                                 {char?.image_url ? <img src={char.image_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : char?.avatar_letter || '?'}
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMine ? 'flex-end' : 'flex-start', maxWidth: '72%' }}>
