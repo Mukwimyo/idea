@@ -1,0 +1,14 @@
+{
+    "name": "이데아",
+    "short_name": "이데아",
+    "description": "1:1 역극 채팅 플랫폼",
+    "start_url": "/idea/",
+    "display": "standalone",
+    "background_color": "#1a1a2e",
+    "theme_color": "#7F77DD",
+    "icons": [{
+        "src": "/idea/favicon.svg",
+        "sizes": "any",
+        "type": "image/svg+xml"
+    }]
+}
