@@ -23,7 +23,7 @@ export default function App() {
   )
 
   return (
-    <BrowserRouter>
+    <BrowserRouter basename="/idea">
       <Routes>
         <Route path="/auth" element={!session ? <Auth /> : <Navigate to="/" />} />
         <Route path="/" element={session ? <RoomList /> : <Navigate to="/auth" />} />
