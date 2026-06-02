@@ -90,13 +90,24 @@ export default function Room() {
                 .on('postgres_changes', {
                     event: '*', schema: 'public', table: 'messages',
                     filter: `room_id=eq.${roomId}`
-                }, async () => {
-                    const { data } = await supabase
-                        .from('messages')
-                        .select('*, characters(name, color, text_color, avatar_letter, image_url)')
-                        .eq('room_id', roomId)
-                        .order('created_at', { ascending: true })
-                    if (data) setMessages(data)
+                }, async (payload) => {
+                    if (payload.eventType === 'INSERT') {
+                        const newMsg = payload.new
+                        const { data: char } = await supabase
+                            .from('characters')
+                            .select('name, color, text_color, avatar_letter, image_url')
+                            .eq('id', newMsg.character_id)
+                            .single()
+                        const fullMsg = { ...newMsg, characters: char || null }
+                        setMessages(prev => {
+                            // 내 temp 메시지 교체
+                            const hastemp = prev.find(m => m.id.toString().startsWith('temp-') && m.content === newMsg.content && m.user_id === newMsg.user_id)
+                            if (hastemp) return prev.map(m => m.id === hastemp.id ? fullMsg : m)
+                            return [...prev, fullMsg]
+                        })
+                    } else if (payload.eventType === 'UPDATE') {
+                        setMessages(prev => prev.map(m => m.id === payload.new.id ? { ...m, ...payload.new } : m))
+                    }
                 })
                 .subscribe()
         }
@@ -257,13 +268,13 @@ export default function Room() {
     })
 
     if (!theme) return (
-        <div style={{ minHeight: '100vh', background: '#1a1a2e', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ height: '100dvh', background: '#1a1a2e', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <div style={{ color: '#7F77DD', fontSize: 28 }}>✦</div>
         </div>
     )
 
     return (
-        <div style={{ minHeight: '100vh', background: t.bg, fontFamily: 'sans-serif', display: 'flex', flexDirection: 'column', maxWidth: 480, margin: '0 auto' }}>
+        <div style={{ height: '100dvh', background: t.bg, fontFamily: 'sans-serif', display: 'flex', flexDirection: 'column', maxWidth: 480, margin: '0 auto' }}>
 
             {/* 헤더 */}
             <div style={{ background: t.panel, borderBottom: `0.5px solid ${t.border}`, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 8, position: 'sticky', top: 0, zIndex: 10 }}>
@@ -407,11 +418,11 @@ export default function Room() {
 
                     if (msg.type === 'narration') return (
                         <div key={msg.id} id={'msg-' + msg.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: '2px 0' }}>
-                            <div style={{ display: 'flex', gap: 3 }}>{[0,1,2].map(i => <div key={i} style={{ width: 3, height: 3, borderRadius: '50%', background: t.narrColor }} />)}</div>
+                            <div style={{ display: 'flex', gap: 3 }}>{[0, 1, 2].map(i => <div key={i} style={{ width: 3, height: 3, borderRadius: '50%', background: t.narrColor }} />)}</div>
                             {msg.content.split('\n').map((line, i) => (
                                 <div key={i} style={{ fontSize: 11, color: t.narrColor, fontStyle: 'italic', textAlign: 'center', padding: '0 16px', lineHeight: 1.6 }}>{line}</div>
                             ))}
-                            <div style={{ display: 'flex', gap: 3 }}>{[0,1,2].map(i => <div key={i} style={{ width: 3, height: 3, borderRadius: '50%', background: t.narrColor }} />)}</div>
+                            <div style={{ display: 'flex', gap: 3 }}>{[0, 1, 2].map(i => <div key={i} style={{ width: 3, height: 3, borderRadius: '50%', background: t.narrColor }} />)}</div>
                         </div>
                     )
 
