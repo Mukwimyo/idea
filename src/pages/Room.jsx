@@ -515,7 +515,7 @@ export default function Room() {
                         rows={1}
                         style={{ flex: 1, background: t.inputBg, border: `0.5px solid ${isNarrActive ? t.point : t.border}`, borderRadius: 11, padding: '8px 11px', color: isNarrActive ? t.narrColor : t.inputText, fontSize: 13, outline: 'none', resize: 'none', fontFamily: 'sans-serif', lineHeight: 1.5, fontStyle: isNarrActive ? 'italic' : 'normal' }}
                     />
-                    <button onClick={sendMessage} style={{ width: 36, height: 36, borderRadius: '50%', border: 'none', background: activeChar?.color || t.point, color: '#fff', fontSize: 18, cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>›</button>
+                    <button onMouseDown={e => e.preventDefault()} onClick={sendMessage} style={{ width: 36, height: 36, borderRadius: '50%', border: 'none', background: activeChar?.color || t.point, color: '#fff', fontSize: 18, cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>›</button>
                 </div>
             </div>
         </div>
