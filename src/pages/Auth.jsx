@@ -17,7 +17,7 @@ export default function Auth() {
     } else {
       const { error } = await supabase.auth.signUp({ email, password })
       if (error) setMessage(error.message)
-      else setMessage('이메일을 확인해주세요!')
+      else setMessage('가입 완료! 로그인해주세요.')
     }
     setLoading(false)
   }

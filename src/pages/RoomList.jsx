@@ -10,26 +10,28 @@ export default function RoomList() {
   const [roomName, setRoomName] = useState('')
   const [inviteCode, setInviteCode] = useState('')
   const [loading, setLoading] = useState(false)
-  const [theme, setTheme] = useState(getTheme('dark-purple'))
+  const [theme, setTheme] = useState(null)
+  const [userId, setUserId] = useState(null)
   const navigate = useNavigate()
 
   useEffect(() => {
-    fetchRooms()
-    loadTheme()
+    init()
   }, [])
 
-  const loadTheme = async () => {
+  const init = async () => {
     const { data: { user } } = await supabase.auth.getUser()
+    setUserId(user.id)
     const { data } = await supabase.from('profiles').select('theme_id').eq('id', user.id).single()
-    if (data?.theme_id) setTheme(getTheme(data.theme_id))
+    setTheme(getTheme(data?.theme_id || 'dark-purple'))
+    fetchRooms(user.id)
   }
 
-  const fetchRooms = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
+  const fetchRooms = async (uid) => {
+    const id = uid || userId
     const { data } = await supabase
       .from('room_members')
       .select('room_id, rooms(*)')
-      .eq('user_id', user.id)
+      .eq('user_id', id)
     if (data) setRooms(data.map(d => d.rooms).filter(Boolean))
   }
 
@@ -66,6 +68,29 @@ export default function RoomList() {
     }
     setLoading(false)
   }
+
+  const deleteRoom = async (e, roomId, createdBy) => {
+    e.stopPropagation()
+    if (createdBy !== userId) {
+      alert('방장만 삭제할 수 있어요.')
+      return
+    }
+    if (!confirm('채팅방을 삭제할까요? 모든 대화 내용이 사라져요.')) return
+    await supabase.from('messages').delete().eq('room_id', roomId)
+    await supabase.from('room_members').delete().eq('room_id', roomId)
+    await supabase.from('bookmarks').delete().in('message_id',
+      (await supabase.from('messages').select('id').eq('room_id', roomId)).data?.map(m => m.id) || []
+    )
+    await supabase.from('rooms').delete().eq('id', roomId)
+    fetchRooms()
+  }
+
+  // 테마 로딩 전 빈 화면 방지
+  if (!theme) return (
+    <div style={{ minHeight: '100vh', background: '#1a1a2e', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ color: '#7F77DD', fontSize: 28 }}>✦</div>
+    </div>
+  )
 
   const t = theme
 
@@ -143,6 +168,11 @@ export default function RoomList() {
                 <div style={{ fontSize: 14, fontWeight: 500, color: t.theirText }}>{room.name}</div>
                 <div style={{ fontSize: 11, color: t.subText, marginTop: 2 }}>{room.chapter}</div>
               </div>
+              {room.created_by === userId && (
+                <button
+                  onClick={(e) => deleteRoom(e, room.id, room.created_by)}
+                  style={{ background: 'none', border: 'none', color: t.subText, fontSize: 16, cursor: 'pointer', padding: 4, opacity: 0.4 }}>🗑️</button>
+              )}
               <div style={{ fontSize: 18, color: t.subText, opacity: 0.5 }}>›</div>
             </div>
           ))}
