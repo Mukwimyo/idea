@@ -48,6 +48,7 @@ export default function Room() {
     const inputRef = useRef(null)
     const isAtBottomRef = useRef(true)
     const messageListRef = useRef(null)
+    const initialScrollDone = useRef(false)
 
     // 패널 하나만 열리도록
     const openPanel = (panel) => {
@@ -118,7 +119,9 @@ export default function Room() {
     // 스크롤: 맨 아래에 있을 때만 자동 스크롤
     useEffect(() => {
         if (isAtBottomRef.current) {
-            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+            const behavior = messages.length > 0 && !initialScrollDone.current ? 'instant' : 'smooth'
+            messagesEndRef.current?.scrollIntoView({ behavior })
+            initialScrollDone.current = true
         }
     }, [messages])
 
