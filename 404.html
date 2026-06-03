@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <script>
+        const path = window.location.pathname.replace('/idea', '') || '/'
+        sessionStorage.setItem('redirect', path)
+        window.location.replace('/idea/')
+    </script>
+</head>
+
+<body></body>
+
+</html>
