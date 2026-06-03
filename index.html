@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="ko">
-  <head>
+
+<head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta name="theme-color" content="#7F77DD" />
@@ -8,10 +9,19 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="이데아" />
     <link rel="manifest" href="/manifest.json" />
+    <script>
+        const redirect = sessionStorage.getItem('redirect')
+        if (redirect) {
+            sessionStorage.removeItem('redirect')
+            window.history.replaceState(null, '', '/idea' + redirect)
+        }
+    </script>
     <title>이데아</title>
-  </head>
-  <body>
+</head>
+
+<body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
-  </body>
+</body>
+
 </html>
