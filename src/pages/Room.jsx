@@ -24,8 +24,17 @@ const WINDOW_H = 240
 
 function SlotEntrance({ roomName, bgColor, pointColor, onDone }) {
     const reelRef = useRef(null)
+    const [dots, setDots] = useState('')
 
     useEffect(() => {
+        // entering... 효과 (2.6초 동안 2회 반복)
+        let count = 0
+        const interval = setInterval(() => {
+            count++
+            setDots('.'.repeat(count % 4))
+        }, 320)
+        setTimeout(() => clearInterval(interval), 2600)
+
         if (!reelRef.current || !roomName) return
         const reel = reelRef.current
 
@@ -69,7 +78,7 @@ function SlotEntrance({ roomName, bgColor, pointColor, onDone }) {
                         }
                     })
                     setTimeout(() => {
-                        const newOffset = targetIdx * ITEM_H - WINDOW_H / 2 + 32
+                        const newOffset = targetIdx * ITEM_H - WINDOW_H / 2 + 40
                         reel.style.transition = 'transform 0.5s ease'
                         reel.style.transform = `translateY(-${newOffset}px)`
                     }, 50)
@@ -86,9 +95,13 @@ function SlotEntrance({ roomName, bgColor, pointColor, onDone }) {
             background: bgColor,
             display: 'flex', flexDirection: 'column',
             alignItems: 'center', justifyContent: 'center',
-            gap: 16, fontFamily: 'sans-serif'
+            gap: 20, fontFamily: 'sans-serif'
         }}>
-            <div style={{ fontSize: 11, color: pointColor + '88', letterSpacing: 3 }}>entering</div>
+            <div style={{ fontSize: 13, color: pointColor + '88', letterSpacing: 3, width: 120 }}>
+                entering{dots}
+            </div>
+            {/* 위 구분선 */}
+            <div style={{ width: '60%', maxWidth: 260, height: 0.5, background: pointColor + '44' }} />
             <div style={{ height: `${WINDOW_H}px`, overflow: 'hidden', position: 'relative', width: '100%', maxWidth: 360 }}>
                 <div style={{
                     position: 'absolute', top: 0, left: 0, right: 0, height: 80, zIndex: 2,
@@ -100,6 +113,8 @@ function SlotEntrance({ roomName, bgColor, pointColor, onDone }) {
                 }} />
                 <div ref={reelRef} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', willChange: 'transform' }} />
             </div>
+            {/* 아래 구분선 */}
+            <div style={{ width: '60%', maxWidth: 260, height: 0.5, background: pointColor + '44' }} />
         </div>
     )
 }
