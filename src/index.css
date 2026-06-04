@@ -23,6 +23,7 @@ button {
 
 ::-webkit-scrollbar {
     width: 4px;
+    height: 4px;
 }
 
 ::-webkit-scrollbar-track {
@@ -30,6 +31,15 @@ button {
 }
 
 ::-webkit-scrollbar-thumb {
-    background: #3d3580;
+    background: var(--scrollbar-color, #3d3580);
     border-radius: 2px;
+}
+
+.chat-scroll::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-color, #3d3580);
+    transition: opacity 0.5s;
+}
+
+.chat-scroll.hide-scroll::-webkit-scrollbar-thumb {
+    background: transparent;
 }

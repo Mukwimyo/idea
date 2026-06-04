@@ -159,6 +159,8 @@ export default function Room() {
     const [showChapterInput, setShowChapterInput] = useState(false)
     const [chapterName, setChapterName] = useState('')
     const [showSlot, setShowSlot] = useState(true)
+    const [hideScroll, setHideScroll] = useState(false)
+    const scrollTimerRef = useRef(null)
     const fileInputRef = useRef(null)
     const messagesEndRef = useRef(null)
     const inputRef = useRef(null)
@@ -242,6 +244,9 @@ export default function Room() {
         const el = messageListRef.current
         if (!el) return
         isAtBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 60
+        setHideScroll(false)
+        clearTimeout(scrollTimerRef.current)
+        scrollTimerRef.current = setTimeout(() => setHideScroll(true), 1500)
     }
 
     const fetchMessages = async () => {
@@ -384,7 +389,7 @@ export default function Room() {
     )
 
     return (
-        <div style={{ height: '100dvh', background: t.bg, fontFamily: 'sans-serif', display: 'flex', flexDirection: 'column', maxWidth: 480, margin: '0 auto' }}>
+        <div style={{ height: '100dvh', background: t.bg, '--scrollbar-color': t.border, fontFamily: 'sans-serif', display: 'flex', flexDirection: 'column', maxWidth: 480, margin: '0 auto' }}>
 
             {showSlot && room && (
                 <SlotEntrance
@@ -515,6 +520,7 @@ export default function Room() {
             <div
                 ref={messageListRef}
                 onScroll={handleScroll}
+                className={`chat-scroll${hideScroll ? ' hide-scroll' : ''}`}
                 style={{ flex: 1, padding: '12px 10px', display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto', background: t.bg }}
             >
                 {filteredMessages.map(msg => {
