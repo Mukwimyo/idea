@@ -599,7 +599,7 @@ export default function Room() {
                         <span style={{ fontSize: 10, color: t.subText, flexShrink: 0 }}>나</span>
                         <div style={{ display: 'flex', gap: 5, flex: 1, flexWrap: 'wrap' }}>
                             {myChars.map(c => (
-                                <button key={c.id} onClick={() => { setActiveChar(c); setMode('chat') }}
+                                <button key={c.id} onMouseDown={e => e.preventDefault()} onClick={() => { setActiveChar(c); setMode('chat') }}
                                     style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 8px 3px 4px', borderRadius: 20, border: activeChar?.id === c.id && mode === 'chat' ? `1.5px solid ${c.color || t.point}` : `1px solid ${t.border}`, background: activeChar?.id === c.id && mode === 'chat' ? (c.color + '22') : 'none', cursor: 'pointer' }}>
                                     <div style={{ width: 18, height: 18, borderRadius: '50%', background: c.color || t.point, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, color: c.text_color || '#fff', overflow: 'hidden', flexShrink: 0 }}>
                                         {c.image_url ? <img src={c.image_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : c.avatar_letter}
@@ -608,7 +608,7 @@ export default function Room() {
                                 </button>
                             ))}
                         </div>
-                        <button onClick={() => setMode(mode === 'narration' ? 'chat' : 'narration')}
+                        <button onMouseDown={e => e.preventDefault()} onClick={() => setMode(mode === 'narration' ? 'chat' : 'narration')}
                             style={{ padding: '3px 9px', borderRadius: 20, fontSize: 11, cursor: 'pointer', border: isNarrActive ? `1.5px solid ${t.point}` : `1px solid ${t.border}`, background: isNarrActive ? t.point + '22' : 'none', color: isNarrActive ? t.narrColor : t.subText, flexShrink: 0 }}>나레이션</button>
                     </div>
                 )}
