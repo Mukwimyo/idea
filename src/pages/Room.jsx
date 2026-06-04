@@ -3,6 +3,100 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { supabase, uploadFile } from '../lib/supabase'
 import { THEMES, getTheme } from '../lib/themes'
 
+/* TODO: 나중에 Supabase messages 테이블에서 최근 chat 타입 메시지 content 가져오기 */
+const SLOT_DUMMY = [
+    '달빛 아래서', '붉은 실의 끝', '균열', '폭풍 전야', '잃어버린 기억',
+    '2화 · 귀환', '첫 번째 밤', '각성의 순간', '운명의 조각', '끝과 시작',
+    '별의 파편', '침묵의 무게', '이름 없는 감정', '거짓말쟁이', '마지막 선택',
+    '어둠 속 목소리', '기억의 잔해', '돌아오지 않는 봄', '상처 입은 날개', '약속의 의미',
+    '그 날의 온도', '지워지지 않는 것', '눈물의 이유', '새벽 세 시', '붕괴',
+]
+
+const ITEM_H = 48
+const WINDOW_H = 240
+
+function SlotEntrance({ roomName, bgColor, pointColor, onDone }) {
+    const reelRef = useRef(null)
+
+    useEffect(() => {
+        if (!reelRef.current || !roomName) return
+        const reel = reelRef.current
+
+        const shuffled = [...SLOT_DUMMY].sort(() => Math.random() - 0.5)
+        const before = shuffled.slice(0, 20)
+        const after = shuffled.slice(0, 8)
+        const items = [...before, roomName, ...after]
+        const targetIdx = before.length
+
+        reel.innerHTML = ''
+        reel.style.transition = 'none'
+        reel.style.transform = 'translateY(0)'
+
+        items.forEach((text) => {
+            const div = document.createElement('div')
+            div.textContent = text
+            div.style.cssText = `height:${ITEM_H}px;line-height:${ITEM_H}px;font-size:15px;color:${pointColor}33;white-space:nowrap;text-align:center;width:100%;font-family:sans-serif;transition:font-size 0.5s ease,color 0.5s ease,height 0.5s ease,line-height 0.5s ease;`
+            reel.appendChild(div)
+        })
+
+        const finalOffset = targetIdx * ITEM_H - WINDOW_H / 2 + ITEM_H / 2
+
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                reel.style.transition = 'transform 2.6s cubic-bezier(0.05, 0.9, 0.25, 1.0)'
+                reel.style.transform = `translateY(-${finalOffset}px)`
+
+                setTimeout(() => {
+                    const spans = reel.querySelectorAll('div')
+                    spans.forEach((s, i) => {
+                        const dist = Math.abs(i - targetIdx)
+                        if (dist === 0) {
+                            s.style.fontSize = '26px'
+                            s.style.fontWeight = '600'
+                            s.style.color = pointColor
+                            s.style.height = '64px'
+                            s.style.lineHeight = '64px'
+                        } else if (dist === 1) {
+                            s.style.fontSize = '17px'
+                            s.style.color = pointColor + '88'
+                        }
+                    })
+                    setTimeout(() => {
+                        const newOffset = targetIdx * ITEM_H - WINDOW_H / 2 + 32
+                        reel.style.transition = 'transform 0.5s ease'
+                        reel.style.transform = `translateY(-${newOffset}px)`
+                    }, 50)
+                }, 2500)
+
+                setTimeout(onDone, 3400)
+            })
+        })
+    }, [roomName])
+
+    return (
+        <div style={{
+            position: 'fixed', inset: 0, zIndex: 200,
+            background: bgColor,
+            display: 'flex', flexDirection: 'column',
+            alignItems: 'center', justifyContent: 'center',
+            gap: 16, fontFamily: 'sans-serif'
+        }}>
+            <div style={{ fontSize: 11, color: pointColor + '88', letterSpacing: 3 }}>entering</div>
+            <div style={{ height: `${WINDOW_H}px`, overflow: 'hidden', position: 'relative', width: '100%', maxWidth: 360 }}>
+                <div style={{
+                    position: 'absolute', top: 0, left: 0, right: 0, height: 80, zIndex: 2,
+                    background: `linear-gradient(to bottom, ${bgColor} 20%, transparent)`
+                }} />
+                <div style={{
+                    position: 'absolute', bottom: 0, left: 0, right: 0, height: 80, zIndex: 2,
+                    background: `linear-gradient(to top, ${bgColor} 20%, transparent)`
+                }} />
+                <div ref={reelRef} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', willChange: 'transform' }} />
+            </div>
+        </div>
+    )
+}
+
 function parseContent(text, actColor) {
     const parts = []
     const re = /(\([^)]*\)?)/g
@@ -40,9 +134,9 @@ export default function Room() {
     const [followShared, setFollowShared] = useState(true)
     const [myThemeId, setMyThemeId] = useState('dark-purple')
     const [isOwner, setIsOwner] = useState(false)
-    // 화수 커스텀 UI
     const [showChapterInput, setShowChapterInput] = useState(false)
     const [chapterName, setChapterName] = useState('')
+    const [showSlot, setShowSlot] = useState(true)
     const fileInputRef = useRef(null)
     const messagesEndRef = useRef(null)
     const inputRef = useRef(null)
@@ -50,7 +144,6 @@ export default function Room() {
     const messageListRef = useRef(null)
     const initialScrollDone = useRef(false)
 
-    // 패널 하나만 열리도록
     const openPanel = (panel) => {
         setShowInvite(panel === 'invite')
         setShowTheme(panel === 'theme')
@@ -101,7 +194,6 @@ export default function Room() {
                             .single()
                         const fullMsg = { ...newMsg, characters: char || null }
                         setMessages(prev => {
-                            // 내 temp 메시지 교체
                             const hastemp = prev.find(m => m.id.toString().startsWith('temp-') && m.content === newMsg.content && m.user_id === newMsg.user_id)
                             if (hastemp) return prev.map(m => m.id === hastemp.id ? fullMsg : m)
                             return [...prev, fullMsg]
@@ -116,7 +208,6 @@ export default function Room() {
         return () => { if (channel) supabase.removeChannel(channel) }
     }, [roomId])
 
-    // 스크롤: 맨 아래에 있을 때만 자동 스크롤
     useEffect(() => {
         if (isAtBottomRef.current) {
             const behavior = messages.length > 0 && !initialScrollDone.current ? 'instant' : 'smooth'
@@ -203,20 +294,14 @@ export default function Room() {
         alert('북마크에 추가됐어요!')
     }
 
-    const addChapter = () => {
-        setShowChapterInput(true)
-    }
+    const addChapter = () => setShowChapterInput(true)
 
     const submitChapter = async () => {
         if (!chapterName.trim()) return
         const { data: { user } } = await supabase.auth.getUser()
         const tempChapter = {
-            id: 'temp-' + Date.now(),
-            room_id: roomId,
-            user_id: user.id,
-            type: 'chapter',
-            content: chapterName.trim(),
-            created_at: new Date().toISOString()
+            id: 'temp-' + Date.now(), room_id: roomId, user_id: user.id,
+            type: 'chapter', content: chapterName.trim(), created_at: new Date().toISOString()
         }
         setMessages(prev => [...prev, tempChapter])
         setChapterName('')
@@ -279,6 +364,15 @@ export default function Room() {
     return (
         <div style={{ height: '100dvh', background: t.bg, fontFamily: 'sans-serif', display: 'flex', flexDirection: 'column', maxWidth: 480, margin: '0 auto' }}>
 
+            {showSlot && room && (
+                <SlotEntrance
+                    roomName={room.name}
+                    bgColor={t.bg}
+                    pointColor={t.point}
+                    onDone={() => setShowSlot(false)}
+                />
+            )}
+
             {/* 헤더 */}
             <div style={{ background: t.panel, borderBottom: `0.5px solid ${t.border}`, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 8, position: 'sticky', top: 0, zIndex: 10 }}>
                 <button onClick={() => navigate('/')} style={{ background: 'none', border: 'none', color: t.subText, fontSize: 24, cursor: 'pointer', padding: '0 4px' }}>‹</button>
@@ -297,9 +391,8 @@ export default function Room() {
                 ))}
             </div>
 
-            {/* 초대 코드 패널 */}
             {showInvite && (
-                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 50, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }} onClick={() => setShowInvite(false)}>
+                <div style={{ position: 'fixed', top: 49, left: 0, right: 0, bottom: 0, zIndex: 50, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }} onClick={() => setShowInvite(false)}>
                     <div style={{ background: t.panel, padding: '14px 16px', borderBottom: `0.5px solid ${t.border}`, textAlign: 'center', maxWidth: 480, margin: '0 auto', width: '100%' }} onClick={e => e.stopPropagation()}>
                         <div style={{ fontSize: 11, color: t.subText, marginBottom: 4 }}>초대 코드</div>
                         <div style={{ fontSize: 22, fontWeight: 600, color: t.point, letterSpacing: 3 }}>{room?.invite_code}</div>
@@ -308,9 +401,8 @@ export default function Room() {
                 </div>
             )}
 
-            {/* 테마 패널 */}
             {showTheme && (
-                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 50, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }} onClick={() => setShowTheme(false)}>
+                <div style={{ position: 'fixed', top: 49, left: 0, right: 0, bottom: 0, zIndex: 50, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }} onClick={() => setShowTheme(false)}>
                     <div style={{ background: t.panel, padding: '12px 14px', borderBottom: `0.5px solid ${t.border}`, maxWidth: 480, margin: '0 auto', width: '100%' }} onClick={e => e.stopPropagation()}>
                         <div style={{ fontSize: 11, color: t.subText, marginBottom: 10 }}>채팅방 테마 설정</div>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, padding: '8px 10px', background: t.bg, borderRadius: 8, border: `0.5px solid ${t.border}` }}>
@@ -356,9 +448,8 @@ export default function Room() {
                 </div>
             )}
 
-            {/* 검색 패널 */}
             {showSearch && (
-                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 50, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }} onClick={() => setShowSearch(false)}>
+                <div style={{ position: 'fixed', top: 49, left: 0, right: 0, bottom: 0, zIndex: 50, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }} onClick={() => setShowSearch(false)}>
                     <div style={{ background: t.panel, padding: '10px 14px', borderBottom: `0.5px solid ${t.border}`, maxWidth: 480, margin: '0 auto', width: '100%' }} onClick={e => e.stopPropagation()}>
                         <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="대사 검색..." autoFocus
                             style={{ width: '100%', background: t.bg, border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '8px 12px', color: t.inputText, fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
@@ -367,9 +458,8 @@ export default function Room() {
                 </div>
             )}
 
-            {/* 날짜 이동 패널 */}
             {showCalendar && (
-                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 50, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }} onClick={() => setShowCalendar(false)}>
+                <div style={{ position: 'fixed', top: 49, left: 0, right: 0, bottom: 0, zIndex: 50, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }} onClick={() => setShowCalendar(false)}>
                     <div style={{ background: t.panel, padding: '10px 14px', borderBottom: `0.5px solid ${t.border}`, maxWidth: 480, margin: '0 auto', width: '100%' }} onClick={e => e.stopPropagation()}>
                         <div style={{ fontSize: 11, color: t.subText, marginBottom: 8 }}>날짜로 이동</div>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
@@ -384,7 +474,6 @@ export default function Room() {
                 </div>
             )}
 
-            {/* 화수 입력 모달 */}
             {showChapterInput && (
                 <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <div style={{ background: t.panel, borderRadius: 16, padding: 20, width: 280, border: `0.5px solid ${t.border}` }}>
@@ -401,7 +490,6 @@ export default function Room() {
                 </div>
             )}
 
-            {/* 메시지 목록 */}
             <div
                 ref={messageListRef}
                 onScroll={handleScroll}
@@ -441,8 +529,8 @@ export default function Room() {
                         </div>
                     )
 
-                    const bubbleBg = isMine ? (char?.color || t.myBubble) : t.theirBubble
-                    const bubbleColor = isMine ? (char?.text_color || t.myText) : t.theirText
+                    const bubbleBg = isMine ? t.myBubble : t.theirBubble
+                    const bubbleColor = isMine ? t.myText : t.theirText
                     const actColor = isMine ? t.myAct : t.subText
 
                     return (
@@ -483,7 +571,6 @@ export default function Room() {
                 <div ref={messagesEndRef} />
             </div>
 
-            {/* 입력 영역 */}
             <div style={{ background: t.panel, borderTop: `0.5px solid ${t.border}`, padding: '8px 10px 12px' }}>
                 {myChars.length > 0 && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 7 }}>
