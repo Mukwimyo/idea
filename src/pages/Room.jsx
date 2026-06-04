@@ -593,7 +593,7 @@ export default function Room() {
                 <div ref={messagesEndRef} />
             </div>
 
-            <div style={{ background: t.panel, borderTop: `0.5px solid ${t.border}`, padding: '8px 10px 12px' }}>
+            <div style={{ background: t.panel, borderTop: `0.5px solid ${t.border}`, padding: '8px 10px 12px', touchAction: 'none' }}>
                 {myChars.length > 0 && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 7 }}>
                         <span style={{ fontSize: 10, color: t.subText, flexShrink: 0 }}>나</span>
