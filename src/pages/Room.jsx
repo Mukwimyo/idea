@@ -42,7 +42,7 @@ function SlotEntrance({ roomName, bgColor, pointColor, onDone }) {
         items.forEach((text) => {
             const div = document.createElement('div')
             div.textContent = text
-            div.style.cssText = `height:${ITEM_H}px;line-height:${ITEM_H}px;font-size:15px;color:${pointColor}33;white-space:nowrap;text-align:center;width:100%;font-family:sans-serif;transition:font-size 0.5s ease,color 0.5s ease,height 0.5s ease,line-height 0.5s ease;`
+            div.style.cssText = `height:${ITEM_H}px;line-height:${ITEM_H}px;font-size:20px;color:${pointColor}33;white-space:nowrap;text-align:center;width:100%;font-family:sans-serif;transition:font-size 0.5s ease,color 0.5s ease,height 0.5s ease,line-height 0.5s ease;`
             reel.appendChild(div)
         })
 
@@ -58,13 +58,13 @@ function SlotEntrance({ roomName, bgColor, pointColor, onDone }) {
                     spans.forEach((s, i) => {
                         const dist = Math.abs(i - targetIdx)
                         if (dist === 0) {
-                            s.style.fontSize = '26px'
+                            s.style.fontSize = '36px'
                             s.style.fontWeight = '600'
                             s.style.color = pointColor
-                            s.style.height = '64px'
-                            s.style.lineHeight = '64px'
+                            s.style.height = '80px'
+                            s.style.lineHeight = '80px'
                         } else if (dist === 1) {
-                            s.style.fontSize = '17px'
+                            s.style.fontSize = '22px'
                             s.style.color = pointColor + '88'
                         }
                     })
