@@ -108,13 +108,23 @@ function SlotEntrance({ roomName, bgColor, pointColor, onDone }) {
     )
 }
 
-function parseContent(text, actColor) {
+function parseContent(text, actColor, actionStyle) {
     const parts = []
     const re = /(\([^)]*\)?)/g
     let last = 0, m
     while ((m = re.exec(text)) !== null) {
         if (m.index > last) parts.push(<span key={last}>{text.slice(last, m.index)}</span>)
-        parts.push(<span key={m.index} style={{ fontSize: '0.85em', color: actColor, opacity: 0.8 }}>{m[0]}</span>)
+        const content = m[0]
+        // 이모지 포함 여부 감지
+        const hasEmoji = /\p{Emoji}/u.test(content)
+        const dimText = actionStyle === 'dim-all' || (actionStyle === 'dim-text' && !hasEmoji)
+        parts.push(
+            <span key={m.index} style={{
+                fontSize: '0.85em',
+                color: dimText ? actColor : 'inherit',
+                opacity: actionStyle === 'bright-all' ? 1 : dimText ? 0.8 : 1
+            }}>{content}</span>
+        )
         last = m.index + m[0].length
     }
     if (last < text.length) parts.push(<span key={last}>{text.slice(last)}</span>)
@@ -140,6 +150,7 @@ export default function Room() {
     const [searchQuery, setSearchQuery] = useState('')
     const [availableDates, setAvailableDates] = useState([])
     const [readReceipt, setReadReceipt] = useState('text')
+    const [actionStyle, setActionStyle] = useState('dim-all')
     const [theme, setTheme] = useState(null)
     const [sharedThemeId, setSharedThemeId] = useState('dark-purple')
     const [followShared, setFollowShared] = useState(true)
@@ -174,6 +185,7 @@ export default function Room() {
             const { data: roomData } = await supabase.from('rooms').select().eq('id', roomId).single()
             setRoom(roomData)
             setReadReceipt(roomData?.read_receipt_style || 'text')
+            setActionStyle(roomData?.action_style || 'dim-all')
             setIsOwner(roomData?.created_by === user.id)
 
             const { data: profile } = await supabase.from('profiles').select('theme_id').eq('id', user.id).single()
@@ -475,6 +487,26 @@ export default function Room() {
                                 ))}
                             </div>
                         </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10 }}>
+                            <div style={{ fontSize: 12, color: t.subText, width: 70 }}>지문 스타일</div>
+                            <div style={{ display: 'flex', gap: 6 }}>
+                                {[
+                                    { val: 'dim-all', label: '전체 흐리게' },
+                                    { val: 'dim-text', label: '이모지만 밝게' },
+                                    { val: 'bright-all', label: '전체 밝게' },
+                                ].map(s => (
+                                    <button key={s.val} onClick={async () => {
+                                        setActionStyle(s.val)
+                                        await supabase.from('rooms').update({ action_style: s.val }).eq('id', roomId)
+                                    }} style={{
+                                        padding: '3px 9px', borderRadius: 10, fontSize: 11, cursor: 'pointer',
+                                        border: actionStyle === s.val ? `1.5px solid ${t.point}` : `0.5px solid ${t.border}`,
+                                        background: actionStyle === s.val ? t.point + '22' : 'none',
+                                        color: actionStyle === s.val ? t.point : t.subText
+                                    }}>{s.label}</button>
+                                ))}
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}
@@ -586,7 +618,7 @@ export default function Room() {
                                 ) : (
                                     <div onDoubleClick={() => { if (isMine) { setEditingId(msg.id); setEditText(msg.content) } }}
                                         style={{ background: bubbleBg, color: bubbleColor, padding: '7px 11px', borderRadius: 12, fontSize: 13, lineHeight: 1.6, border: isMine ? 'none' : `0.5px solid ${t.theirBorder}`, cursor: isMine ? 'pointer' : 'default' }}>
-                                        {parseContent(msg.content, actColor)}
+                                        {parseContent(msg.content, actColor, actionStyle)}
                                         {msg.edited && <span style={{ fontSize: 9, opacity: 0.5, marginLeft: 4 }}>수정됨</span>}
                                     </div>
                                 )}
