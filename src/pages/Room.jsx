@@ -116,13 +116,13 @@ function parseContent(text, actColor, actionStyle) {
         if (m.index > last) parts.push(<span key={last}>{text.slice(last, m.index)}</span>)
         const content = m[0]
         // 이모지 포함 여부 감지
-        const hasEmoji = /\p{Emoji}/u.test(content)
-        const dimText = actionStyle === 'dim-all' || (actionStyle === 'dim-text' && !hasEmoji)
+        const hasEmoji = /\p{Emoji_Presentation}\p{Emoji_Modifier}?/u.test(content)
+const dimText = actionStyle === 'dim-all' || (actionStyle === 'dim-text' && !hasEmoji)
         parts.push(
             <span key={m.index} style={{
                 fontSize: '0.85em',
                 color: dimText ? actColor : 'inherit',
-                opacity: actionStyle === 'bright-all' ? 1 : dimText ? 0.8 : 1
+                opacity: dimText ? 0.6 : 1
             }}>{content}</span>
         )
         last = m.index + m[0].length
@@ -267,7 +267,7 @@ export default function Room() {
         if (!input.trim()) return
         const { data: { user } } = await supabase.auth.getUser()
         const isNarr = mode === 'narration'
-        const content = input.trim()
+        const content = input.trim().replace(/\(([^)]*$)/g, '($1)')
 
         if (isNarr && messages.length > 0) {
             const last = messages[messages.length - 1]
