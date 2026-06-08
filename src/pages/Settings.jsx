@@ -4,6 +4,19 @@ import { supabase } from '../lib/supabase'
 import { THEMES, getTheme } from '../lib/themes'
 import { ChevronLeft, ChevronRight, LogOut, Users } from 'lucide-react'
 
+const FONTS = [
+  { id: 'sans', name: '기본', family: 'sans-serif' },
+  { id: 'godo-b', name: '고도체 B', family: 'GodoB' },
+  { id: 'godo-m', name: '고도체 M', family: 'GodoM' },
+  { id: 'pretendard', name: '프리텐다드', family: 'Pretendard' },
+  { id: 'nanum-gothic', name: '나눔고딕', family: 'Nanum Gothic' },
+  { id: 'nanum-myeongjo', name: '나눔명조', family: 'Nanum Myeongjo' },
+  { id: 'noto-serif', name: '본명조', family: 'Noto Serif KR' },
+  { id: 'maru-buri', name: '마루부리', family: 'MaruBuri' },
+  { id: 'jeju-myeongjo', name: '제주명조', family: 'JejuMyeongjo' },
+  { id: 'aggro', name: '어그로체', family: 'SBAggroB' },
+]
+
 function ThemePreview({ t }) {
   return (
     <div style={{ width: 140, borderRadius: 10, overflow: 'hidden', border: `1.5px solid ${t.border}`, flexShrink: 0 }}>
@@ -34,13 +47,15 @@ export default function Settings() {
   const navigate = useNavigate()
   const [myThemeId, setMyThemeId] = useState('dark-purple')
   const [saving, setSaving] = useState(false)
+  const [myFontId, setMyFontId] = useState('sans')
 
   useEffect(() => { loadSettings() }, [])
 
   const loadSettings = async () => {
     const { data: { user } } = await supabase.auth.getUser()
-    const { data } = await supabase.from('profiles').select('theme_id').eq('id', user.id).single()
+    const { data } = await supabase.from('profiles').select('theme_id, font_id').eq('id', user.id).single()
     if (data?.theme_id) setMyThemeId(data.theme_id)
+    if (data?.font_id) setMyFontId(data.font_id)
   }
 
   const saveTheme = async (id) => {
@@ -49,6 +64,13 @@ export default function Settings() {
     const { data: { user } } = await supabase.auth.getUser()
     await supabase.from('profiles').update({ theme_id: id }).eq('id', user.id)
     setSaving(false)
+  }
+
+  const saveFont = async (id) => {
+    setMyFontId(id)
+    const { data: { user } } = await supabase.auth.getUser()
+    await supabase.from('profiles').update({ font_id: id }).eq('id', user.id)
+    document.body.style.fontFamily = FONTS.find(f => f.id === id)?.family || 'sans-serif'
   }
 
   const t = getTheme(myThemeId)
@@ -97,6 +119,19 @@ export default function Settings() {
         </div>
 
         <div style={{ height: 0.5, background: t.border, marginBottom: 28 }} />
+
+        <div style={{ marginBottom: 28 }}>
+          <div style={{ fontSize: 11, color: t.subText, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>폰트</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {FONTS.map(f => (
+              <div key={f.id} onClick={() => saveFont(f.id)}
+                style={{ background: t.panel, border: myFontId === f.id ? `1.5px solid ${t.point}` : `0.5px solid ${t.border}`, borderRadius: 10, padding: '10px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: 14, fontFamily: f.family, color: t.theirText }}>{f.name}</span>
+                <span style={{ fontSize: 12, fontFamily: f.family, color: t.subText }}>가나다 ABC 123</span>
+              </div>
+            ))}
+          </div>
+        </div>
 
         <div style={{ marginBottom: 28 }}>
           <div style={{ fontSize: 11, color: t.subText, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>계정</div>

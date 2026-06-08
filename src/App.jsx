@@ -7,12 +7,24 @@ import Room from './pages/Room'
 import Characters from './pages/Characters'
 import Settings from './pages/Settings'
 
+const FONT_MAP = { 'godo-b': 'GodoB', 'godo-m': 'GodoM', 'pretendard': 'Pretendard', 'nanum-gothic': 'Nanum Gothic', 'nanum-myeongjo': 'Nanum Myeongjo', 'noto-serif': 'Noto Serif KR', 'maru-buri': 'MaruBuri', 'jeju-myeongjo': 'JejuMyeongjo', 'aggro': 'SBAggroB' }
+
 export default function App() {
   const [session, setSession] = useState(undefined)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => setSession(session))
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => setSession(session))
+
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return
+      supabase.from('profiles').select('font_id').eq('id', user.id).single().then(({ data }) => {
+        if (data?.font_id && FONT_MAP[data.font_id]) {
+          document.body.style.fontFamily = FONT_MAP[data.font_id]
+        }
+      })
+    })
+
     return () => subscription.unsubscribe()
   }, [])
 
