@@ -108,6 +108,7 @@ function SlotEntrance({ roomName, bgColor, pointColor, onDone }) {
     )
 }
 
+// 찾을 것
 function parseContent(text, actColor, actionStyle) {
     const parts = []
     const re = /(\([^)]*\)?)/g
@@ -115,15 +116,34 @@ function parseContent(text, actColor, actionStyle) {
     while ((m = re.exec(text)) !== null) {
         if (m.index > last) parts.push(<span key={last}>{text.slice(last, m.index)}</span>)
         const content = m[0]
-        // 이모지 포함 여부 감지
         const hasEmoji = /\p{Emoji_Presentation}\p{Emoji_Modifier}?/u.test(content)
-const dimText = actionStyle === 'dim-all' || (actionStyle === 'dim-text' && !hasEmoji)
+        const dimText = actionStyle === 'dim-all' || (actionStyle === 'dim-text' && !hasEmoji)
         parts.push(
             <span key={m.index} style={{
                 fontSize: '0.85em',
                 color: dimText ? actColor : 'inherit',
                 opacity: dimText ? 0.6 : 1
             }}>{content}</span>
+        )
+        last = m.index + m[0].length
+    }
+    if (last < text.length) parts.push(<span key={last}>{text.slice(last)}</span>)
+    return parts
+}
+
+// 바꿀 것
+function parseContent(text, actColor, actionStyle) {
+    const parts = []
+    const re = /(\([^)]*\)?)/g
+    let last = 0, m
+    while ((m = re.exec(text)) !== null) {
+        if (m.index > last) parts.push(<span key={last}>{text.slice(last, m.index)}</span>)
+        parts.push(
+            <span key={m.index} style={{
+                fontSize: '0.85em',
+                color: actionStyle === 'dim' ? actColor : 'inherit',
+                opacity: actionStyle === 'dim' ? 0.6 : 1
+            }}>{m[0]}</span>
         )
         last = m.index + m[0].length
     }
@@ -150,7 +170,7 @@ export default function Room() {
     const [searchQuery, setSearchQuery] = useState('')
     const [availableDates, setAvailableDates] = useState([])
     const [readReceipt, setReadReceipt] = useState('text')
-    const [actionStyle, setActionStyle] = useState('dim-all')
+    const [actionStyle, setActionStyle] = useState('dim')
     const [theme, setTheme] = useState(null)
     const [sharedThemeId, setSharedThemeId] = useState('dark-purple')
     const [followShared, setFollowShared] = useState(true)
@@ -185,7 +205,7 @@ export default function Room() {
             const { data: roomData } = await supabase.from('rooms').select().eq('id', roomId).single()
             setRoom(roomData)
             setReadReceipt(roomData?.read_receipt_style || 'text')
-            setActionStyle(roomData?.action_style || 'dim-all')
+            setActionStyle(roomData?.action_style || 'dim')
             setIsOwner(roomData?.created_by === user.id)
 
             const { data: profile } = await supabase.from('profiles').select('theme_id').eq('id', user.id).single()
@@ -491,9 +511,8 @@ export default function Room() {
                             <div style={{ fontSize: 12, color: t.subText, width: 70 }}>지문 스타일</div>
                             <div style={{ display: 'flex', gap: 6 }}>
                                 {[
-                                    { val: 'dim-all', label: '전체 흐리게' },
-                                    { val: 'dim-text', label: '이모지만 밝게' },
-                                    { val: 'bright-all', label: '전체 밝게' },
+                                    { val: 'dim', label: '흐리게' },
+                                    { val: 'bright', label: '밝게' },
                                 ].map(s => (
                                     <button key={s.val} onClick={async () => {
                                         setActionStyle(s.val)
