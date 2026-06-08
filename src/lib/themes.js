@@ -48,7 +48,7 @@ export const THEMES = [{
         bg: '#111111',
         panel: '#1e1e1e',
         border: '#333333',
-        point: '#ffffff',
+        point: '#e0e0e0',
         myBubble: '#333333',
         myText: '#ffffff',
         myAct: '#aaaaaa',

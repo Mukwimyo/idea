@@ -94,7 +94,7 @@ function SlotEntrance({ roomName, bgColor, pointColor, onDone }) {
             alignItems: 'center', justifyContent: 'center',
             gap: 20, fontFamily: 'sans-serif'
         }}>
-            <div style={{ fontSize: 13, color: pointColor + '88', letterSpacing: 3, width: 120 }}>
+            <div style={{ fontSize: 20, color: pointColor + '88', letterSpacing: 3, textAlign: 'center', width: 160 }}>
                 entering{dots}
             </div>
             <div style={{ width: '60%', maxWidth: 260, height: 0.5, background: pointColor + '44' }} />

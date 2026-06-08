@@ -92,9 +92,9 @@ export default function RoomList() {
 
         {/* 헤더 */}
         <div style={{ display: 'flex', alignItems: 'center', marginBottom: 20, paddingTop: 8 }}>
-          <div style={{ fontSize: 20, color: t.theirText, fontWeight: 600 }}>✦ 이데아</div>
+          <div style={{ fontSize: 20, color: t.theirText, fontWeight: 600 }}>이데아</div>
           <button onClick={() => navigate('/characters')} style={{
-            marginLeft: 'auto', marginRight: 8, background: 'none', border: `0.5px solid ${t.border}`,
+            marginLeft: 'auto', marginRight: 8, background: 'none', border: `1px solid ${t.border}`, boxShadow: `0 1px 4px rgba(0,0,0,0.15)`,
             borderRadius: 8, padding: '6px 12px', color: t.subText, cursor: 'pointer',
             display: 'flex', alignItems: 'center', gap: 5
           }}>
@@ -102,7 +102,7 @@ export default function RoomList() {
             <span style={{ fontSize: 12 }}>캐릭터</span>
           </button>
           <button onClick={() => navigate('/settings')} style={{
-            background: 'none', border: `0.5px solid ${t.border}`,
+            background: 'none', border: `1px solid ${t.border}`, boxShadow: `0 1px 4px rgba(0,0,0,0.15)`,
             borderRadius: 8, padding: '6px 12px', color: t.subText, cursor: 'pointer',
             display: 'flex', alignItems: 'center', gap: 5
           }}>
@@ -115,40 +115,40 @@ export default function RoomList() {
         <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
           <button onClick={() => setShowCreate(true)} style={{
             flex: 1, background: t.point, border: 'none', borderRadius: 10,
-            padding: '10px', color: '#fff', fontSize: 13, cursor: 'pointer'
+            padding: '10px', color: t.bg, fontSize: 13, cursor: 'pointer'
           }}>+ 새 역극방</button>
           <button onClick={() => setShowJoin(true)} style={{
-            flex: 1, background: t.panel, border: `0.5px solid ${t.border}`, borderRadius: 10,
+            flex: 1, background: t.panel, border: `1px solid ${t.border}`, boxShadow: `0 1px 4px rgba(0,0,0,0.15)`, borderRadius: 10,
             padding: '10px', color: t.subText, fontSize: 13, cursor: 'pointer'
           }}>초대코드로 입장</button>
         </div>
 
         {/* 방 만들기 폼 */}
         {showCreate && (
-          <div style={{ background: t.panel, borderRadius: 12, padding: 14, marginBottom: 12, border: `0.5px solid ${t.border}` }}>
+          <div style={{ background: t.panel, borderRadius: 12, padding: 14, marginBottom: 12, border: `1px solid ${t.border}`, boxShadow: `0 1px 4px rgba(0,0,0,0.15)` }}>
             <div style={{ fontSize: 13, color: t.subText, marginBottom: 8 }}>채팅방 이름</div>
             <input value={roomName} onChange={e => setRoomName(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && createRoom()}
               placeholder="예) 세라핀 × 리온"
-              style={{ width: '100%', background: t.bg, border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '9px 12px', color: t.inputText, fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
+              style={{ width: '100%', background: t.bg, border: `1px solid ${t.border}`, boxShadow: `0 1px 4px rgba(0,0,0,0.15)`, borderRadius: 8, padding: '9px 12px', color: t.inputText, fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
             <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
               <button onClick={createRoom} disabled={loading} style={{ flex: 1, background: t.point, border: 'none', borderRadius: 8, padding: '9px', color: '#fff', fontSize: 12, cursor: 'pointer' }}>만들기</button>
-              <button onClick={() => setShowCreate(false)} style={{ flex: 1, background: 'none', border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '9px', color: t.subText, fontSize: 12, cursor: 'pointer' }}>취소</button>
+              <button onClick={() => setShowCreate(false)} style={{ flex: 1, background: 'none', border: `1px solid ${t.border}`, boxShadow: `0 1px 4px rgba(0,0,0,0.15)`, borderRadius: 8, padding: '9px', color: t.subText, fontSize: 12, cursor: 'pointer' }}>취소</button>
             </div>
           </div>
         )}
 
         {/* 초대코드 입장 폼 */}
         {showJoin && (
-          <div style={{ background: t.panel, borderRadius: 12, padding: 14, marginBottom: 12, border: `0.5px solid ${t.border}` }}>
+          <div style={{ background: t.panel, borderRadius: 12, padding: 14, marginBottom: 12, border: `1px solid ${t.border}`, boxShadow: `0 1px 4px rgba(0,0,0,0.15)` }}>
             <div style={{ fontSize: 13, color: t.subText, marginBottom: 8 }}>초대 코드</div>
             <input value={inviteCode} onChange={e => setInviteCode(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && joinRoom()}
               placeholder="8자리 코드 입력"
-              style={{ width: '100%', background: t.bg, border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '9px 12px', color: t.inputText, fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
+              style={{ width: '100%', background: t.bg, border: `1px solid ${t.border}`, boxShadow: `0 1px 4px rgba(0,0,0,0.15)`, borderRadius: 8, padding: '9px 12px', color: t.inputText, fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
             <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
               <button onClick={joinRoom} disabled={loading} style={{ flex: 1, background: t.point, border: 'none', borderRadius: 8, padding: '9px', color: '#fff', fontSize: 12, cursor: 'pointer' }}>입장</button>
-              <button onClick={() => setShowJoin(false)} style={{ flex: 1, background: 'none', border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '9px', color: t.subText, fontSize: 12, cursor: 'pointer' }}>취소</button>
+              <button onClick={() => setShowJoin(false)} style={{ flex: 1, background: 'none', border: `1px solid ${t.border}`, boxShadow: `0 1px 4px rgba(0,0,0,0.15)`, borderRadius: 8, padding: '9px', color: t.subText, fontSize: 12, cursor: 'pointer' }}>취소</button>
             </div>
           </div>
         )}
@@ -162,7 +162,7 @@ export default function RoomList() {
           )}
           {rooms.map(room => (
             <div key={room.id} onClick={() => navigate(`/room/${room.id}`)}
-              style={{ background: t.panel, borderRadius: 12, padding: '13px 15px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, border: `0.5px solid ${t.border}` }}>
+              style={{ background: t.panel, borderRadius: 12, padding: '13px 15px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, border: `1px solid ${t.border}`, boxShadow: `0 1px 4px rgba(0,0,0,0.15)` }}>
               <div style={{ width: 40, height: 40, borderRadius: '50%', background: t.point, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, color: '#fff', flexShrink: 0 }}>✦</div>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 14, fontWeight: 500, color: t.theirText }}>{room.name}</div>
