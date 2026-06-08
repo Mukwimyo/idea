@@ -673,7 +673,17 @@ export default function Room() {
                     <textarea
                         ref={inputRef}
                         value={input}
-                        onChange={e => { setInput(e.target.value); e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 80) + 'px' }}
+                        onChange={e => {
+                            let val = e.target.value
+                            const pos = e.target.selectionStart
+                            if (val.length === input.length + 1 && val[pos - 1] === '(') {
+                                val = val.slice(0, pos) + ')' + val.slice(pos)
+                                setTimeout(() => { inputRef.current.selectionStart = inputRef.current.selectionEnd = pos }, 0)
+                            }
+                            setInput(val)
+                            e.target.style.height = 'auto'
+                            e.target.style.height = Math.min(e.target.scrollHeight, 80) + 'px'
+                        }}
                         onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() } }}
                         placeholder={isNarrActive ? '나레이션 입력...' : activeChar ? `${activeChar.name}으로 입력...` : '캐릭터를 먼저 추가해주세요'}
                         rows={1}
