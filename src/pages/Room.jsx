@@ -2,16 +2,14 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase, uploadFile } from '../lib/supabase'
 import { THEMES, getTheme } from '../lib/themes'
+import { ChevronLeft, Link2, BookmarkPlus, Settings, Search, Calendar, Paperclip, ArrowUp, Bookmark } from 'lucide-react'
 
 /* TODO: 나중에 Supabase messages 테이블에서 최근 chat 타입 메시지 content 가져오기 */
 const SLOT_DUMMY = [
-    // 고유명사
-    '아르카디아', '세렌디아',
-    '발타자르', '엘리시온', '카르타고', '미스트헤임', '아스가르트',
+    '아르카디아', '세렌디아', '발타자르', '엘리시온', '카르타고', '미스트헤임', '아스가르트',
     '티베리우스', '에오스테르', '네크로폴리스', '이스칸다르', '팔레스트리나',
     '솔리투도', '아우로라', '크림슨 홀', '아르테미시아', '에테르나',
     '라그나렉', '세라피나', '루시페리아', '발할라', '사라진 카리나',
-    // 장소
     '황혼의 언덕', '안개 낀 숲', '폐역 플랫폼', '무너진 등대', '달빛 호수',
     '버려진 극장', '균열된 거울 속', '세계의 끝', '첫눈의 밤', '불타는 궁전',
     '빗속 골목길', '끝없는 복도', '지하 서고', '잊혀진 신전', '기억의 잔해',
@@ -27,7 +25,6 @@ function SlotEntrance({ roomName, bgColor, pointColor, onDone }) {
     const [dots, setDots] = useState('')
 
     useEffect(() => {
-        // entering... 효과 (2.6초 동안 2회 반복)
         let count = 0
         const interval = setInterval(() => {
             count++
@@ -100,20 +97,12 @@ function SlotEntrance({ roomName, bgColor, pointColor, onDone }) {
             <div style={{ fontSize: 13, color: pointColor + '88', letterSpacing: 3, width: 120 }}>
                 entering{dots}
             </div>
-            {/* 위 구분선 */}
             <div style={{ width: '60%', maxWidth: 260, height: 0.5, background: pointColor + '44' }} />
             <div style={{ height: `${WINDOW_H}px`, overflow: 'hidden', position: 'relative', width: '100%', maxWidth: 360 }}>
-                <div style={{
-                    position: 'absolute', top: 0, left: 0, right: 0, height: 80, zIndex: 2,
-                    background: `linear-gradient(to bottom, ${bgColor} 20%, transparent)`
-                }} />
-                <div style={{
-                    position: 'absolute', bottom: 0, left: 0, right: 0, height: 80, zIndex: 2,
-                    background: `linear-gradient(to top, ${bgColor} 20%, transparent)`
-                }} />
+                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 80, zIndex: 2, background: `linear-gradient(to bottom, ${bgColor} 20%, transparent)` }} />
+                <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 80, zIndex: 2, background: `linear-gradient(to top, ${bgColor} 20%, transparent)` }} />
                 <div ref={reelRef} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', willChange: 'transform' }} />
             </div>
-            {/* 아래 구분선 */}
             <div style={{ width: '60%', maxWidth: 260, height: 0.5, background: pointColor + '44' }} />
         </div>
     )
@@ -382,6 +371,16 @@ export default function Room() {
         return msg.content?.toLowerCase().includes(searchQuery.toLowerCase())
     })
 
+    const iconBtn = (onClick, icon, active) => ({
+        onClick,
+        style: {
+            background: active ? t.point + '22' : 'none',
+            border: `0.5px solid ${active ? t.point : t.border}`,
+            borderRadius: 8, padding: '6px 8px', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center'
+        }
+    })
+
     if (!theme) return (
         <div style={{ height: '100dvh', background: '#1a1a2e', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <div style={{ color: '#7F77DD', fontSize: 28 }}>✦</div>
@@ -392,32 +391,36 @@ export default function Room() {
         <div style={{ height: '100dvh', background: t.bg, '--scrollbar-color': t.border, fontFamily: 'sans-serif', display: 'flex', flexDirection: 'column', maxWidth: 480, margin: '0 auto' }}>
 
             {showSlot && room && (
-                <SlotEntrance
-                    roomName={room.name}
-                    bgColor={t.bg}
-                    pointColor={t.point}
-                    onDone={() => setShowSlot(false)}
-                />
+                <SlotEntrance roomName={room.name} bgColor={t.bg} pointColor={t.point} onDone={() => setShowSlot(false)} />
             )}
 
             {/* 헤더 */}
             <div style={{ background: t.panel, borderBottom: `0.5px solid ${t.border}`, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 8, position: 'sticky', top: 0, zIndex: 10 }}>
-                <button onClick={() => navigate('/')} style={{ background: 'none', border: 'none', color: t.subText, fontSize: 24, cursor: 'pointer', padding: '0 4px' }}>‹</button>
+                <button onClick={() => navigate('/')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 2px', display: 'flex', alignItems: 'center' }}>
+                    <ChevronLeft size={22} color={t.subText} />
+                </button>
                 <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 14, fontWeight: 500, color: t.theirText }}>{room?.name}</div>
                     <div style={{ fontSize: 10, color: t.subText }}>{room?.chapter}</div>
                 </div>
-                {[
-                    { label: '초대', key: 'invite', onClick: () => openPanel(showInvite ? null : 'invite') },
-                    { label: '+ 화수', key: 'chapter', onClick: addChapter },
-                    { label: '⚙️', key: 'theme', onClick: () => openPanel(showTheme ? null : 'theme') },
-                    { label: '🔍', key: 'search', onClick: () => openPanel(showSearch ? null : 'search') },
-                    { label: '📅', key: 'calendar', onClick: () => openPanel(showCalendar ? null : 'calendar') },
-                ].map(btn => (
-                    <button key={btn.key} onClick={btn.onClick} style={{ background: 'none', border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '6px 10px', color: t.subText, fontSize: 13, cursor: 'pointer' }}>{btn.label}</button>
-                ))}
+                <button {...iconBtn(() => openPanel(showInvite ? null : 'invite'), null, showInvite)}>
+                    <Link2 size={15} color={showInvite ? t.point : t.subText} />
+                </button>
+                <button {...iconBtn(addChapter, null, false)} style={{ ...iconBtn(addChapter, null, false).style, fontSize: 12, color: t.subText, gap: 3 }}>
+                    <BookmarkPlus size={15} color={t.subText} />
+                </button>
+                <button {...iconBtn(() => openPanel(showTheme ? null : 'theme'), null, showTheme)}>
+                    <Settings size={15} color={showTheme ? t.point : t.subText} />
+                </button>
+                <button {...iconBtn(() => openPanel(showSearch ? null : 'search'), null, showSearch)}>
+                    <Search size={15} color={showSearch ? t.point : t.subText} />
+                </button>
+                <button {...iconBtn(() => openPanel(showCalendar ? null : 'calendar'), null, showCalendar)}>
+                    <Calendar size={15} color={showCalendar ? t.point : t.subText} />
+                </button>
             </div>
 
+            {/* 초대 코드 패널 */}
             {showInvite && (
                 <div style={{ position: 'fixed', top: 49, left: 0, right: 0, bottom: 0, zIndex: 50, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }} onClick={() => setShowInvite(false)}>
                     <div style={{ background: t.panel, padding: '14px 16px', borderBottom: `0.5px solid ${t.border}`, textAlign: 'center', maxWidth: 480, margin: '0 auto', width: '100%' }} onClick={e => e.stopPropagation()}>
@@ -428,6 +431,7 @@ export default function Room() {
                 </div>
             )}
 
+            {/* 테마 패널 */}
             {showTheme && (
                 <div style={{ position: 'fixed', top: 49, left: 0, right: 0, bottom: 0, zIndex: 50, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }} onClick={() => setShowTheme(false)}>
                     <div style={{ background: t.panel, padding: '12px 14px', borderBottom: `0.5px solid ${t.border}`, maxWidth: 480, margin: '0 auto', width: '100%' }} onClick={e => e.stopPropagation()}>
@@ -475,6 +479,7 @@ export default function Room() {
                 </div>
             )}
 
+            {/* 검색 패널 */}
             {showSearch && (
                 <div style={{ position: 'fixed', top: 49, left: 0, right: 0, bottom: 0, zIndex: 50, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }} onClick={() => setShowSearch(false)}>
                     <div style={{ background: t.panel, padding: '10px 14px', borderBottom: `0.5px solid ${t.border}`, maxWidth: 480, margin: '0 auto', width: '100%' }} onClick={e => e.stopPropagation()}>
@@ -485,6 +490,7 @@ export default function Room() {
                 </div>
             )}
 
+            {/* 날짜 이동 패널 */}
             {showCalendar && (
                 <div style={{ position: 'fixed', top: 49, left: 0, right: 0, bottom: 0, zIndex: 50, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }} onClick={() => setShowCalendar(false)}>
                     <div style={{ background: t.panel, padding: '10px 14px', borderBottom: `0.5px solid ${t.border}`, maxWidth: 480, margin: '0 auto', width: '100%' }} onClick={e => e.stopPropagation()}>
@@ -501,6 +507,7 @@ export default function Room() {
                 </div>
             )}
 
+            {/* 화수 입력 모달 */}
             {showChapterInput && (
                 <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <div style={{ background: t.panel, borderRadius: 16, padding: 20, width: 280, border: `0.5px solid ${t.border}` }}>
@@ -517,6 +524,7 @@ export default function Room() {
                 </div>
             )}
 
+            {/* 메시지 목록 */}
             <div
                 ref={messageListRef}
                 onScroll={handleScroll}
@@ -590,7 +598,9 @@ export default function Room() {
                                             : new Date(msg.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
                                         }
                                     </div>
-                                    <button onClick={() => bookmarkMessage(msg.id)} style={{ background: 'none', border: 'none', color: t.subText, fontSize: 11, cursor: 'pointer', padding: 0, opacity: 0.5 }}>🔖</button>
+                                    <button onClick={() => bookmarkMessage(msg.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, opacity: 0.4, display: 'flex', alignItems: 'center' }}>
+                                        <Bookmark size={12} color={t.subText} />
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -599,6 +609,7 @@ export default function Room() {
                 <div ref={messagesEndRef} />
             </div>
 
+            {/* 입력 영역 */}
             <div style={{ background: t.panel, borderTop: `0.5px solid ${t.border}`, padding: '8px 10px 12px', touchAction: 'none' }}>
                 {myChars.length > 0 && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 7 }}>
@@ -622,7 +633,10 @@ export default function Room() {
                     <button onClick={() => navigate('/characters')} style={{ width: '100%', background: 'none', border: `0.5px dashed ${t.border}`, borderRadius: 10, padding: '8px', color: t.subText, fontSize: 12, cursor: 'pointer', marginBottom: 8 }}>+ 캐릭터 추가하기</button>
                 )}
                 <div style={{ display: 'flex', gap: 7, alignItems: 'flex-end' }}>
-                    <button onMouseDown={e => e.preventDefault()} onClick={() => fileInputRef.current?.click()} style={{ width: 36, height: 36, borderRadius: '50%', border: `0.5px solid ${t.border}`, background: 'none', color: t.subText, fontSize: 22, cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
+                    <button onMouseDown={e => e.preventDefault()} onClick={() => fileInputRef.current?.click()}
+                        style={{ width: 36, height: 36, borderRadius: '50%', border: `0.5px solid ${t.border}`, background: 'none', cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Paperclip size={16} color={t.subText} />
+                    </button>
                     <input type="file" accept="image/*,video/*,.gif" ref={fileInputRef} onChange={e => sendImage(e.target.files[0])} style={{ display: 'none' }} />
                     <textarea
                         ref={inputRef}
@@ -633,7 +647,10 @@ export default function Room() {
                         rows={1}
                         style={{ flex: 1, background: t.inputBg, border: `0.5px solid ${isNarrActive ? t.point : t.border}`, borderRadius: 11, padding: '8px 11px', color: isNarrActive ? t.narrColor : t.inputText, fontSize: 13, outline: 'none', resize: 'none', fontFamily: 'sans-serif', lineHeight: 1.5, fontStyle: isNarrActive ? 'italic' : 'normal' }}
                     />
-                    <button onMouseDown={e => e.preventDefault()} onClick={sendMessage} style={{ width: 36, height: 36, borderRadius: '50%', border: 'none', background: t.point, color: '#fff', fontSize: 22, fontWeight: 700, cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}>›</button>
+                    <button onMouseDown={e => e.preventDefault()} onClick={sendMessage}
+                        style={{ width: 36, height: 36, borderRadius: '50%', border: 'none', background: t.point, cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <ArrowUp size={18} color='#fff' strokeWidth={2.5} />
+                    </button>
                 </div>
             </div>
         </div>

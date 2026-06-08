@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { getTheme } from '../lib/themes'
+import { Settings, Users, ChevronRight, Trash2 } from 'lucide-react'
 
 export default function RoomList() {
   const [rooms, setRooms] = useState([])
@@ -14,9 +15,7 @@ export default function RoomList() {
   const [userId, setUserId] = useState(null)
   const navigate = useNavigate()
 
-  useEffect(() => {
-    init()
-  }, [])
+  useEffect(() => { init() }, [])
 
   const init = async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -71,21 +70,14 @@ export default function RoomList() {
 
   const deleteRoom = async (e, roomId, createdBy) => {
     e.stopPropagation()
-    if (createdBy !== userId) {
-      alert('방장만 삭제할 수 있어요.')
-      return
-    }
+    if (createdBy !== userId) { alert('방장만 삭제할 수 있어요.'); return }
     if (!confirm('채팅방을 삭제할까요? 모든 대화 내용이 사라져요.')) return
     await supabase.from('messages').delete().eq('room_id', roomId)
     await supabase.from('room_members').delete().eq('room_id', roomId)
-    await supabase.from('bookmarks').delete().in('message_id',
-      (await supabase.from('messages').select('id').eq('room_id', roomId)).data?.map(m => m.id) || []
-    )
     await supabase.from('rooms').delete().eq('id', roomId)
     fetchRooms()
   }
 
-  // 테마 로딩 전 빈 화면 방지
   if (!theme) return (
     <div style={{ minHeight: '100vh', background: '#1a1a2e', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div style={{ color: '#7F77DD', fontSize: 28 }}>✦</div>
@@ -103,12 +95,20 @@ export default function RoomList() {
           <div style={{ fontSize: 20, color: t.theirText, fontWeight: 600 }}>✦ 이데아</div>
           <button onClick={() => navigate('/characters')} style={{
             marginLeft: 'auto', marginRight: 8, background: 'none', border: `0.5px solid ${t.border}`,
-            borderRadius: 8, padding: '5px 12px', color: t.subText, fontSize: 12, cursor: 'pointer'
-          }}>캐릭터</button>
+            borderRadius: 8, padding: '6px 12px', color: t.subText, cursor: 'pointer',
+            display: 'flex', alignItems: 'center', gap: 5
+          }}>
+            <Users size={14} color={t.subText} />
+            <span style={{ fontSize: 12 }}>캐릭터</span>
+          </button>
           <button onClick={() => navigate('/settings')} style={{
             background: 'none', border: `0.5px solid ${t.border}`,
-            borderRadius: 8, padding: '5px 12px', color: t.subText, fontSize: 12, cursor: 'pointer'
-          }}>⚙️ 설정</button>
+            borderRadius: 8, padding: '6px 12px', color: t.subText, cursor: 'pointer',
+            display: 'flex', alignItems: 'center', gap: 5
+          }}>
+            <Settings size={14} color={t.subText} />
+            <span style={{ fontSize: 12 }}>설정</span>
+          </button>
         </div>
 
         {/* 방 만들기 / 입장 */}
@@ -169,11 +169,12 @@ export default function RoomList() {
                 <div style={{ fontSize: 11, color: t.subText, marginTop: 2 }}>{room.chapter}</div>
               </div>
               {room.created_by === userId && (
-                <button
-                  onClick={(e) => deleteRoom(e, room.id, room.created_by)}
-                  style={{ background: 'none', border: 'none', color: t.subText, fontSize: 16, cursor: 'pointer', padding: 4, opacity: 0.4 }}>🗑️</button>
+                <button onMouseDown={e => e.stopPropagation()} onClick={(e) => deleteRoom(e, room.id, room.created_by)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, opacity: 0.4, display: 'flex', alignItems: 'center' }}>
+                  <Trash2 size={15} color={t.subText} />
+                </button>
               )}
-              <div style={{ fontSize: 18, color: t.subText, opacity: 0.5 }}>›</div>
+              <ChevronRight size={18} color={t.subText} opacity={0.5} />
             </div>
           ))}
         </div>
