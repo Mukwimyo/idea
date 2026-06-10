@@ -396,7 +396,7 @@ export default function Room() {
     )
 
     return (
-        <div style={{ height: '100dvh', background: t.bg, '--scrollbar-color': t.border, fontFamily: 'sans-serif', display: 'flex', flexDirection: 'column', maxWidth: 480, margin: '0 auto' }}>
+        <div style={{ height: '100dvh', background: t.bg, '--scrollbar-color': t.border, display: 'flex', flexDirection: 'column', maxWidth: 480, margin: '0 auto' }}>
 
             {showSlot && room && (
                 <SlotEntrance roomName={room.name} bgColor={t.bg} pointColor={t.point} onDone={() => setShowSlot(false)} />

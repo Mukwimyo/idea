@@ -99,7 +99,7 @@ export default function Characters() {
     const t = theme
 
     return (
-        <div style={{ minHeight: '100vh', background: t.bg, fontFamily: 'sans-serif', padding: 16 }}>
+        <div style={{ minHeight: '100vh', background: t.bg, padding: 16 }}>
             <div style={{ maxWidth: 400, margin: '0 auto' }}>
                 <div style={{ display: 'flex', alignItems: 'center', marginBottom: 20, paddingTop: 8 }}>
                     <button onClick={() => navigate(-1)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 4px', marginRight: 8, display: 'flex', alignItems: 'center' }}>
@@ -133,7 +133,7 @@ export default function Characters() {
                         <input value={avatarLetter} onChange={e => setAvatarLetter(e.target.value.slice(0, 2))} placeholder="아바타 글자 (이미지 없을 때 표시)"
                             style={{ width: '100%', background: t.bg, border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '9px 12px', color: t.inputText, fontSize: 13, outline: 'none', boxSizing: 'border-box', marginBottom: 8 }} />
                         <textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="캐릭터 설명 (선택)"
-                            style={{ width: '100%', background: t.bg, border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '9px 12px', color: t.inputText, fontSize: 13, outline: 'none', boxSizing: 'border-box', resize: 'none', height: 70, fontFamily: 'sans-serif', marginBottom: 10 }} />
+                            style={{ width: '100%', background: t.bg, border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '9px 12px', color: t.inputText, fontSize: 13, outline: 'none', boxSizing: 'border-box', resize: 'none', height: 70,marginBottom: 10 }} />
                         <div style={{ fontSize: 11, color: t.subText, marginBottom: 7 }}>말풍선 색상</div>
                         <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
                             {COLORS.map((c, i) => (

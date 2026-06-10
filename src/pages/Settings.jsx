@@ -13,7 +13,7 @@ const FONTS = [
   { id: 'nanum-myeongjo', name: '나눔명조', family: 'Nanum Myeongjo' },
   { id: 'noto-serif', name: '본명조', family: 'Noto Serif KR' },
   { id: 'maru-buri', name: '마루부리', family: 'MaruBuri' },
-  { id: 'jeju-myeongjo', name: '제주명조', family: 'JejuMyeongjo' },
+  { id: 'jeju-myeongjo', name: '제주명조', family: 'Jeju Myeongjo' },
   { id: 'aggro', name: '어그로체', family: 'SBAggroB' },
 ]
 
@@ -78,7 +78,7 @@ export default function Settings() {
   const lightThemes = THEMES.filter(th => !th.dark)
 
   return (
-    <div style={{ minHeight: '100vh', background: t.bg, fontFamily: 'sans-serif', transition: 'background 0.3s' }}>
+    <div style={{ minHeight: '100vh', background: t.bg, transition: 'background 0.3s' }}>
       <div style={{ maxWidth: 480, margin: '0 auto', padding: 16 }}>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 24, paddingTop: 8 }}>

@@ -25,7 +25,7 @@ export default function Auth() {
   return (
     <div style={{
       minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: '#1a1a2e', fontFamily: 'sans-serif'
+      background: '#1a1a2e'
     }}>
       <div style={{
         background: '#2d2157', borderRadius: 20, padding: '32px 28px', width: 320,

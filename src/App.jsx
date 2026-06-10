@@ -7,7 +7,7 @@ import Room from './pages/Room'
 import Characters from './pages/Characters'
 import Settings from './pages/Settings'
 
-const FONT_MAP = { 'godo-b': 'GodoB', 'godo-m': 'GodoM', 'pretendard': 'Pretendard', 'nanum-gothic': 'Nanum Gothic', 'nanum-myeongjo': 'Nanum Myeongjo', 'noto-serif': 'Noto Serif KR', 'maru-buri': 'MaruBuri', 'jeju-myeongjo': 'JejuMyeongjo', 'aggro': 'SBAggroB' }
+const FONT_MAP = { 'godo-b': 'GodoB', 'godo-m': 'GodoM', 'pretendard': 'Pretendard', 'nanum-gothic': 'Nanum Gothic', 'nanum-myeongjo': 'Nanum Myeongjo', 'noto-serif': 'Noto Serif KR', 'maru-buri': 'MaruBuri', 'jeju-myeongjo': 'Jeju Myeongjo', 'aggro': 'SBAggroB' }
 
 export default function App() {
   const [session, setSession] = useState(undefined)
