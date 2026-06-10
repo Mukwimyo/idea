@@ -206,6 +206,7 @@ export default function Room() {
                     event: '*', schema: 'public', table: 'messages',
                     filter: `room_id=eq.${roomId}`
                 }, async (payload) => {
+                    console.log('realtime event:', payload.eventType, payload.new?.read_by)
                     if (payload.eventType === 'INSERT') {
                         const newMsg = payload.new
                         const { data: char } = await supabase
@@ -225,7 +226,11 @@ export default function Room() {
                                 .eq('id', newMsg.id)
                         }
                     } else if (payload.eventType === 'UPDATE') {
-                        setMessages(prev => prev.map(m => m.id === payload.new.id ? { ...m, ...payload.new } : m))
+                        setMessages(prev => prev.map(m =>
+                            m.id === payload.new.id
+                                ? { ...m, read_by: payload.new.read_by, edited: payload.new.edited, content: payload.new.content }
+                                : m
+                        ))
                     }
                 })
                 .subscribe()
@@ -267,14 +272,23 @@ export default function Room() {
 
     const markAsRead = async (msgs) => {
         const { data: { user } } = await supabase.auth.getUser()
-        console.log('userId:', user.id)
-        console.log('msgs:', msgs.map(m => ({ id: m.id, user_id: m.user_id, read_by: m.read_by, type: m.type })))
         const unread = msgs.filter(m =>
             m.user_id !== user.id &&
             !m.read_by?.includes(user.id) &&
-            m.type !== 'chapter'
+            m.type !== 'chapter' &&
+            !m.id.toString().startsWith('temp-')
         )
-        console.log('unread count:', unread.length)
+        if (unread.length === 0) return
+        await Promise.all(unread.map(m =>
+            supabase.from('messages')
+                .update({ read_by: [...(m.read_by || []), user.id] })
+                .eq('id', m.id)
+        ))
+        setMessages(prev => prev.map(m =>
+            unread.find(u => u.id === m.id)
+                ? { ...m, read_by: [...(m.read_by || []), user.id] }
+                : m
+        ))
     }
 
     const sendMessage = async () => {
@@ -636,7 +650,7 @@ export default function Room() {
                                     </div>
                                 )}
                                 <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 2 }}>
-                                    {isMine && readReceipt !== 'none' && msg.read_by?.length > 0 && (
+                                    {msg.user_id === userId && readReceipt !== 'none' && msg.read_by?.some(id => id !== msg.user_id) && (
                                         <div style={{ fontSize: 9, color: t.point }}>{readReceipt === 'text' ? '읽음' : '1'}</div>
                                     )}
                                     <div style={{ fontSize: 9, color: t.subText, opacity: 0.6 }}>

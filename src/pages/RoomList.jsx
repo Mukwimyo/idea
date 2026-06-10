@@ -87,7 +87,7 @@ export default function RoomList() {
   const t = theme
 
   return (
-    <div style={{ minHeight: '100vh', background: t.bg, fontFamily: 'sans-serif', padding: 16 }}>
+    <div style={{ minHeight: '100vh', background: t.bg, padding: 16 }}>
       <div style={{ maxWidth: 400, margin: '0 auto' }}>
 
         {/* 헤더 */}
