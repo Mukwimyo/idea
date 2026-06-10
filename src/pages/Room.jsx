@@ -157,6 +157,8 @@ export default function Room() {
     const [showSlot, setShowSlot] = useState(true)
     const [hideScroll, setHideScroll] = useState(false)
     const [newMsgAlert, setNewMsgAlert] = useState(false)
+    const [editingRoomName, setEditingRoomName] = useState(false)
+    const [roomNameText, setRoomNameText] = useState('')
     const scrollTimerRef = useRef(null)
     const fileInputRef = useRef(null)
     const messagesEndRef = useRef(null)
@@ -366,6 +368,13 @@ export default function Room() {
 
     const addChapter = () => setShowChapterInput(true)
 
+    const saveRoomName = async () => {
+        if (!roomNameText.trim()) return
+        await supabase.from('rooms').update({ name: roomNameText.trim() }).eq('id', roomId)
+        setRoom(prev => ({ ...prev, name: roomNameText.trim() }))
+        setEditingRoomName(false)
+    }
+
     const submitChapter = async () => {
         if (!chapterName.trim()) return
         const { data: { user } } = await supabase.auth.getUser()
@@ -548,6 +557,22 @@ export default function Room() {
                                 ))}
                             </div>
                         </div>
+                        {isOwner && (
+                            <div style={{ marginTop: 10 }}>
+                                <div style={{ fontSize: 12, color: t.subText, marginBottom: 6 }}>방 이름</div>
+                                <div style={{ display: 'flex', gap: 6 }}>
+                                    <input
+                                        value={roomNameText}
+                                        onChange={e => setRoomNameText(e.target.value)}
+                                        onFocus={() => setRoomNameText(room?.name || '')}
+                                        onKeyDown={e => e.key === 'Enter' && saveRoomName()}
+                                        placeholder={room?.name}
+                                        style={{ flex: 1, background: t.bg, border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '5px 10px', color: t.inputText, fontSize: 12, outline: 'none' }}
+                                    />
+                                    <button onClick={saveRoomName} style={{ background: t.point, border: 'none', borderRadius: 8, padding: '5px 12px', color: '#fff', fontSize: 12, cursor: 'pointer' }}>저장</button>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
