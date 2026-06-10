@@ -108,30 +108,6 @@ function SlotEntrance({ roomName, bgColor, pointColor, onDone }) {
     )
 }
 
-// 찾을 것
-function parseContent(text, actColor, actionStyle) {
-    const parts = []
-    const re = /(\([^)]*\)?)/g
-    let last = 0, m
-    while ((m = re.exec(text)) !== null) {
-        if (m.index > last) parts.push(<span key={last}>{text.slice(last, m.index)}</span>)
-        const content = m[0]
-        const hasEmoji = /\p{Emoji_Presentation}\p{Emoji_Modifier}?/u.test(content)
-        const dimText = actionStyle === 'dim-all' || (actionStyle === 'dim-text' && !hasEmoji)
-        parts.push(
-            <span key={m.index} style={{
-                fontSize: '0.85em',
-                color: dimText ? actColor : 'inherit',
-                opacity: dimText ? 0.6 : 1
-            }}>{content}</span>
-        )
-        last = m.index + m[0].length
-    }
-    if (last < text.length) parts.push(<span key={last}>{text.slice(last)}</span>)
-    return parts
-}
-
-// 바꿀 것
 function parseContent(text, actColor, actionStyle) {
     const parts = []
     const re = /(\([^)]*\)?)/g
