@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase, uploadFile } from '../lib/supabase'
 import { THEMES, getTheme } from '../lib/themes'
-import { ChevronLeft, Link2, BookmarkPlus, Settings, Search, Calendar, Paperclip, ArrowUp, Bookmark, Eye} from 'lucide-react'
+import { ChevronLeft, Link2, BookmarkPlus, Settings, Search, Calendar, Paperclip, ArrowUp, Bookmark, Eye } from 'lucide-react'
 
 /* TODO: 나중에 Supabase messages 테이블에서 최근 chat 타입 메시지 content 가져오기 */
 const SLOT_DUMMY = [
@@ -220,9 +220,10 @@ export default function Room() {
                             if (hastemp) return prev.map(m => m.id === hastemp.id ? fullMsg : m)
                             return [...prev, fullMsg]
                         })
-                        if (newMsg.user_id !== userId) {
-                            supabase.from('messages')
-                                .update({ read_by: [userId] })
+                        const { data: { user: currentUser } } = await supabase.auth.getUser()
+                        if (newMsg.user_id !== currentUser.id) {
+                            await supabase.from('messages')
+                                .update({ read_by: [...(newMsg.read_by || []), currentUser.id] })
                                 .eq('id', newMsg.id)
                         }
                     } else if (payload.eventType === 'UPDATE') {
