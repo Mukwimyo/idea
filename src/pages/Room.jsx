@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase, uploadFile } from '../lib/supabase'
 import { THEMES, getTheme } from '../lib/themes'
-import { ChevronLeft, Link2, BookmarkPlus, Settings, Search, Calendar, Paperclip, ArrowUp, Bookmark, Eye } from 'lucide-react'
+import { ChevronLeft, Link2, BookmarkPlus, Settings, Search, Calendar, Paperclip, ArrowUp, Bookmark, Eye, ArrowDown } from 'lucide-react'
 
 /* TODO: 나중에 Supabase messages 테이블에서 최근 chat 타입 메시지 content 가져오기 */
 const SLOT_DUMMY = [
@@ -156,6 +156,7 @@ export default function Room() {
     const [chapterName, setChapterName] = useState('')
     const [showSlot, setShowSlot] = useState(true)
     const [hideScroll, setHideScroll] = useState(false)
+    const [newMsgAlert, setNewMsgAlert] = useState(false)
     const scrollTimerRef = useRef(null)
     const fileInputRef = useRef(null)
     const messagesEndRef = useRef(null)
@@ -220,6 +221,11 @@ export default function Room() {
                             if (hastemp) return prev.map(m => m.id === hastemp.id ? fullMsg : m)
                             return [...prev, fullMsg]
                         })
+                        if (isAtBottomRef.current) {
+                            isAtBottomRef.current = true
+                        } else {
+                            setNewMsgAlert(true)
+                        }
                         const { data: { user: currentUser } } = await supabase.auth.getUser()
                         if (newMsg.user_id !== currentUser.id) {
                             await supabase.from('messages')
@@ -248,6 +254,12 @@ export default function Room() {
         }
     }, [messages])
 
+    const scrollToBottom = () => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'instant' })
+        setNewMsgAlert(false)
+        isAtBottomRef.current = true
+    }
+
     const handleScroll = () => {
         const el = messageListRef.current
         if (!el) return
@@ -255,6 +267,7 @@ export default function Room() {
         setHideScroll(false)
         clearTimeout(scrollTimerRef.current)
         scrollTimerRef.current = setTimeout(() => setHideScroll(true), 1500)
+        if (isAtBottomRef.current) setNewMsgAlert(false)
     }
 
     const fetchMessages = async () => {
@@ -585,11 +598,25 @@ export default function Room() {
             )}
 
             {/* 메시지 목록 */}
+            {newMsgAlert && (
+                <div onClick={scrollToBottom} style={{
+                    position: 'fixed', bottom: 110, left: '50%', transform: 'translateX(-50%)',
+                    zIndex: 20, background: t.panel,
+                    border: `1px solid ${t.border}`,
+                    color: t.theirText,
+                    padding: '6px 16px', borderRadius: 20, fontSize: 12,
+                    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
+                }}>
+                    <ArrowDown size={13} color='#fff' />
+                    새 대화
+                </div>
+            )}
             <div
                 ref={messageListRef}
                 onScroll={handleScroll}
                 className={`chat-scroll${hideScroll ? ' hide-scroll' : ''}`}
-                style={{ flex: 1, padding: '12px 10px', display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto', background: t.bg }}
+                style={{ position: 'relative', flex: 1, padding: '12px 10px', display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto', background: t.bg }}
             >
                 {filteredMessages.map(msg => {
                     const isMine = msg.user_id === userId
