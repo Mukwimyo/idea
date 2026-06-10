@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { getTheme } from '../lib/themes'
@@ -15,28 +15,29 @@ export default function RoomList() {
   const [userId, setUserId] = useState(null)
   const navigate = useNavigate()
 
-  useEffect(() => {
-    let channel
-    const init = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      setUserId(user.id)
-      const { data } = await supabase.from('profiles').select('theme_id').eq('id', user.id).single()
-      setTheme(getTheme(data?.theme_id || 'dark-purple'))
-      fetchRooms(user.id)
 
-      channel = supabase
-        .channel('roomlist-messages')
-        .on('postgres_changes', {
-          event: 'INSERT', schema: 'public', table: 'messages'
-        }, () => {
-          fetchRooms(user.id)
-        })
-        .subscribe()
+const channelRef = useRef(null)
+
+useEffect(() => {
+    const init = async () => {
+        const { data: { user } } = await supabase.auth.getUser()
+        setUserId(user.id)
+        const { data } = await supabase.from('profiles').select('theme_id').eq('id', user.id).single()
+        setTheme(getTheme(data?.theme_id || 'dark-purple'))
+        fetchRooms(user.id)
+
+        channelRef.current = supabase
+            .channel('roomlist-messages')
+            .on('postgres_changes', {
+                event: 'INSERT', schema: 'public', table: 'messages'
+            }, () => {
+                fetchRooms(user.id)
+            })
+            .subscribe()
     }
     init()
-    return () => { if (channel) supabase.removeChannel(channel) }
-  }, [])
-  
+    return () => { if (channelRef.current) supabase.removeChannel(channelRef.current) }
+}, [])
   const fetchRooms = async (uid) => {
     const id = uid || userId
     const { data } = await supabase
