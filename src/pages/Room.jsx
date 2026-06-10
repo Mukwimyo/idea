@@ -92,7 +92,7 @@ function SlotEntrance({ roomName, bgColor, pointColor, onDone }) {
             background: bgColor,
             display: 'flex', flexDirection: 'column',
             alignItems: 'center', justifyContent: 'center',
-            gap: 20, fontFamily: 'sans-serif'
+            gap: 20
         }}>
             <div style={{ fontSize: 20, color: pointColor + '88', letterSpacing: 3, textAlign: 'center', width: 160 }}>
                 entering{dots}
@@ -219,6 +219,11 @@ export default function Room() {
                             if (hastemp) return prev.map(m => m.id === hastemp.id ? fullMsg : m)
                             return [...prev, fullMsg]
                         })
+                        if (newMsg.user_id !== userId) {
+                            supabase.from('messages')
+                                .update({ read_by: [userId] })
+                                .eq('id', newMsg.id)
+                        }
                     } else if (payload.eventType === 'UPDATE') {
                         setMessages(prev => prev.map(m => m.id === payload.new.id ? { ...m, ...payload.new } : m))
                     }
@@ -254,9 +259,25 @@ export default function Room() {
             .order('created_at', { ascending: true })
         if (data) {
             setMessages(data)
+            markAsRead(data)
             const dates = [...new Set(data.map(m => new Date(m.created_at).toLocaleDateString('ko-KR')))]
             setAvailableDates(dates)
         }
+    }
+
+    const markAsRead = async (msgs) => {
+        const { data: { user } } = await supabase.auth.getUser()
+        const unread = msgs.filter(m =>
+            m.user_id !== user.id &&
+            !m.read_by?.includes(user.id) &&
+            m.type !== 'chapter'
+        )
+        if (unread.length === 0) return
+        await Promise.all(unread.map(m =>
+            supabase.from('messages')
+                .update({ read_by: [...(m.read_by || []), user.id] })
+                .eq('id', m.id)
+        ))
     }
 
     const sendMessage = async () => {
@@ -618,7 +639,9 @@ export default function Room() {
                                     </div>
                                 )}
                                 <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 2 }}>
-                                    {isMine && readReceipt !== 'none' && <div style={{ fontSize: 9, color: t.point }}>{readReceipt === 'text' ? '읽음' : '1'}</div>}
+                                    {isMine && readReceipt !== 'none' && msg.read_by?.length > 0 && (
+                                        <div style={{ fontSize: 9, color: t.point }}>{readReceipt === 'text' ? '읽음' : '1'}</div>
+                                    )}
                                     <div style={{ fontSize: 9, color: t.subText, opacity: 0.6 }}>
                                         {searchQuery
                                             ? new Date(msg.created_at).toLocaleDateString('ko-KR') + ' ' + new Date(msg.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
@@ -672,7 +695,7 @@ export default function Room() {
                         onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() } }}
                         placeholder={isNarrActive ? '나레이션 입력...' : activeChar ? `${activeChar.name}으로 입력...` : '캐릭터를 먼저 추가해주세요'}
                         rows={1}
-                        style={{ flex: 1, background: t.inputBg, border: `0.5px solid ${isNarrActive ? t.point : t.border}`, borderRadius: 11, padding: '8px 11px', color: isNarrActive ? t.narrColor : t.inputText, fontSize: 13, outline: 'none', resize: 'none', fontFamily: 'sans-serif', lineHeight: 1.5, fontStyle: isNarrActive ? 'italic' : 'normal' }}
+                        style={{ flex: 1, background: t.inputBg, border: `0.5px solid ${isNarrActive ? t.point : t.border}`, borderRadius: 11, padding: '8px 11px', color: isNarrActive ? t.narrColor : t.inputText, fontSize: 13, outline: 'none', resize: 'none', lineHeight: 1.5, fontStyle: isNarrActive ? 'italic' : 'normal' }}
                     />
                     <button onMouseDown={e => e.preventDefault()} onClick={sendMessage}
                         style={{ width: 36, height: 36, borderRadius: '50%', border: 'none', background: t.point, cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
