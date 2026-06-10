@@ -267,19 +267,14 @@ export default function Room() {
 
     const markAsRead = async (msgs) => {
         const { data: { user } } = await supabase.auth.getUser()
+        console.log('userId:', user.id)
+        console.log('msgs:', msgs.map(m => ({ id: m.id, user_id: m.user_id, read_by: m.read_by, type: m.type })))
         const unread = msgs.filter(m =>
             m.user_id !== user.id &&
             !m.read_by?.includes(user.id) &&
             m.type !== 'chapter'
         )
-        console.log('unread count:', unread.length) // ← 추가
-        if (unread.length === 0) return
-        const results = await Promise.all(unread.map(m =>
-            supabase.from('messages')
-                .update({ read_by: [...(m.read_by || []), user.id] })
-                .eq('id', m.id)
-        ))
-        console.log('markAsRead results:', results) // ← 추가
+        console.log('unread count:', unread.length)
     }
 
     const sendMessage = async () => {
