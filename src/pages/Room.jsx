@@ -272,12 +272,14 @@ export default function Room() {
             !m.read_by?.includes(user.id) &&
             m.type !== 'chapter'
         )
+        console.log('unread count:', unread.length) // ← 추가
         if (unread.length === 0) return
-        await Promise.all(unread.map(m =>
+        const results = await Promise.all(unread.map(m =>
             supabase.from('messages')
                 .update({ read_by: [...(m.read_by || []), user.id] })
                 .eq('id', m.id)
         ))
+        console.log('markAsRead results:', results) // ← 추가
     }
 
     const sendMessage = async () => {
