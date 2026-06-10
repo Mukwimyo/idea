@@ -644,7 +644,7 @@ export default function Room() {
                                     </div>
                                 ) : (
                                     <div onDoubleClick={() => { if (isMine) { setEditingId(msg.id); setEditText(msg.content) } }}
-                                        style={{ background: bubbleBg, color: bubbleColor, padding: '7px 11px', borderRadius: 12, fontSize: 13, lineHeight: 1.6, border: isMine ? 'none' : `0.5px solid ${t.theirBorder}`, cursor: isMine ? 'pointer' : 'default' }}>
+                                        style={{ background: bubbleBg, color: bubbleColor, padding: '7px 11px', borderRadius: 12, fontSize: 13, lineHeight: 1.6, border: 'none', cursor: isMine ? 'pointer' : 'default' }}>
                                         {parseContent(msg.content, actColor, actionStyle)}
                                         {msg.edited && <span style={{ fontSize: 9, opacity: 0.5, marginLeft: 4 }}>수정됨</span>}
                                     </div>
