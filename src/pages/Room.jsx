@@ -206,6 +206,12 @@ export default function Room() {
             channelRef.current = supabase
                 .channel('room-' + roomId)
                 .on('postgres_changes', {
+                    event: 'UPDATE', schema: 'public', table: 'rooms',
+                    filter: `id=eq.${roomId}`
+                }, (payload) => {
+                    setRoom(prev => ({ ...prev, ...payload.new }))
+                })
+                .on('postgres_changes', {
                     event: '*', schema: 'public', table: 'messages',
                     filter: `room_id=eq.${roomId}`
                 }, async (payload) => {
