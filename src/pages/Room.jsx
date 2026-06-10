@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase, uploadFile } from '../lib/supabase'
 import { THEMES, getTheme } from '../lib/themes'
-import { ChevronLeft, Link2, BookmarkPlus, Settings, Search, Calendar, Paperclip, ArrowUp, Bookmark } from 'lucide-react'
+import { ChevronLeft, Link2, BookmarkPlus, Settings, Search, Calendar, Paperclip, ArrowUp, Bookmark, Eye} from 'lucide-react'
 
 /* TODO: 나중에 Supabase messages 테이블에서 최근 chat 타입 메시지 content 가져오기 */
 const SLOT_DUMMY = [
@@ -650,8 +650,8 @@ export default function Room() {
                                     </div>
                                 )}
                                 <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 2 }}>
-                                    {msg.user_id === userId && readReceipt !== 'none' && msg.read_by?.some(id => id !== msg.user_id) && (
-                                        <div style={{ fontSize: 9, color: t.point }}>{readReceipt === 'text' ? '읽음' : '1'}</div>
+                                    {msg.user_id === userId && readReceipt !== 'none' && (msg.read_by || []).some(id => id !== msg.user_id) && (
+                                        <Eye size={10} color={t.subText} opacity={0.4} />
                                     )}
                                     <div style={{ fontSize: 9, color: t.subText, opacity: 0.6 }}>
                                         {searchQuery
