@@ -15,23 +15,58 @@ export default function RoomList() {
   const [userId, setUserId] = useState(null)
   const navigate = useNavigate()
 
-  useEffect(() => { init() }, [])
+  useEffect(() => {
+    let channel
+    const init = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      setUserId(user.id)
+      const { data } = await supabase.from('profiles').select('theme_id').eq('id', user.id).single()
+      setTheme(getTheme(data?.theme_id || 'dark-purple'))
+      fetchRooms(user.id)
 
-  const init = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    setUserId(user.id)
-    const { data } = await supabase.from('profiles').select('theme_id').eq('id', user.id).single()
-    setTheme(getTheme(data?.theme_id || 'dark-purple'))
-    fetchRooms(user.id)
-  }
-
+      channel = supabase
+        .channel('roomlist-messages')
+        .on('postgres_changes', {
+          event: 'INSERT', schema: 'public', table: 'messages'
+        }, () => {
+          fetchRooms(user.id)
+        })
+        .subscribe()
+    }
+    init()
+    return () => { if (channel) supabase.removeChannel(channel) }
+  }, [])
+  
   const fetchRooms = async (uid) => {
     const id = uid || userId
     const { data } = await supabase
       .from('room_members')
       .select('room_id, rooms(*)')
       .eq('user_id', id)
-    if (data) setRooms(data.map(d => d.rooms).filter(Boolean))
+    if (!data) return
+
+    const rooms = data.map(d => d.rooms).filter(Boolean)
+
+    const enriched = await Promise.all(rooms.map(async (room) => {
+      const { data: lastMsg } = await supabase
+        .from('messages')
+        .select('content, type, characters(name)')
+        .eq('room_id', room.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
+
+      const { count } = await supabase
+        .from('messages')
+        .select('*', { count: 'exact', head: true })
+        .eq('room_id', room.id)
+        .not('read_by', 'cs', `{${id}}`)
+        .neq('user_id', id)
+
+      return { ...room, lastMsg: lastMsg || null, unreadCount: count || 0 }
+    }))
+
+    setRooms(enriched)
   }
 
   const createRoom = async () => {
@@ -163,11 +198,25 @@ export default function RoomList() {
           {rooms.map(room => (
             <div key={room.id} onClick={() => navigate(`/room/${room.id}`)}
               style={{ background: t.panel, borderRadius: 12, padding: '13px 15px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, border: `1px solid ${t.border}`, boxShadow: `0 1px 4px rgba(0,0,0,0.15)` }}>
-              <div style={{ width: 40, height: 40, borderRadius: '50%', background: t.point, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, color: '#fff', flexShrink: 0 }}>✦</div>
-              <div style={{ flex: 1 }}>
+              <div style={{ width: 40, height: 40, borderRadius: '50%', background: t.point, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, color: t.bg, flexShrink: 0 }}>✦</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 14, fontWeight: 500, color: t.theirText }}>{room.name}</div>
-                <div style={{ fontSize: 11, color: t.subText, marginTop: 2 }}>{room.chapter}</div>
+                <div style={{ fontSize: 11, color: t.subText, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {room.lastMsg
+                    ? `${room.lastMsg.characters?.name || ''}: ${room.lastMsg.type === 'chat' ? room.lastMsg.content : '[이미지]'}`
+                    : room.chapter || ''
+                  }
+                </div>
               </div>
+              {room.unreadCount > 0 && (
+                <div style={{
+                  background: t.point, color: t.bg,
+                  borderRadius: 10, padding: '2px 7px',
+                  fontSize: 11, fontWeight: 600, flexShrink: 0
+                }}>
+                  {room.unreadCount}
+                </div>
+              )}
               {room.created_by === userId && (
                 <button onMouseDown={e => e.stopPropagation()} onClick={(e) => deleteRoom(e, room.id, room.created_by)}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, opacity: 0.4, display: 'flex', alignItems: 'center' }}>

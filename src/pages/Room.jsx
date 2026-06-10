@@ -164,6 +164,7 @@ export default function Room() {
     const isAtBottomRef = useRef(true)
     const messageListRef = useRef(null)
     const initialScrollDone = useRef(false)
+    const channelRef = useRef(null)
 
     const openPanel = (panel) => {
         setShowInvite(panel === 'invite')
@@ -173,7 +174,6 @@ export default function Room() {
     }
 
     useEffect(() => {
-        let channel
         const init = async () => {
             const { data: { user } } = await supabase.auth.getUser()
             setUserId(user.id)
@@ -201,7 +201,7 @@ export default function Room() {
 
             await fetchMessages()
 
-            channel = supabase
+            channelRef.current = supabase
                 .channel('room-' + roomId)
                 .on('postgres_changes', {
                     event: '*', schema: 'public', table: 'messages',
@@ -243,7 +243,7 @@ export default function Room() {
                 .subscribe()
         }
         init()
-        return () => { if (channel) supabase.removeChannel(channel) }
+        return () => { if (channelRef.current) supabase.removeChannel(channelRef.current) }
     }, [roomId])
 
     useEffect(() => {
@@ -662,7 +662,7 @@ export default function Room() {
                                 {char?.image_url ? <img src={char.image_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : char?.avatar_letter || '?'}
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMine ? 'flex-end' : 'flex-start', maxWidth: '72%' }}>
-                                {isMine && myChars.length > 1 && <div style={{ fontSize: 9, color: t.subText, marginBottom: 2 }}>{char?.name}</div>}
+                                {char?.name && <div style={{ fontSize: 9, color: t.subText, marginBottom: 2 }}>{char?.name}</div>}
                                 {editingId === msg.id ? (
                                     <div style={{ display: 'flex', gap: 6 }}>
                                         <input value={editText} onChange={e => setEditText(e.target.value)} onKeyDown={e => e.key === 'Enter' && editMessage(msg.id)}
