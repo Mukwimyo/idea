@@ -179,7 +179,7 @@ export default function Room() {
         const init = async () => {
             const { data: { user } } = await supabase.auth.getUser()
             setUserId(user.id)
-            await supabase.from('profiles').upsert({ id: user.id, email: user.email })
+            await supabase.from('profiles').update({ email: user.email }).eq('id', user.id)
 
             const { data: roomData } = await supabase.from('rooms').select().eq('id', roomId).single()
             setRoom(roomData)
