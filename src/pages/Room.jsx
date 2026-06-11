@@ -749,7 +749,7 @@ export default function Room() {
                                     setActiveChar(c)
                                     setMode('chat')
                                     const { data: { user } } = await supabase.auth.getUser()
-                                    supabase.from('profiles').update({ last_char_id: c.id }).eq('id', user.id)
+                                    const { error } = await supabase.from('profiles').update({ last_char_id: c.id }).eq('id', user.id)
                                 }}
                                     style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 8px 3px 4px', borderRadius: 20, border: activeChar?.id === c.id && mode === 'chat' ? `1.5px solid ${c.color || t.point}` : `1px solid ${t.border}`, background: activeChar?.id === c.id && mode === 'chat' ? (c.color + '22') : 'none', cursor: 'pointer' }}>
                                     <div style={{ width: 18, height: 18, borderRadius: '50%', background: c.color || t.point, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, color: c.text_color || '#fff', overflow: 'hidden', flexShrink: 0 }}>
