@@ -683,8 +683,11 @@ export default function Room() {
 
                     if (msg.type === 'image') return (
                         <div key={msg.id} id={'msg-' + msg.id} style={{ display: 'flex', flexDirection: isMine ? 'row-reverse' : 'row', alignItems: 'flex-end', gap: 6 }}>
-                            <div style={{ width: 36, height: 36, borderRadius: '50%', flexShrink: 0, background: char?.color || t.border, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 500, color: char?.text_color || t.subText }}>
-                                {char?.image_url ? <img src={char.image_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : char?.avatar_letter || '?'}
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, flexShrink: 0, width: 36 }}>
+                                <div style={{ width: 36, height: 36, borderRadius: '50%', background: char?.color || t.border, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 500, color: char?.text_color || t.subText }}>
+                                    {char?.image_url ? <img src={char.image_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : char?.avatar_letter || '?'}
+                                </div>
+                                {char?.name && <div style={{ fontSize: 9, color: t.subText, whiteSpace: 'nowrap', maxWidth: 40, overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'center' }}>{char?.name}</div>}
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMine ? 'flex-end' : 'flex-start' }}>
                                 <img src={msg.content} style={{ maxWidth: 180, borderRadius: 10, cursor: 'pointer' }} onClick={() => window.open(msg.content, '_blank')} />
@@ -699,11 +702,13 @@ export default function Room() {
 
                     return (
                         <div key={msg.id} id={'msg-' + msg.id} style={{ display: 'flex', flexDirection: isMine ? 'row-reverse' : 'row', alignItems: 'flex-end', gap: 6 }}>
-                            <div style={{ width: 36, height: 36, borderRadius: '50%', flexShrink: 0, background: char?.color || t.border, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 500, color: char?.text_color || t.subText }}>
-                                {char?.image_url ? <img src={char.image_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : char?.avatar_letter || '?'}
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, flexShrink: 0, width: 36 }}>
+                                <div style={{ width: 36, height: 36, borderRadius: '50%', background: char?.color || t.border, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 500, color: char?.text_color || t.subText }}>
+                                    {char?.image_url ? <img src={char.image_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : char?.avatar_letter || '?'}
+                                </div>
+                                {char?.name && <div style={{ fontSize: 9, color: t.subText, whiteSpace: 'nowrap', maxWidth: 40, overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'center' }}>{char?.name}</div>}
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMine ? 'flex-end' : 'flex-start', maxWidth: '72%' }}>
-                                {char?.name && <div style={{ fontSize: 9, color: t.subText, marginBottom: 2 }}>{char?.name}</div>}
                                 {editingId === msg.id ? (
                                     <div style={{ display: 'flex', gap: 6 }}>
                                         <input value={editText} onChange={e => setEditText(e.target.value)} onKeyDown={e => e.key === 'Enter' && editMessage(msg.id)}
