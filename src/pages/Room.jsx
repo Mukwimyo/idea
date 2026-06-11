@@ -200,7 +200,8 @@ export default function Room() {
             const { data: chars } = await supabase.from('characters').select().eq('user_id', user.id).eq('is_archived', false)
             setMyChars(chars || [])
             if (chars && chars.length > 0) {
-                const lastChar = chars.find(c => c.id === profile?.last_char_id)
+                const { data: member } = await supabase.from('room_members').select('last_char_id').eq('room_id', roomId).eq('user_id', user.id).single()
+                const lastChar = chars.find(c => c.id === member?.last_char_id)
                 setActiveChar(lastChar || chars[0])
             }
 
@@ -749,7 +750,7 @@ export default function Room() {
                                     setActiveChar(c)
                                     setMode('chat')
                                     const { data: { user } } = await supabase.auth.getUser()
-                                    const { error } = await supabase.from('profiles').update({ last_char_id: c.id }).eq('id', user.id)
+                                    await supabase.from('room_members').update({ last_char_id: c.id }).eq('room_id', roomId).eq('user_id', user.id)
                                 }}
                                     style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 8px 3px 4px', borderRadius: 20, border: activeChar?.id === c.id && mode === 'chat' ? `1.5px solid ${c.color || t.point}` : `1px solid ${t.border}`, background: activeChar?.id === c.id && mode === 'chat' ? (c.color + '22') : 'none', cursor: 'pointer' }}>
                                     <div style={{ width: 18, height: 18, borderRadius: '50%', background: c.color || t.point, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, color: c.text_color || '#fff', overflow: 'hidden', flexShrink: 0 }}>
