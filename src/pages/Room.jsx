@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase, uploadFile } from '../lib/supabase'
 import { THEMES, getTheme } from '../lib/themes'
-import { ChevronLeft, Link2, BookmarkPlus, Settings, Search, Calendar, Paperclip, ArrowUp, Bookmark, Eye, ArrowDown } from 'lucide-react'
+import { ChevronLeft, Link2, BookmarkPlus, Settings, Search, Calendar, Paperclip, ArrowUp, Eye, ArrowDown } from 'lucide-react'
 
 /* TODO: 나중에 Supabase messages 테이블에서 최근 chat 타입 메시지 content 가져오기 */
 const SLOT_DUMMY = [
@@ -376,12 +376,6 @@ export default function Room() {
         setEditText('')
     }
 
-    const bookmarkMessage = async (msgId) => {
-        const { data: { user } } = await supabase.auth.getUser()
-        await supabase.from('bookmarks').upsert({ user_id: user.id, message_id: msgId })
-        alert('북마크에 추가됐어요!')
-    }
-
     const addChapter = () => setShowChapterInput(true)
 
     const saveRoomName = async () => {
@@ -733,9 +727,6 @@ export default function Room() {
                                             : new Date(msg.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
                                         }
                                     </div>
-                                    <button onClick={() => bookmarkMessage(msg.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, opacity: 0.4, display: 'flex', alignItems: 'center' }}>
-                                        <Bookmark size={12} color={t.subText} />
-                                    </button>
                                 </div>
                             </div>
                         </div>
