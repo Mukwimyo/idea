@@ -262,6 +262,12 @@ export default function Room() {
         }
     }, [messages])
 
+    useEffect(() => {
+        const handleFocus = () => fetchMessages()
+        window.addEventListener('focus', handleFocus)
+        return () => window.removeEventListener('focus', handleFocus)
+    }, [])
+
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'instant' })
         setNewMsgAlert(false)
