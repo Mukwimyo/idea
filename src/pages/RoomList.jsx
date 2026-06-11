@@ -16,28 +16,29 @@ export default function RoomList() {
   const navigate = useNavigate()
 
 
-const channelRef = useRef(null)
+  const channelRef = useRef(null)
 
-useEffect(() => {
+  useEffect(() => {
     const init = async () => {
-        const { data: { user } } = await supabase.auth.getUser()
-        setUserId(user.id)
-        const { data } = await supabase.from('profiles').select('theme_id').eq('id', user.id).single()
-        setTheme(getTheme(data?.theme_id || 'dark-purple'))
-        fetchRooms(user.id)
+      const { data: { user } } = await supabase.auth.getUser()
+      setUserId(user.id)
+      const { data } = await supabase.from('profiles').select('theme_id').eq('id', user.id).single()
+      setTheme(getTheme(data?.theme_id || 'dark-purple'))
+      fetchRooms(user.id)
 
-        channelRef.current = supabase
-            .channel('roomlist-messages')
-            .on('postgres_changes', {
-                event: 'INSERT', schema: 'public', table: 'messages'
-            }, () => {
-                fetchRooms(user.id)
-            })
-            .subscribe()
+      channelRef.current = supabase
+        .channel('roomlist-messages')
+        .on('postgres_changes', {
+          event: '*', schema: 'public', table: 'messages'
+        }, (payload) => {
+          console.log('roomlist event:', payload.eventType)
+          fetchRooms(user.id)
+        })
+        .subscribe()
     }
     init()
     return () => { if (channelRef.current) supabase.removeChannel(channelRef.current) }
-}, [])
+  }, [])
   const fetchRooms = async (uid) => {
     const id = uid || userId
     const { data } = await supabase
@@ -51,7 +52,7 @@ useEffect(() => {
     const enriched = await Promise.all(rooms.map(async (room) => {
       const { data: lastMsg } = await supabase
         .from('messages')
-        .select('content, type, characters(name)')
+        .select('content, type, created_at, characters(name)')
         .eq('room_id', room.id)
         .order('created_at', { ascending: false })
         .limit(1)
@@ -67,7 +68,11 @@ useEffect(() => {
       return { ...room, lastMsg: lastMsg || null, unreadCount: count || 0 }
     }))
 
-    setRooms(enriched)
+    setRooms(enriched.sort((a, b) => {
+      const aTime = a.lastMsg?.created_at || a.created_at || ''
+      const bTime = b.lastMsg?.created_at || b.created_at || ''
+      return bTime.localeCompare(aTime)
+    }))
   }
 
   const createRoom = async () => {
