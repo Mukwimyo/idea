@@ -187,7 +187,7 @@ export default function Room() {
             setActionStyle(roomData?.action_style || 'dim')
             setIsOwner(roomData?.created_by === user.id)
 
-            const { data: profile } = await supabase.from('profiles').select('theme_id').eq('id', user.id).single()
+            const { data: profile } = await supabase.from('profiles').select('theme_id, last_char_id').eq('id', user.id).single()
             const myId = profile?.theme_id || 'dark-purple'
             setMyThemeId(myId)
 
@@ -200,8 +200,7 @@ export default function Room() {
             const { data: chars } = await supabase.from('characters').select().eq('user_id', user.id).eq('is_archived', false)
             setMyChars(chars || [])
             if (chars && chars.length > 0) {
-                const { data: prof } = await supabase.from('profiles').select('last_char_id').eq('id', user.id).single()
-                const lastChar = chars.find(c => c.id === prof?.last_char_id)
+                const lastChar = chars.find(c => c.id === profile?.last_char_id)
                 setActiveChar(lastChar || chars[0])
             }
 
