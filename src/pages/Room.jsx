@@ -95,7 +95,7 @@ function SlotEntrance({ roomName, bgColor, pointColor, onDone }) {
             gap: 20
         }}>
             <div style={{ fontSize: 20, color: pointColor + '88', letterSpacing: 3, textAlign: 'center', width: 160 }}>
-                entering{dots}
+                ENTERING{dots}
             </div>
             <div style={{ width: '60%', maxWidth: 260, height: 0.5, background: pointColor + '44' }} />
             <div style={{ height: `${WINDOW_H}px`, overflow: 'hidden', position: 'relative', width: '100%', maxWidth: 360 }}>
