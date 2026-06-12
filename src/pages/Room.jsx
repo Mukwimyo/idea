@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase, uploadFile } from '../lib/supabase'
 import { THEMES, getTheme } from '../lib/themes'
-import { ChevronLeft, Link2, BookmarkPlus, Settings, Search, Calendar, Paperclip, ArrowUp, Eye, ArrowDown } from 'lucide-react'
+import { ChevronLeft, Link2, BookmarkPlus, Settings, Search, Calendar, Paperclip, ArrowUp, Eye, ArrowDown, ChevronDown, ChevronUp } from 'lucide-react'
 
 /* TODO: 나중에 Supabase messages 테이블에서 최근 chat 타입 메시지 content 가져오기 */
 const SLOT_DUMMY = [
@@ -159,6 +159,7 @@ export default function Room() {
     const [newMsgAlert, setNewMsgAlert] = useState(false)
     const [editingRoomName, setEditingRoomName] = useState(false)
     const [roomNameText, setRoomNameText] = useState('')
+    const [showCharList, setShowCharList] = useState(true)
     const scrollTimerRef = useRef(null)
     const fileInputRef = useRef(null)
     const messagesEndRef = useRef(null)
@@ -736,8 +737,26 @@ export default function Room() {
             </div>
 
             {/* 입력 영역 */}
-            <div style={{ background: t.panel, borderTop: `0.5px solid ${t.border}`, padding: '8px 10px 12px', touchAction: 'none' }}>
+            <div style={{ background: t.panel, borderTop: `0.5px solid ${t.border}`, padding: '8px 10px 12px', touchAction: 'none', position: 'relative' }}>
+                {/* 토글 버튼 */}
                 {myChars.length > 0 && (
+                    <button
+                        onMouseDown={e => e.preventDefault()}
+                        onClick={() => setShowCharList(v => !v)}
+                        style={{
+                            position: 'absolute', top: -20, left: 10,
+                            background: t.panel, border: `0.5px solid ${t.border}`,
+                            borderRadius: '6px 6px 0 0', borderBottom: `1px solid ${t.panel}`,
+                            padding: '2px 10px', cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center'
+                        }}>
+                        {showCharList
+                            ? <ChevronDown size={13} color={t.subText} />
+                            : <ChevronUp size={13} color={t.subText} />
+                        }
+                    </button>
+                )}
+                {myChars.length > 0 && showCharList && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 7 }}>
                         <span style={{ fontSize: 10, color: t.subText, flexShrink: 0 }}>나</span>
                         <div style={{ display: 'flex', gap: 5, flex: 1, flexWrap: 'wrap' }}>
