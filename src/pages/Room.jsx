@@ -199,11 +199,24 @@ export default function Room() {
             setTheme(getTheme(follow ? sharedId : myId))
 
             const { data: chars } = await supabase.from('characters').select().eq('user_id', user.id).eq('is_archived', false)
-            setMyChars(chars || [])
-            if (chars && chars.length > 0) {
+
+            const { data: roomGroups } = await supabase.from('groups')
+                .select('id').eq('room_id', roomId).eq('type', 'room').eq('user_id', user.id)
+            const roomGroupIds = (roomGroups || []).map(g => g.id)
+
+            let availableChars = []
+            if (roomGroupIds.length > 0) {
+                const { data: cgData } = await supabase.from('character_groups')
+                    .select('character_id').in('group_id', roomGroupIds)
+                const availableIds = [...new Set((cgData || []).map(d => d.character_id))]
+                availableChars = (chars || []).filter(c => availableIds.includes(c.id))
+            }
+
+            setMyChars(availableChars)
+            if (availableChars.length > 0) {
                 const { data: member } = await supabase.from('room_members').select('last_char_id').eq('room_id', roomId).eq('user_id', user.id).single()
-                const lastChar = chars.find(c => c.id === member?.last_char_id)
-                setActiveChar(lastChar || chars[0])
+                const lastChar = availableChars.find(c => c.id === member?.last_char_id)
+                setActiveChar(lastChar || availableChars[0])
             }
 
             await fetchMessages()
@@ -790,11 +803,12 @@ export default function Room() {
                         <textarea
                             ref={inputRef}
                             value={input}
+                            disabled={!isNarrActive && myChars.length === 0}
                             onChange={e => { setInput(e.target.value); e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 80) + 'px' }}
                             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() } }}
-                            placeholder={isNarrActive ? '나레이션 입력...' : activeChar ? `${activeChar.name}으로 입력...` : '캐릭터를 먼저 추가해주세요'}
+                            placeholder={isNarrActive ? '나레이션 입력...' : activeChar ? `${activeChar.name}으로 입력...` : '먼저 프로필을 방 동아리에 할당해야합니다'}
                             rows={1}
-                            style={{ flex: 1, background: t.inputBg, border: `0.5px solid ${isNarrActive ? t.point : t.border}`, borderRadius: 11, padding: '8px 11px', color: isNarrActive ? t.narrColor : t.inputText, fontSize: 13, outline: 'none', resize: 'none', lineHeight: 1.5, fontStyle: isNarrActive ? 'italic' : 'normal' }}
+                            style={{ flex: 1, background: t.inputBg, opacity: (!isNarrActive && myChars.length === 0) ? 0.4 : 1, border: `0.5px solid ${isNarrActive ? t.point : t.border}`, borderRadius: 11, padding: '8px 11px', color: isNarrActive ? t.narrColor : t.inputText, fontSize: 13, outline: 'none', resize: 'none', lineHeight: 1.5, fontStyle: isNarrActive ? 'italic' : 'normal' }}
                         />
                         {myChars.length > 0 && (
                             <button onMouseDown={e => e.preventDefault()} onClick={() => setMode(mode === 'narration' ? 'chat' : 'narration')}
