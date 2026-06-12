@@ -250,6 +250,10 @@ export default function Characters() {
                             background: 'none', border: `0.5px solid ${t.border}`,
                             borderRadius: 8, padding: '6px 14px', color: t.subText, fontSize: 12, cursor: 'pointer'
                         }}>보관함</button>
+                        <button onClick={() => navigate('/groups')} style={{
+                            marginLeft: 8, background: 'none', border: `0.5px solid ${t.border}`,
+                            borderRadius: 8, padding: '6px 14px', color: t.subText, fontSize: 12, cursor: 'pointer'
+                        }}>동아리</button>
                         <button onClick={() => setShowAdd(true)} style={{
                             marginLeft: 8, background: t.point, border: 'none', borderRadius: 8,
                             padding: '6px 14px', color: '#fff', fontSize: 12, cursor: 'pointer'

@@ -6,6 +6,7 @@ import RoomList from './pages/RoomList'
 import Room from './pages/Room'
 import Characters from './pages/Characters'
 import Settings from './pages/Settings'
+import Groups from './pages/Groups'
 
 const FONT_MAP = { 'godo-b': 'GodoB', 'godo-m': 'GodoM', 'pretendard': 'Pretendard', 'nanum-gothic': 'Nanum Gothic', 'nanum-myeongjo': 'Nanum Myeongjo', 'noto-serif': 'Noto Serif KR', 'maru-buri': 'MaruBuri', 'jeju-myeongjo': 'Jeju Myeongjo', 'aggro': 'SBAggroB' }
 
@@ -43,6 +44,7 @@ export default function App() {
         <Route path="/room/:roomId/characters" element={session ? <Characters /> : <Navigate to="/auth" />} />
         <Route path="/characters" element={session ? <Characters /> : <Navigate to="/auth" />} />
         <Route path="/settings" element={session ? <Settings /> : <Navigate to="/auth" />} />
+        <Route path="/groups" element={session ? <Groups /> : <Navigate to="/auth" />} />
       </Routes>
     </BrowserRouter>
   )
