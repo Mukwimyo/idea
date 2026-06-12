@@ -26,6 +26,15 @@ export default function Characters() {
     const [showArchive, setShowArchive] = useState(false)
     const [archivedChars, setArchivedChars] = useState([])
     const [theme, setTheme] = useState(null)
+
+    const [editingChar, setEditingChar] = useState(null)
+    const [editName, setEditName] = useState('')
+    const [editDescription, setEditDescription] = useState('')
+    const [editAvatarLetter, setEditAvatarLetter] = useState('')
+    const [editImageFile, setEditImageFile] = useState(null)
+    const [editImagePreview, setEditImagePreview] = useState(null)
+    const [editSelectedColor, setEditSelectedColor] = useState(0)
+
     const navigate = useNavigate()
 
     useEffect(() => { init() }, [])
@@ -84,6 +93,40 @@ export default function Characters() {
         fetchChars()
     }
 
+    const startEdit = (c) => {
+        setEditingChar(c.id)
+        setEditName(c.name)
+        setEditDescription(c.description || '')
+        setEditAvatarLetter(c.avatar_letter || '')
+        setEditImagePreview(c.image_url || null)
+        setEditImageFile(null)
+        setEditSelectedColor(COLORS.findIndex(col => col.bg === c.color) ?? 0)
+    }
+
+    const saveEdit = async (c) => {
+        if (!editName.trim()) return
+        setLoading(true)
+        let imageUrl = c.image_url
+        if (editImageFile) {
+            const { data: { user } } = await supabase.auth.getUser()
+            const ext = editImageFile.name.split('.').pop()
+            const path = `avatars/${user.id}/${Date.now()}.${ext}`
+            imageUrl = await uploadFile(editImageFile, path)
+        }
+        const color = COLORS[editSelectedColor] || COLORS[0]
+        await supabase.from('characters').update({
+            name: editName.trim(),
+            description: editDescription.trim(),
+            avatar_letter: editAvatarLetter || editName[0],
+            color: color.bg,
+            text_color: color.text,
+            image_url: imageUrl
+        }).eq('id', c.id)
+        setEditingChar(null)
+        setLoading(false)
+        fetchChars()
+    }
+
     const deleteChar = async (id) => {
         if (!confirm('이 캐릭터를 보관함으로 이동할까요?\n과거 대사는 그대로 보존돼요.')) return
         await supabase.from('characters').update({ is_archived: true }).eq('id', id)
@@ -133,7 +176,7 @@ export default function Characters() {
                         <input value={avatarLetter} onChange={e => setAvatarLetter(e.target.value.slice(0, 2))} placeholder="아바타 글자 (이미지 없을 때 표시)"
                             style={{ width: '100%', background: t.bg, border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '9px 12px', color: t.inputText, fontSize: 13, outline: 'none', boxSizing: 'border-box', marginBottom: 8 }} />
                         <textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="캐릭터 설명 (선택)"
-                            style={{ width: '100%', background: t.bg, border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '9px 12px', color: t.inputText, fontSize: 13, outline: 'none', boxSizing: 'border-box', resize: 'none', height: 70,marginBottom: 10 }} />
+                            style={{ width: '100%', background: t.bg, border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '9px 12px', color: t.inputText, fontSize: 13, outline: 'none', boxSizing: 'border-box', resize: 'none', height: 70, marginBottom: 10 }} />
                         <div style={{ fontSize: 11, color: t.subText, marginBottom: 7 }}>말풍선 색상</div>
                         <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
                             {COLORS.map((c, i) => (
@@ -152,17 +195,49 @@ export default function Characters() {
                         <div style={{ textAlign: 'center', color: t.subText, fontSize: 13, marginTop: 40, opacity: 0.5 }}>캐릭터가 없어요</div>
                     )}
                     {chars.map(c => (
-                        <div key={c.id} style={{ background: t.panel, borderRadius: 12, padding: '13px 15px', display: 'flex', alignItems: 'center', gap: 12, border: `0.5px solid ${t.border}` }}>
-                            <div style={{ width: 44, height: 44, borderRadius: '50%', background: c.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 500, color: c.text_color, flexShrink: 0, overflow: 'hidden' }}>
-                                {c.image_url ? <img src={c.image_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : c.avatar_letter}
-                            </div>
-                            <div style={{ flex: 1 }}>
-                                <div style={{ fontSize: 14, fontWeight: 500, color: t.theirText }}>{c.name}</div>
-                                {c.description && <div style={{ fontSize: 11, color: t.subText, marginTop: 2 }}>{c.description}</div>}
-                            </div>
-                            <button onClick={() => deleteChar(c.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, opacity: 0.4, display: 'flex', alignItems: 'center' }}>
-                                <X size={16} color={t.subText} />
-                            </button>
+                        <div key={c.id} style={{ background: t.panel, borderRadius: 12, padding: '13px 15px', border: `0.5px solid ${t.border}` }}>
+                            {editingChar === c.id ? (
+                                <div>
+                                    <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
+                                        <label style={{ cursor: 'pointer' }}>
+                                            <div style={{ width: 72, height: 72, borderRadius: '50%', background: editImagePreview ? 'transparent' : t.bg, border: `0.5px dashed ${t.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                                                {editImagePreview ? <img src={editImagePreview} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 24, color: t.border }}>+</span>}
+                                            </div>
+                                            <div style={{ fontSize: 10, color: t.subText, textAlign: 'center', marginTop: 4 }}>프로필 이미지</div>
+                                            <input type="file" accept="image/*" onChange={e => { const f = e.target.files[0]; if (f) { setEditImageFile(f); setEditImagePreview(URL.createObjectURL(f)) } }} style={{ display: 'none' }} />
+                                        </label>
+                                    </div>
+                                    <input value={editName} onChange={e => setEditName(e.target.value)} placeholder="캐릭터 이름 *"
+                                        style={{ width: '100%', background: t.bg, border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '9px 12px', color: t.inputText, fontSize: 13, outline: 'none', boxSizing: 'border-box', marginBottom: 8 }} />
+                                    <input value={editAvatarLetter} onChange={e => setEditAvatarLetter(e.target.value.slice(0, 2))} placeholder="아바타 글자"
+                                        style={{ width: '100%', background: t.bg, border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '9px 12px', color: t.inputText, fontSize: 13, outline: 'none', boxSizing: 'border-box', marginBottom: 8 }} />
+                                    <textarea value={editDescription} onChange={e => setEditDescription(e.target.value)} placeholder="캐릭터 설명 (선택)"
+                                        style={{ width: '100%', background: t.bg, border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '9px 12px', color: t.inputText, fontSize: 13, outline: 'none', boxSizing: 'border-box', resize: 'none', height: 70, marginBottom: 10 }} />
+                                    <div style={{ fontSize: 11, color: t.subText, marginBottom: 7 }}>말풍선 색상</div>
+                                    <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+                                        {COLORS.map((col, i) => (
+                                            <div key={i} onClick={() => setEditSelectedColor(i)} style={{ width: 28, height: 28, borderRadius: '50%', background: col.bg, cursor: 'pointer', border: editSelectedColor === i ? '2.5px solid #fff' : '2px solid transparent' }} />
+                                        ))}
+                                    </div>
+                                    <div style={{ display: 'flex', gap: 8 }}>
+                                        <button onClick={() => saveEdit(c)} disabled={loading} style={{ flex: 1, background: t.point, border: 'none', borderRadius: 8, padding: 9, color: '#fff', fontSize: 12, cursor: 'pointer' }}>{loading ? '...' : '저장'}</button>
+                                        <button onClick={() => setEditingChar(null)} style={{ flex: 1, background: 'none', border: `0.5px solid ${t.border}`, borderRadius: 8, padding: 9, color: t.subText, fontSize: 12, cursor: 'pointer' }}>취소</button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                    <div style={{ width: 44, height: 44, borderRadius: '50%', background: c.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 500, color: c.text_color, flexShrink: 0, overflow: 'hidden' }}>
+                                        {c.image_url ? <img src={c.image_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : c.avatar_letter}
+                                    </div>
+                                    <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => startEdit(c)}>
+                                        <div style={{ fontSize: 14, fontWeight: 500, color: t.theirText }}>{c.name}</div>
+                                        {c.description && <div style={{ fontSize: 11, color: t.subText, marginTop: 2 }}>{c.description}</div>}
+                                    </div>
+                                    <button onClick={() => deleteChar(c.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, opacity: 0.4, display: 'flex', alignItems: 'center' }}>
+                                        <X size={16} color={t.subText} />
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     ))}
                 </div>
