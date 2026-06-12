@@ -55,7 +55,9 @@ export default function Characters() {
     const init = async () => {
         const { data: { user } } = await supabase.auth.getUser()
         const { data } = await supabase.from('profiles').select('theme_id').eq('id', user.id).single()
-        setTheme(getTheme(data?.theme_id || 'dark-purple'))
+        const resolvedTheme = getTheme(data?.theme_id || 'dark-purple')
+        setTheme(resolvedTheme)
+        document.querySelector('meta[name="theme-color"]')?.setAttribute('content', resolvedTheme.panel)
         fetchChars(user.id)
     }
 

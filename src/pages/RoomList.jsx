@@ -23,7 +23,9 @@ export default function RoomList() {
       const { data: { user } } = await supabase.auth.getUser()
       setUserId(user.id)
       const { data } = await supabase.from('profiles').select('theme_id').eq('id', user.id).single()
-      setTheme(getTheme(data?.theme_id || 'dark-purple'))
+      const resolvedTheme = getTheme(data?.theme_id || 'dark-purple')
+      setTheme(resolvedTheme)
+      document.querySelector('meta[name="theme-color"]')?.setAttribute('content', resolvedTheme.panel)
       fetchRooms(user.id)
 
       channelRef.current = supabase
