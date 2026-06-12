@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase, uploadFile } from '../lib/supabase'
 import { THEMES, getTheme } from '../lib/themes'
-import { ChevronLeft, Link2, BookmarkPlus, Settings, Search, Calendar, Paperclip, ArrowUp, Eye, ArrowDown, ChevronDown, ChevronUp } from 'lucide-react'
+import { ChevronLeft, Link2, BookmarkPlus, Settings, Search, Calendar, Paperclip, ArrowUp, Eye, ArrowDown, ChevronDown, ChevronUp, Quote } from 'lucide-react'
 
 /* TODO: 나중에 Supabase messages 테이블에서 최근 chat 타입 메시지 content 가져오기 */
 const SLOT_DUMMY = [
@@ -775,8 +775,6 @@ export default function Room() {
                                 </button>
                             ))}
                         </div>
-                        <button onMouseDown={e => e.preventDefault()} onClick={() => setMode(mode === 'narration' ? 'chat' : 'narration')}
-                            style={{ padding: '3px 9px', borderRadius: 20, fontSize: 11, cursor: 'pointer', border: isNarrActive ? `1.5px solid ${t.point}` : `1px solid ${t.border}`, background: isNarrActive ? t.point + '22' : 'none', color: isNarrActive ? t.narrColor : t.subText, flexShrink: 0 }}>나레이션</button>
                     </div>
                 )}
                 {myChars.length === 0 && (
@@ -788,15 +786,27 @@ export default function Room() {
                         <Paperclip size={16} color={t.subText} />
                     </button>
                     <input type="file" accept="image/*,video/*,.gif" ref={fileInputRef} onChange={e => sendImage(e.target.files[0])} style={{ display: 'none' }} />
-                    <textarea
-                        ref={inputRef}
-                        value={input}
-                        onChange={e => { setInput(e.target.value); e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 80) + 'px' }}
-                        onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() } }}
-                        placeholder={isNarrActive ? '나레이션 입력...' : activeChar ? `${activeChar.name}으로 입력...` : '캐릭터를 먼저 추가해주세요'}
-                        rows={1}
-                        style={{ flex: 1, background: t.inputBg, border: `0.5px solid ${isNarrActive ? t.point : t.border}`, borderRadius: 11, padding: '8px 11px', color: isNarrActive ? t.narrColor : t.inputText, fontSize: 13, outline: 'none', resize: 'none', lineHeight: 1.5, fontStyle: isNarrActive ? 'italic' : 'normal' }}
-                    />
+                    <div style={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'flex-end' }}>
+                        <textarea
+                            ref={inputRef}
+                            value={input}
+                            onChange={e => { setInput(e.target.value); e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 80) + 'px' }}
+                            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() } }}
+                            placeholder={isNarrActive ? '나레이션 입력...' : activeChar ? `${activeChar.name}으로 입력...` : '캐릭터를 먼저 추가해주세요'}
+                            rows={1}
+                            style={{ flex: 1, background: t.inputBg, border: `0.5px solid ${isNarrActive ? t.point : t.border}`, borderRadius: 11, padding: '8px 11px', color: isNarrActive ? t.narrColor : t.inputText, fontSize: 13, outline: 'none', resize: 'none', lineHeight: 1.5, fontStyle: isNarrActive ? 'italic' : 'normal' }}
+                        />
+                        {myChars.length > 0 && (
+                            <button onMouseDown={e => e.preventDefault()} onClick={() => setMode(mode === 'narration' ? 'chat' : 'narration')}
+                                style={{
+                                    position: 'absolute', right: 8, bottom: 7,
+                                    padding: '2px', borderRadius: 6, cursor: 'pointer',
+                                    border: 'none', background: 'none',
+                                    display: 'flex', alignItems: 'center'
+                                }}>
+                                <Quote size={14} color={isNarrActive ? t.narrColor : t.subText} />
+                            </button>
+                        )}</div>
                     <button onMouseDown={e => e.preventDefault()} onClick={sendMessage}
                         style={{ width: 36, height: 36, borderRadius: '50%', border: 'none', background: t.point, cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         <ArrowUp size={18} color='#fff' strokeWidth={2.5} />
