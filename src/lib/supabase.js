@@ -25,7 +25,7 @@ function urlBase64ToUint8Array(base64String) {
   return outputArray
 }
 
-export const subscribePush = async (userId) => {
+export const subscribePush = async userId => {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
     console.log('push unsupported')
     return { success: false, reason: 'unsupported' }
@@ -46,7 +46,30 @@ export const subscribePush = async (userId) => {
     return { success: false, reason: 'sw_register_failed' }
   }
   await navigator.serviceWorker.ready
-  
+
+  let subscription = await registration.pushManager.getSubscription()
+  if (!subscription) {
+    subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(import.meta.env.VITE_VAPID_PUBLIC_KEY),
+    })
+  }
+
+  const subJson = subscription.toJSON()
+  const { error } = await supabase.from('push_subscriptions').upsert(
+    {
+      user_id: userId,
+      endpoint: subJson.endpoint,
+      p256dh: subJson.keys.p256dh,
+      auth: subJson.keys.auth,
+    },
+    { onConflict: 'user_id,endpoint' }
+  )
+
+  if (error) return { success: false, reason: 'db_error' }
+  return { success: true }
+}
+
 export const unsubscribePush = async userId => {
   const registration = await navigator.serviceWorker.getRegistration('/idea/sw.js')
   if (registration) {
