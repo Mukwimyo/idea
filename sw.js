@@ -8,6 +8,10 @@ self.addEventListener('push', event => {
     badge: '/idea/icon-192.png',
     data: { url: data.url || '/idea/' },
     vibrate: [200, 100, 200],
+    requireInteraction: false,
+    silent: false,
+    renotify: true,
+    tag: 'idea-message',
   }
 
   event.waitUntil(self.registration.showNotification(data.title || '이데아', options))
