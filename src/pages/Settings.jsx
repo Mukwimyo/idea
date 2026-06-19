@@ -1,8 +1,15 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "../lib/supabase";
 import { THEMES, getTheme } from "../lib/themes";
-import { ChevronLeft, ChevronRight, LogOut, Users } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  LogOut,
+  Users,
+  Bell,
+  BellOff,
+} from "lucide-react";
+import { supabase, subscribePush, unsubscribePush } from "../lib/supabase";
 
 const FONTS = [
   { id: "sans", name: "기본", family: "sans-serif" },
@@ -145,6 +152,8 @@ export default function Settings() {
   const [myThemeId, setMyThemeId] = useState("dark-purple");
   const [saving, setSaving] = useState(false);
   const [myFontId, setMyFontId] = useState("sans");
+  const [pushEnabled, setPushEnabled] = useState(false);
+  const [pushLoading, setPushLoading] = useState(false);
 
   useEffect(() => {
     loadSettings();
@@ -161,6 +170,15 @@ export default function Settings() {
       .single();
     if (data?.theme_id) setMyThemeId(data.theme_id);
     if (data?.font_id) setMyFontId(data.font_id);
+
+    if ("serviceWorker" in navigator) {
+      const registration =
+        await navigator.serviceWorker.getRegistration("/idea/sw.js");
+      if (registration) {
+        const sub = await registration.pushManager.getSubscription();
+        setPushEnabled(!!sub);
+      }
+    }
   };
 
   const saveTheme = async (id) => {
@@ -181,6 +199,27 @@ export default function Settings() {
     await supabase.from("profiles").update({ font_id: id }).eq("id", user.id);
     document.body.style.fontFamily =
       FONTS.find((f) => f.id === id)?.family || "sans-serif";
+  };
+
+  const togglePush = async () => {
+    setPushLoading(true);
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (pushEnabled) {
+      await unsubscribePush(user.id);
+      setPushEnabled(false);
+    } else {
+      const result = await subscribePush(user.id);
+      if (result.success) {
+        setPushEnabled(true);
+      } else if (result.reason === "denied") {
+        alert("알림 권한이 거부됐어요. 브라우저 설정에서 허용해주세요.");
+      } else if (result.reason === "unsupported") {
+        alert("이 브라우저는 푸시 알림을 지원하지 않아요.");
+      }
+    }
+    setPushLoading(false);
   };
 
   const t = getTheme(myThemeId);
@@ -410,6 +449,69 @@ export default function Settings() {
                 </span>
               </div>
             ))}
+          </div>
+        </div>
+
+        <div style={{ marginBottom: 28 }}>
+          <div
+            style={{
+              fontSize: 11,
+              color: t.subText,
+              textTransform: "uppercase",
+              letterSpacing: "0.06em",
+              marginBottom: 12,
+            }}
+          >
+            알림
+          </div>
+          <div
+            style={{
+              background: t.panel,
+              border: `0.5px solid ${t.border}`,
+              borderRadius: 12,
+              padding: "12px 14px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {pushEnabled ? (
+                <Bell size={15} color={t.subText} />
+              ) : (
+                <BellOff size={15} color={t.subText} />
+              )}
+              <div style={{ fontSize: 13, color: t.theirText }}>
+                새 메시지 푸시 알림
+              </div>
+            </div>
+            <div
+              onClick={togglePush}
+              style={{
+                width: 40,
+                height: 22,
+                borderRadius: 11,
+                cursor: pushLoading ? "wait" : "pointer",
+                transition: "background 0.2s",
+                background: pushEnabled ? t.point : t.border,
+                position: "relative",
+                flexShrink: 0,
+                opacity: pushLoading ? 0.5 : 1,
+              }}
+            >
+              <div
+                style={{
+                  position: "absolute",
+                  top: 3,
+                  left: pushEnabled ? 20 : 3,
+                  width: 16,
+                  height: 16,
+                  borderRadius: "50%",
+                  background: "#fff",
+                  transition: "left 0.2s",
+                }}
+              />
+            </div>
           </div>
         </div>
 
