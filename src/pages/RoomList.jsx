@@ -15,12 +15,13 @@ export default function RoomList() {
   const [userId, setUserId] = useState(null)
   const navigate = useNavigate()
 
-
   const channelRef = useRef(null)
 
   useEffect(() => {
     const init = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
       setUserId(user.id)
       const { data } = await supabase.from('profiles').select('theme_id').eq('id', user.id).single()
       const resolvedTheme = getTheme(data?.theme_id || 'dark-purple')
@@ -30,60 +31,65 @@ export default function RoomList() {
 
       channelRef.current = supabase
         .channel('roomlist-messages')
-        .on('postgres_changes', {
-          event: '*', schema: 'public', table: 'messages'
-        }, (payload) => {
-          console.log('roomlist event:', payload.eventType)
-          fetchRooms(user.id)
-        })
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'messages',
+          },
+          payload => {
+            console.log('roomlist event:', payload.eventType)
+            fetchRooms(user.id)
+          }
+        )
         .subscribe()
     }
     init()
-    return () => { if (channelRef.current) supabase.removeChannel(channelRef.current) }
+    return () => {
+      if (channelRef.current) supabase.removeChannel(channelRef.current)
+    }
   }, [])
-  const fetchRooms = async (uid) => {
+  const fetchRooms = async uid => {
     const id = uid || userId
-    const { data } = await supabase
-      .from('room_members')
-      .select('room_id, rooms(*)')
-      .eq('user_id', id)
+    const { data } = await supabase.from('room_members').select('room_id, rooms(*)').eq('user_id', id)
     if (!data) return
 
     const rooms = data.map(d => d.rooms).filter(Boolean)
 
-    const enriched = await Promise.all(rooms.map(async (room) => {
-      const { data: lastMsg } = await supabase
-        .from('messages')
-        .select('content, type, created_at, characters(name)')
-        .eq('room_id', room.id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single()
+    const enriched = await Promise.all(
+      rooms.map(async room => {
+        const { data: lastMsg } = await supabase.from('messages').select('content, type, created_at, characters(name)').eq('room_id', room.id).order('created_at', { ascending: false }).limit(1).single()
 
-      const { count } = await supabase
-        .from('messages')
-        .select('*', { count: 'exact', head: true })
-        .eq('room_id', room.id)
-        .not('read_by', 'cs', `{${id}}`)
-        .neq('user_id', id)
+        const { count } = await supabase.from('messages').select('*', { count: 'exact', head: true }).eq('room_id', room.id).not('read_by', 'cs', `{${id}}`).neq('user_id', id)
 
-      return { ...room, lastMsg: lastMsg || null, unreadCount: count || 0 }
-    }))
+        return { ...room, lastMsg: lastMsg || null, unreadCount: count || 0 }
+      })
+    )
 
-    setRooms(enriched.sort((a, b) => {
-      const aTime = a.lastMsg?.created_at || a.created_at || ''
-      const bTime = b.lastMsg?.created_at || b.created_at || ''
-      return bTime.localeCompare(aTime)
-    }))
+    setRooms(
+      enriched.sort((a, b) => {
+        const aTime = a.lastMsg?.created_at || a.created_at || ''
+        const bTime = b.lastMsg?.created_at || b.created_at || ''
+        return bTime.localeCompare(aTime)
+      })
+    )
   }
 
   const createRoom = async () => {
     if (!roomName.trim()) return
     setLoading(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    const { data: room } = await supabase.from('rooms').insert({
-      name: roomName, created_by: user.id
-    }).select().single()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    const { data: room } = await supabase
+      .from('rooms')
+      .insert({
+        name: roomName,
+        created_by: user.id,
+      })
+      .select()
+      .single()
     if (room) {
       await supabase.from('room_members').insert({ room_id: room.id, user_id: user.id })
       await supabase.from('profiles').upsert({ id: user.id, email: user.email })
@@ -97,7 +103,9 @@ export default function RoomList() {
   const joinRoom = async () => {
     if (!inviteCode.trim()) return
     setLoading(true)
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
     const { data: room } = await supabase.from('rooms').select().eq('invite_code', inviteCode.trim()).single()
     if (room) {
       await supabase.from('profiles').upsert({ id: user.id, email: user.email })
@@ -113,7 +121,10 @@ export default function RoomList() {
 
   const deleteRoom = async (e, roomId, createdBy) => {
     e.stopPropagation()
-    if (createdBy !== userId) { alert('방장만 삭제할 수 있어요.'); return }
+    if (createdBy !== userId) {
+      alert('방장만 삭제할 수 있어요.')
+      return
+    }
     if (!confirm('채팅방을 삭제할까요? 모든 대화 내용이 사라져요.')) return
     await supabase.from('messages').delete().eq('room_id', roomId)
     await supabase.from('room_members').delete().eq('room_id', roomId)
@@ -121,34 +132,67 @@ export default function RoomList() {
     fetchRooms()
   }
 
-  if (!theme) return (
-    <div style={{ minHeight: '100vh', background: '#1a1a2e', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ color: '#7F77DD', fontSize: 28 }}>✦</div>
-    </div>
-  )
+  if (!theme)
+    return (
+      <div
+        style={{
+          minHeight: '100vh',
+          background: '#1a1a2e',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}>
+        <div style={{ color: '#7F77DD', fontSize: 28 }}>✦</div>
+      </div>
+    )
 
   const t = theme
 
   return (
     <div style={{ minHeight: '100vh', background: t.bg, padding: 16 }}>
       <div style={{ maxWidth: 400, margin: '0 auto' }}>
-
         {/* 헤더 */}
-        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 20, paddingTop: 8 }}>
-          <div style={{ fontSize: 20, color: t.theirText, fontWeight: 600 }}>이데아</div>
-          <button onClick={() => navigate('/characters')} style={{
-            marginLeft: 'auto', marginRight: 8, background: 'none', border: `1px solid ${t.border}`, boxShadow: `0 1px 4px rgba(0,0,0,0.15)`,
-            borderRadius: 8, padding: '6px 12px', color: t.subText, cursor: 'pointer',
-            display: 'flex', alignItems: 'center', gap: 5
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            marginBottom: 20,
+            paddingTop: 8,
           }}>
+          <div style={{ fontSize: 20, color: t.theirText, fontWeight: 600 }}>이데아</div>
+          <button
+            onClick={() => navigate('/characters')}
+            style={{
+              marginLeft: 'auto',
+              marginRight: 8,
+              background: 'none',
+              border: `1px solid ${t.border}`,
+              boxShadow: `0 1px 4px rgba(0,0,0,0.15)`,
+              borderRadius: 8,
+              padding: '6px 12px',
+              color: t.subText,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 5,
+            }}>
             <Users size={14} color={t.subText} />
             <span style={{ fontSize: 12 }}>캐릭터</span>
           </button>
-          <button onClick={() => navigate('/settings')} style={{
-            background: 'none', border: `1px solid ${t.border}`, boxShadow: `0 1px 4px rgba(0,0,0,0.15)`,
-            borderRadius: 8, padding: '6px 12px', color: t.subText, cursor: 'pointer',
-            display: 'flex', alignItems: 'center', gap: 5
-          }}>
+          <button
+            onClick={() => navigate('/settings')}
+            style={{
+              background: 'none',
+              border: `1px solid ${t.border}`,
+              boxShadow: `0 1px 4px rgba(0,0,0,0.15)`,
+              borderRadius: 8,
+              padding: '6px 12px',
+              color: t.subText,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 5,
+            }}>
             <Settings size={14} color={t.subText} />
             <span style={{ fontSize: 12 }}>설정</span>
           </button>
@@ -156,42 +200,163 @@ export default function RoomList() {
 
         {/* 방 만들기 / 입장 */}
         <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-          <button onClick={() => setShowCreate(true)} style={{
-            flex: 1, background: t.point, border: 'none', borderRadius: 10,
-            padding: '10px', color: t.bg, fontSize: 13, cursor: 'pointer'
-          }}>+ 새 역극방</button>
-          <button onClick={() => setShowJoin(true)} style={{
-            flex: 1, background: t.panel, border: `1px solid ${t.border}`, boxShadow: `0 1px 4px rgba(0,0,0,0.15)`, borderRadius: 10,
-            padding: '10px', color: t.subText, fontSize: 13, cursor: 'pointer'
-          }}>초대코드로 입장</button>
+          <button
+            onClick={() => setShowCreate(true)}
+            style={{
+              flex: 1,
+              background: t.point,
+              border: 'none',
+              borderRadius: 10,
+              padding: '10px',
+              color: t.bg,
+              fontSize: 13,
+              cursor: 'pointer',
+            }}>
+            + 새 역극방
+          </button>
+          <button
+            onClick={() => setShowJoin(true)}
+            style={{
+              flex: 1,
+              background: t.panel,
+              border: `1px solid ${t.border}`,
+              boxShadow: `0 1px 4px rgba(0,0,0,0.15)`,
+              borderRadius: 10,
+              padding: '10px',
+              color: t.subText,
+              fontSize: 13,
+              cursor: 'pointer',
+            }}>
+            초대코드로 입장
+          </button>
         </div>
 
         {/* 방 만들기 폼 */}
         {showCreate && (
-          <div style={{ background: t.panel, borderRadius: 12, padding: 14, marginBottom: 12, border: `1px solid ${t.border}`, boxShadow: `0 1px 4px rgba(0,0,0,0.15)` }}>
+          <div
+            style={{
+              background: t.panel,
+              borderRadius: 12,
+              padding: 14,
+              marginBottom: 12,
+              border: `1px solid ${t.border}`,
+              boxShadow: `0 1px 4px rgba(0,0,0,0.15)`,
+            }}>
             <div style={{ fontSize: 13, color: t.subText, marginBottom: 8 }}>채팅방 이름</div>
-            <input value={roomName} onChange={e => setRoomName(e.target.value)}
+            <input
+              value={roomName}
+              onChange={e => setRoomName(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && createRoom()}
               placeholder="예) 세라핀 × 리온"
-              style={{ width: '100%', background: t.bg, border: `1px solid ${t.border}`, boxShadow: `0 1px 4px rgba(0,0,0,0.15)`, borderRadius: 8, padding: '9px 12px', color: t.inputText, fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
+              style={{
+                width: '100%',
+                background: t.bg,
+                border: `1px solid ${t.border}`,
+                boxShadow: `0 1px 4px rgba(0,0,0,0.15)`,
+                borderRadius: 8,
+                padding: '9px 12px',
+                color: t.inputText,
+                fontSize: 13,
+                outline: 'none',
+                boxSizing: 'border-box',
+              }}
+            />
             <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-              <button onClick={createRoom} disabled={loading} style={{ flex: 1, background: t.point, border: 'none', borderRadius: 8, padding: '9px', color: '#fff', fontSize: 12, cursor: 'pointer' }}>만들기</button>
-              <button onClick={() => setShowCreate(false)} style={{ flex: 1, background: 'none', border: `1px solid ${t.border}`, boxShadow: `0 1px 4px rgba(0,0,0,0.15)`, borderRadius: 8, padding: '9px', color: t.subText, fontSize: 12, cursor: 'pointer' }}>취소</button>
+              <button
+                onClick={createRoom}
+                disabled={loading}
+                style={{
+                  flex: 1,
+                  background: t.point,
+                  border: 'none',
+                  borderRadius: 8,
+                  padding: '9px',
+                  color: '#fff',
+                  fontSize: 12,
+                  cursor: 'pointer',
+                }}>
+                만들기
+              </button>
+              <button
+                onClick={() => setShowCreate(false)}
+                style={{
+                  flex: 1,
+                  background: 'none',
+                  border: `1px solid ${t.border}`,
+                  boxShadow: `0 1px 4px rgba(0,0,0,0.15)`,
+                  borderRadius: 8,
+                  padding: '9px',
+                  color: t.subText,
+                  fontSize: 12,
+                  cursor: 'pointer',
+                }}>
+                취소
+              </button>
             </div>
           </div>
         )}
 
         {/* 초대코드 입장 폼 */}
         {showJoin && (
-          <div style={{ background: t.panel, borderRadius: 12, padding: 14, marginBottom: 12, border: `1px solid ${t.border}`, boxShadow: `0 1px 4px rgba(0,0,0,0.15)` }}>
+          <div
+            style={{
+              background: t.panel,
+              borderRadius: 12,
+              padding: 14,
+              marginBottom: 12,
+              border: `1px solid ${t.border}`,
+              boxShadow: `0 1px 4px rgba(0,0,0,0.15)`,
+            }}>
             <div style={{ fontSize: 13, color: t.subText, marginBottom: 8 }}>초대 코드</div>
-            <input value={inviteCode} onChange={e => setInviteCode(e.target.value)}
+            <input
+              value={inviteCode}
+              onChange={e => setInviteCode(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && joinRoom()}
               placeholder="8자리 코드 입력"
-              style={{ width: '100%', background: t.bg, border: `1px solid ${t.border}`, boxShadow: `0 1px 4px rgba(0,0,0,0.15)`, borderRadius: 8, padding: '9px 12px', color: t.inputText, fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
+              style={{
+                width: '100%',
+                background: t.bg,
+                border: `1px solid ${t.border}`,
+                boxShadow: `0 1px 4px rgba(0,0,0,0.15)`,
+                borderRadius: 8,
+                padding: '9px 12px',
+                color: t.inputText,
+                fontSize: 13,
+                outline: 'none',
+                boxSizing: 'border-box',
+              }}
+            />
             <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-              <button onClick={joinRoom} disabled={loading} style={{ flex: 1, background: t.point, border: 'none', borderRadius: 8, padding: '9px', color: '#fff', fontSize: 12, cursor: 'pointer' }}>입장</button>
-              <button onClick={() => setShowJoin(false)} style={{ flex: 1, background: 'none', border: `1px solid ${t.border}`, boxShadow: `0 1px 4px rgba(0,0,0,0.15)`, borderRadius: 8, padding: '9px', color: t.subText, fontSize: 12, cursor: 'pointer' }}>취소</button>
+              <button
+                onClick={joinRoom}
+                disabled={loading}
+                style={{
+                  flex: 1,
+                  background: t.point,
+                  border: 'none',
+                  borderRadius: 8,
+                  padding: '9px',
+                  color: '#fff',
+                  fontSize: 12,
+                  cursor: 'pointer',
+                }}>
+                입장
+              </button>
+              <button
+                onClick={() => setShowJoin(false)}
+                style={{
+                  flex: 1,
+                  background: 'none',
+                  border: `1px solid ${t.border}`,
+                  boxShadow: `0 1px 4px rgba(0,0,0,0.15)`,
+                  borderRadius: 8,
+                  padding: '9px',
+                  color: t.subText,
+                  fontSize: 12,
+                  cursor: 'pointer',
+                }}>
+                취소
+              </button>
             </div>
           </div>
         )}
@@ -199,35 +364,88 @@ export default function RoomList() {
         {/* 방 목록 */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {rooms.length === 0 && (
-            <div style={{ textAlign: 'center', color: t.subText, fontSize: 13, marginTop: 40, opacity: 0.5 }}>
+            <div
+              style={{
+                textAlign: 'center',
+                color: t.subText,
+                fontSize: 13,
+                marginTop: 40,
+                opacity: 0.5,
+              }}>
               아직 채팅방이 없어요
             </div>
           )}
           {rooms.map(room => (
-            <div key={room.id} onClick={() => navigate(`/room/${room.id}`)}
-              style={{ background: t.panel, borderRadius: 12, padding: '13px 15px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, border: `1px solid ${t.border}`, boxShadow: `0 1px 4px rgba(0,0,0,0.15)` }}>
-              <div style={{ width: 40, height: 40, borderRadius: '50%', background: t.point, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, color: t.bg, flexShrink: 0 }}>✦</div>
+            <div
+              key={room.id}
+              onClick={() => navigate(`/room/${room.id}`)}
+              style={{
+                background: t.panel,
+                borderRadius: 12,
+                padding: '13px 15px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+                border: `1px solid ${t.border}`,
+                boxShadow: `0 1px 4px rgba(0,0,0,0.15)`,
+              }}>
+              <div
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: '50%',
+                  background: t.point,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 16,
+                  color: t.bg,
+                  flexShrink: 0,
+                }}>
+                ✦
+              </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 14, fontWeight: 500, color: t.theirText }}>{room.name}</div>
-                <div style={{ fontSize: 11, color: t.subText, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {room.lastMsg
-                    ? `${room.lastMsg.characters?.name || ''}: ${room.lastMsg.type === 'chat' ? room.lastMsg.content : '[이미지]'}`
-                    : room.chapter || ''
-                  }
+                <div
+                  style={{
+                    fontSize: 11,
+                    color: t.subText,
+                    marginTop: 2,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}>
+                  {room.lastMsg ? `${room.lastMsg.characters?.name || ''}: ${room.lastMsg.type === 'chat' ? room.lastMsg.content : '[이미지]'}` : room.chapter || ''}
                 </div>
               </div>
               {room.unreadCount > 0 && (
-                <div style={{
-                  background: t.point, color: t.bg,
-                  borderRadius: 10, padding: '2px 7px',
-                  fontSize: 11, fontWeight: 600, flexShrink: 0
-                }}>
+                <div
+                  style={{
+                    background: t.point,
+                    color: t.bg,
+                    borderRadius: 10,
+                    padding: '2px 7px',
+                    fontSize: 11,
+                    fontWeight: 600,
+                    flexShrink: 0,
+                  }}>
                   {room.unreadCount}
                 </div>
               )}
               {room.created_by === userId && (
-                <button onMouseDown={e => e.stopPropagation()} onClick={(e) => deleteRoom(e, room.id, room.created_by)}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, opacity: 0.4, display: 'flex', alignItems: 'center' }}>
+                <button
+                  onMouseDown={e => e.stopPropagation()}
+                  onClick={e => deleteRoom(e, room.id, room.created_by)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: 4,
+                    opacity: 0.4,
+                    display: 'flex',
+                    alignItems: 'center',
+                  }}>
                   <Trash2 size={15} color={t.subText} />
                 </button>
               )}
