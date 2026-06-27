@@ -526,7 +526,7 @@ export default function Room() {
 
             {/* 메시지 목록 */}
             <div ref={messageListRef} onScroll={handleScroll} className={`chat-scroll${hideScroll ? ' hide-scroll' : ''}`}
-                style={{ position: 'relative', flex: 1, padding: '12px 10px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', gap: 8, overflowY: 'auto', background: t.bg }}>
+                style={{ position: 'relative', flex: 1, padding: '12px 10px', display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto', background: t.bg }}>
                 {filteredMessages.map(msg => {
                     const isMine = msg.user_id === userId
                     const char = msg.characters
