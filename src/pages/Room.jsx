@@ -4,7 +4,6 @@ import { supabase, uploadFile } from '../lib/supabase'
 import { THEMES, getTheme } from '../lib/themes'
 import { ChevronLeft, Link2, BookmarkPlus, Settings, Search, Calendar, Paperclip, ArrowUp, Eye, ArrowDown, ChevronDown, ChevronUp, Quote } from 'lucide-react'
 
-/* TODO: 나중에 Supabase messages 테이블에서 최근 chat 타입 메시지 content 가져오기 */
 const SLOT_DUMMY = [
     '아르카디아', '세렌디아', '발타자르', '엘리시온', '카르타고', '미스트헤임', '아스가르트',
     '티베리우스', '에오스테르', '네크로폴리스', '이스칸다르', '팔레스트리나',
@@ -87,16 +86,8 @@ function SlotEntrance({ roomName, bgColor, pointColor, onDone }) {
     }, [roomName])
 
     return (
-        <div style={{
-            position: 'fixed', inset: 0, zIndex: 200,
-            background: bgColor,
-            display: 'flex', flexDirection: 'column',
-            alignItems: 'center', justifyContent: 'center',
-            gap: 20
-        }}>
-            <div style={{ fontSize: 20, color: pointColor + '88', letterSpacing: 3, textAlign: 'center', width: 160 }}>
-                ENTERING{dots}
-            </div>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: bgColor, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 20 }}>
+            <div style={{ fontSize: 20, color: pointColor + '88', letterSpacing: 3, textAlign: 'center', width: 160 }}>ENTERING{dots}</div>
             <div style={{ width: '60%', maxWidth: 260, height: 0.5, background: pointColor + '44' }} />
             <div style={{ height: `${WINDOW_H}px`, overflow: 'hidden', position: 'relative', width: '100%', maxWidth: 360 }}>
                 <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 80, zIndex: 2, background: `linear-gradient(to bottom, ${bgColor} 20%, transparent)` }} />
@@ -114,13 +105,7 @@ function parseContent(text, actColor, actionStyle) {
     let last = 0, m
     while ((m = re.exec(text)) !== null) {
         if (m.index > last) parts.push(<span key={last}>{text.slice(last, m.index)}</span>)
-        parts.push(
-            <span key={m.index} style={{
-                fontSize: '0.85em',
-                color: actionStyle === 'dim' ? actColor : 'inherit',
-                opacity: actionStyle === 'dim' ? 0.6 : 1
-            }}>{m[0]}</span>
-        )
+        parts.push(<span key={m.index} style={{ fontSize: '0.85em', color: actionStyle === 'dim' ? actColor : 'inherit', opacity: actionStyle === 'dim' ? 0.6 : 1 }}>{m[0]}</span>)
         last = m.index + m[0].length
     }
     if (last < text.length) parts.push(<span key={last}>{text.slice(last)}</span>)
@@ -196,7 +181,9 @@ export default function Room() {
             const follow = roomData?.theme_follow ?? true
             setSharedThemeId(sharedId)
             setFollowShared(follow)
-            setTheme(getTheme(follow ? sharedId : myId))
+            const resolvedTheme = getTheme(follow ? sharedId : myId)
+            setTheme(resolvedTheme)
+            document.querySelector('meta[name="theme-color"]')?.setAttribute('content', resolvedTheme.panel)
 
             const { data: chars } = await supabase.from('characters').select().eq('user_id', user.id).eq('is_archived', false)
             setMyChars(chars || [])
@@ -210,47 +197,26 @@ export default function Room() {
 
             channelRef.current = supabase
                 .channel('room-' + roomId)
-                .on('postgres_changes', {
-                    event: 'UPDATE', schema: 'public', table: 'rooms',
-                    filter: `id=eq.${roomId}`
-                }, (payload) => {
+                .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rooms', filter: `id=eq.${roomId}` }, (payload) => {
                     setRoom(prev => ({ ...prev, ...payload.new }))
                 })
-                .on('postgres_changes', {
-                    event: '*', schema: 'public', table: 'messages',
-                    filter: `room_id=eq.${roomId}`
-                }, async (payload) => {
-                    console.log('realtime event:', payload.eventType, payload.new?.read_by)
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `room_id=eq.${roomId}` }, async (payload) => {
                     if (payload.eventType === 'INSERT') {
                         const newMsg = payload.new
-                        const { data: char } = await supabase
-                            .from('characters')
-                            .select('name, color, text_color, avatar_letter, image_url')
-                            .eq('id', newMsg.character_id)
-                            .single()
+                        const { data: char } = await supabase.from('characters').select('name, color, text_color, avatar_letter, image_url').eq('id', newMsg.character_id).single()
                         const fullMsg = { ...newMsg, characters: char || null }
                         setMessages(prev => {
                             const hastemp = prev.find(m => m.id.toString().startsWith('temp-') && m.content === newMsg.content && m.user_id === newMsg.user_id)
                             if (hastemp) return prev.map(m => m.id === hastemp.id ? fullMsg : m)
                             return [...prev, fullMsg]
                         })
-                        if (isAtBottomRef.current) {
-                            isAtBottomRef.current = true
-                        } else {
-                            setNewMsgAlert(true)
-                        }
+                        if (!isAtBottomRef.current) setNewMsgAlert(true)
                         const { data: { user: currentUser } } = await supabase.auth.getUser()
                         if (newMsg.user_id !== currentUser.id) {
-                            await supabase.from('messages')
-                                .update({ read_by: [...(newMsg.read_by || []), currentUser.id] })
-                                .eq('id', newMsg.id)
+                            await supabase.from('messages').update({ read_by: [...(newMsg.read_by || []), currentUser.id] }).eq('id', newMsg.id)
                         }
                     } else if (payload.eventType === 'UPDATE') {
-                        setMessages(prev => prev.map(m =>
-                            m.id === payload.new.id
-                                ? { ...m, read_by: payload.new.read_by, edited: payload.new.edited, content: payload.new.content }
-                                : m
-                        ))
+                        setMessages(prev => prev.map(m => m.id === payload.new.id ? { ...m, read_by: payload.new.read_by, edited: payload.new.edited, content: payload.new.content } : m))
                     }
                 })
                 .subscribe()
@@ -290,11 +256,7 @@ export default function Room() {
     }
 
     const fetchMessages = async () => {
-        const { data } = await supabase
-            .from('messages')
-            .select('*, characters(name, color, text_color, avatar_letter, image_url)')
-            .eq('room_id', roomId)
-            .order('created_at', { ascending: true })
+        const { data } = await supabase.from('messages').select('*, characters(name, color, text_color, avatar_letter, image_url)').eq('room_id', roomId).order('created_at', { ascending: true })
         if (data) {
             setMessages(data)
             markAsRead(data)
@@ -305,23 +267,10 @@ export default function Room() {
 
     const markAsRead = async (msgs) => {
         const { data: { user } } = await supabase.auth.getUser()
-        const unread = msgs.filter(m =>
-            m.user_id !== user.id &&
-            !m.read_by?.includes(user.id) &&
-            m.type !== 'chapter' &&
-            !m.id.toString().startsWith('temp-')
-        )
+        const unread = msgs.filter(m => m.user_id !== user.id && !m.read_by?.includes(user.id) && m.type !== 'chapter' && !m.id.toString().startsWith('temp-'))
         if (unread.length === 0) return
-        await Promise.all(unread.map(m =>
-            supabase.from('messages')
-                .update({ read_by: [...(m.read_by || []), user.id] })
-                .eq('id', m.id)
-        ))
-        setMessages(prev => prev.map(m =>
-            unread.find(u => u.id === m.id)
-                ? { ...m, read_by: [...(m.read_by || []), user.id] }
-                : m
-        ))
+        await Promise.all(unread.map(m => supabase.from('messages').update({ read_by: [...(m.read_by || []), user.id] }).eq('id', m.id)))
+        setMessages(prev => prev.map(m => unread.find(u => u.id === m.id) ? { ...m, read_by: [...(m.read_by || []), user.id] } : m))
     }
 
     const sendMessage = async () => {
@@ -334,9 +283,7 @@ export default function Room() {
             const last = messages[messages.length - 1]
             if (last.type === 'narration' && last.user_id === user.id) {
                 const merged = last.content + '\n' + content
-                setMessages(prev => prev.map(m =>
-                    m.id === last.id ? { ...m, content: merged } : m
-                ))
+                setMessages(prev => prev.map(m => m.id === last.id ? { ...m, content: merged } : m))
                 setInput('')
                 inputRef.current?.focus()
                 await supabase.from('messages').update({ content: merged }).eq('id', last.id)
@@ -345,30 +292,17 @@ export default function Room() {
         }
 
         const tempMsg = {
-            id: 'temp-' + Date.now(),
-            room_id: roomId,
-            user_id: user.id,
+            id: 'temp-' + Date.now(), room_id: roomId, user_id: user.id,
             character_id: isNarr ? null : activeChar?.id,
-            characters: activeChar ? {
-                name: activeChar.name, color: activeChar.color,
-                text_color: activeChar.text_color, avatar_letter: activeChar.avatar_letter,
-                image_url: activeChar.image_url
-            } : null,
-            type: isNarr ? 'narration' : 'chat',
-            content, edited: false,
-            created_at: new Date().toISOString()
+            characters: activeChar ? { name: activeChar.name, color: activeChar.color, text_color: activeChar.text_color, avatar_letter: activeChar.avatar_letter, image_url: activeChar.image_url } : null,
+            type: isNarr ? 'narration' : 'chat', content, edited: false, created_at: new Date().toISOString()
         }
         isAtBottomRef.current = true
         setMessages(prev => [...prev, tempMsg])
         setInput('')
         if (mode === 'narration') setMode('chat')
         inputRef.current?.focus()
-
-        await supabase.from('messages').insert({
-            room_id: roomId, user_id: user.id,
-            character_id: isNarr ? null : activeChar?.id,
-            type: isNarr ? 'narration' : 'chat', content
-        })
+        await supabase.from('messages').insert({ room_id: roomId, user_id: user.id, character_id: isNarr ? null : activeChar?.id, type: isNarr ? 'narration' : 'chat', content })
     }
 
     const editMessage = async (id) => {
@@ -389,17 +323,11 @@ export default function Room() {
     const submitChapter = async () => {
         if (!chapterName.trim()) return
         const { data: { user } } = await supabase.auth.getUser()
-        const tempChapter = {
-            id: 'temp-' + Date.now(), room_id: roomId, user_id: user.id,
-            type: 'chapter', content: chapterName.trim(), created_at: new Date().toISOString()
-        }
+        const tempChapter = { id: 'temp-' + Date.now(), room_id: roomId, user_id: user.id, type: 'chapter', content: chapterName.trim(), created_at: new Date().toISOString() }
         setMessages(prev => [...prev, tempChapter])
         setChapterName('')
         setShowChapterInput(false)
-        await supabase.from('messages').insert({
-            room_id: roomId, user_id: user.id,
-            type: 'chapter', content: tempChapter.content
-        })
+        await supabase.from('messages').insert({ room_id: roomId, user_id: user.id, type: 'chapter', content: tempChapter.content })
     }
 
     const saveSharedTheme = async (id) => {
@@ -422,37 +350,21 @@ export default function Room() {
         const url = await uploadFile(file, path)
         if (!url) return alert('업로드 실패')
         const tempMsg = {
-            id: 'temp-' + Date.now(), room_id: roomId, user_id: user.id,
-            character_id: activeChar?.id,
-            characters: activeChar ? {
-                name: activeChar.name, color: activeChar.color,
-                text_color: activeChar.text_color, avatar_letter: activeChar.avatar_letter,
-                image_url: activeChar.image_url
-            } : null,
+            id: 'temp-' + Date.now(), room_id: roomId, user_id: user.id, character_id: activeChar?.id,
+            characters: activeChar ? { name: activeChar.name, color: activeChar.color, text_color: activeChar.text_color, avatar_letter: activeChar.avatar_letter, image_url: activeChar.image_url } : null,
             type: 'image', content: url, edited: false, created_at: new Date().toISOString()
         }
         setMessages(prev => [...prev, tempMsg])
-        await supabase.from('messages').insert({
-            room_id: roomId, user_id: user.id,
-            character_id: activeChar?.id, type: 'image', content: url
-        })
+        await supabase.from('messages').insert({ room_id: roomId, user_id: user.id, character_id: activeChar?.id, type: 'image', content: url })
     }
 
     const t = theme || getTheme('dark-purple')
     const isNarrActive = mode === 'narration'
-    const filteredMessages = messages.filter(msg => {
-        if (!searchQuery) return true
-        return msg.content?.toLowerCase().includes(searchQuery.toLowerCase())
-    })
+    const filteredMessages = messages.filter(msg => { if (!searchQuery) return true; return msg.content?.toLowerCase().includes(searchQuery.toLowerCase()) })
 
     const iconBtn = (onClick, icon, active) => ({
         onClick,
-        style: {
-            background: active ? t.point + '22' : 'none',
-            border: `0.5px solid ${active ? t.point : t.border}`,
-            borderRadius: 8, padding: '6px 8px', cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center'
-        }
+        style: { background: active ? t.point + '22' : 'none', border: `0.5px solid ${active ? t.point : t.border}`, borderRadius: 8, padding: '6px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }
     })
 
     if (!theme) return (
@@ -464,9 +376,7 @@ export default function Room() {
     return (
         <div style={{ height: '100dvh', background: t.bg, '--scrollbar-color': t.border, display: 'flex', flexDirection: 'column', maxWidth: 480, margin: '0 auto' }}>
 
-            {showSlot && room && (
-                <SlotEntrance roomName={room.name} bgColor={t.bg} pointColor={t.point} onDone={() => setShowSlot(false)} />
-            )}
+            {showSlot && room && <SlotEntrance roomName={room.name} bgColor={t.bg} pointColor={t.point} onDone={() => setShowSlot(false)} />}
 
             {/* 헤더 */}
             <div style={{ background: t.panel, borderBottom: `0.5px solid ${t.border}`, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 8, position: 'sticky', top: 0, zIndex: 10 }}>
@@ -477,21 +387,11 @@ export default function Room() {
                     <div style={{ fontSize: 14, fontWeight: 500, color: t.theirText }}>{room?.name}</div>
                     <div style={{ fontSize: 10, color: t.subText }}>{room?.chapter}</div>
                 </div>
-                <button {...iconBtn(() => openPanel(showInvite ? null : 'invite'), null, showInvite)}>
-                    <Link2 size={15} color={showInvite ? t.point : t.subText} />
-                </button>
-                <button {...iconBtn(addChapter, null, false)} style={{ ...iconBtn(addChapter, null, false).style, fontSize: 12, color: t.subText, gap: 3 }}>
-                    <BookmarkPlus size={15} color={t.subText} />
-                </button>
-                <button {...iconBtn(() => openPanel(showTheme ? null : 'theme'), null, showTheme)}>
-                    <Settings size={15} color={showTheme ? t.point : t.subText} />
-                </button>
-                <button {...iconBtn(() => openPanel(showSearch ? null : 'search'), null, showSearch)}>
-                    <Search size={15} color={showSearch ? t.point : t.subText} />
-                </button>
-                <button {...iconBtn(() => openPanel(showCalendar ? null : 'calendar'), null, showCalendar)}>
-                    <Calendar size={15} color={showCalendar ? t.point : t.subText} />
-                </button>
+                <button {...iconBtn(() => openPanel(showInvite ? null : 'invite'), null, showInvite)}><Link2 size={15} color={showInvite ? t.point : t.subText} /></button>
+                <button {...iconBtn(addChapter, null, false)} style={{ ...iconBtn(addChapter, null, false).style, fontSize: 12, color: t.subText, gap: 3 }}><BookmarkPlus size={15} color={t.subText} /></button>
+                <button {...iconBtn(() => openPanel(showTheme ? null : 'theme'), null, showTheme)}><Settings size={15} color={showTheme ? t.point : t.subText} /></button>
+                <button {...iconBtn(() => openPanel(showSearch ? null : 'search'), null, showSearch)}><Search size={15} color={showSearch ? t.point : t.subText} /></button>
+                <button {...iconBtn(() => openPanel(showCalendar ? null : 'calendar'), null, showCalendar)}><Calendar size={15} color={showCalendar ? t.point : t.subText} /></button>
             </div>
 
             {/* 초대 코드 패널 */}
@@ -508,7 +408,7 @@ export default function Room() {
             {/* 테마 패널 */}
             {showTheme && (
                 <div style={{ position: 'fixed', top: 49, left: 0, right: 0, bottom: 0, zIndex: 50, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }} onClick={() => setShowTheme(false)}>
-                    <div style={{ background: t.panel, padding: '12px 14px', borderBottom: `0.5px solid ${t.border}`, maxWidth: 480, margin: '0 auto', width: '100%' }} onClick={e => e.stopPropagation()}>
+                    <div style={{ background: t.panel, padding: '12px 14px', borderBottom: `0.5px solid ${t.border}`, maxWidth: 480, margin: '0 auto', width: '100%', overflowY: 'auto', maxHeight: '80vh' }} onClick={e => e.stopPropagation()}>
                         <div style={{ fontSize: 11, color: t.subText, marginBottom: 10 }}>채팅방 테마 설정</div>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, padding: '8px 10px', background: t.bg, borderRadius: 8, border: `0.5px solid ${t.border}` }}>
                             <div>
@@ -552,19 +452,11 @@ export default function Room() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10 }}>
                             <div style={{ fontSize: 12, color: t.subText, width: 70 }}>지문 스타일</div>
                             <div style={{ display: 'flex', gap: 6 }}>
-                                {[
-                                    { val: 'dim', label: '흐리게' },
-                                    { val: 'bright', label: '밝게' },
-                                ].map(s => (
-                                    <button key={s.val} onClick={async () => {
-                                        setActionStyle(s.val)
-                                        await supabase.from('rooms').update({ action_style: s.val }).eq('id', roomId)
-                                    }} style={{
-                                        padding: '3px 9px', borderRadius: 10, fontSize: 11, cursor: 'pointer',
-                                        border: actionStyle === s.val ? `1.5px solid ${t.point}` : `0.5px solid ${t.border}`,
-                                        background: actionStyle === s.val ? t.point + '22' : 'none',
-                                        color: actionStyle === s.val ? t.point : t.subText
-                                    }}>{s.label}</button>
+                                {[{ val: 'dim', label: '흐리게' }, { val: 'bright', label: '밝게' }].map(s => (
+                                    <button key={s.val} onClick={async () => { setActionStyle(s.val); await supabase.from('rooms').update({ action_style: s.val }).eq('id', roomId) }}
+                                        style={{ padding: '3px 9px', borderRadius: 10, fontSize: 11, cursor: 'pointer', border: actionStyle === s.val ? `1.5px solid ${t.point}` : `0.5px solid ${t.border}`, background: actionStyle === s.val ? t.point + '22' : 'none', color: actionStyle === s.val ? t.point : t.subText }}>
+                                        {s.label}
+                                    </button>
                                 ))}
                             </div>
                         </div>
@@ -572,14 +464,8 @@ export default function Room() {
                             <div style={{ marginTop: 10 }}>
                                 <div style={{ fontSize: 12, color: t.subText, marginBottom: 6 }}>방 이름</div>
                                 <div style={{ display: 'flex', gap: 6 }}>
-                                    <input
-                                        value={roomNameText}
-                                        onChange={e => setRoomNameText(e.target.value)}
-                                        onFocus={() => setRoomNameText(room?.name || '')}
-                                        onKeyDown={e => e.key === 'Enter' && saveRoomName()}
-                                        placeholder={room?.name}
-                                        style={{ flex: 1, background: t.bg, border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '5px 10px', color: t.inputText, fontSize: 12, outline: 'none' }}
-                                    />
+                                    <input value={roomNameText} onChange={e => setRoomNameText(e.target.value)} onFocus={() => setRoomNameText(room?.name || '')} onKeyDown={e => e.key === 'Enter' && saveRoomName()} placeholder={room?.name}
+                                        style={{ flex: 1, background: t.bg, border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '5px 10px', color: t.inputText, fontSize: 12, outline: 'none' }} />
                                     <button onClick={saveRoomName} style={{ background: t.point, border: 'none', borderRadius: 8, padding: '5px 12px', color: '#fff', fontSize: 12, cursor: 'pointer' }}>저장</button>
                                 </div>
                             </div>
@@ -621,9 +507,7 @@ export default function Room() {
                 <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <div style={{ background: t.panel, borderRadius: 16, padding: 20, width: 280, border: `0.5px solid ${t.border}` }}>
                         <div style={{ fontSize: 14, color: t.theirText, fontWeight: 500, marginBottom: 12 }}>화수 이름</div>
-                        <input value={chapterName} onChange={e => setChapterName(e.target.value)}
-                            onKeyDown={e => e.key === 'Enter' && submitChapter()}
-                            placeholder="예) 2화 · 균열" autoFocus
+                        <input value={chapterName} onChange={e => setChapterName(e.target.value)} onKeyDown={e => e.key === 'Enter' && submitChapter()} placeholder="예) 2화 · 균열" autoFocus
                             style={{ width: '100%', background: t.bg, border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '9px 12px', color: t.inputText, fontSize: 13, outline: 'none', boxSizing: 'border-box', marginBottom: 12 }} />
                         <div style={{ display: 'flex', gap: 8 }}>
                             <button onClick={submitChapter} style={{ flex: 1, background: t.point, border: 'none', borderRadius: 8, padding: 9, color: '#fff', fontSize: 13, cursor: 'pointer' }}>추가</button>
@@ -633,27 +517,16 @@ export default function Room() {
                 </div>
             )}
 
-            {/* 메시지 목록 */}
+            {/* 새 메시지 알림 버튼 */}
             {newMsgAlert && (
-                <div onClick={scrollToBottom} style={{
-                    position: 'fixed', bottom: 110, left: '50%', transform: 'translateX(-50%)',
-                    zIndex: 20, background: t.panel,
-                    border: `1px solid ${t.border}`,
-                    color: t.theirText,
-                    padding: '6px 16px', borderRadius: 20, fontSize: 12,
-                    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
-                }}>
-                    <ArrowDown size={13} color='#fff' />
-                    새 대화
+                <div onClick={scrollToBottom} style={{ position: 'fixed', bottom: 110, left: '50%', transform: 'translateX(-50%)', zIndex: 20, background: t.panel, border: `1px solid ${t.border}`, color: t.theirText, padding: '6px 16px', borderRadius: 20, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>
+                    <ArrowDown size={13} color='#fff' />새 대화
                 </div>
             )}
-            <div
-                ref={messageListRef}
-                onScroll={handleScroll}
-                className={`chat-scroll${hideScroll ? ' hide-scroll' : ''}`}
-                style={{ position: 'relative', flex: 1, padding: '12px 10px', display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto', background: t.bg }}
-            >
+
+            {/* 메시지 목록 */}
+            <div ref={messageListRef} onScroll={handleScroll} className={`chat-scroll${hideScroll ? ' hide-scroll' : ''}`}
+                style={{ position: 'relative', flex: 1, padding: '12px 10px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', gap: 8, overflowY: 'auto', background: t.bg }}>
                 {filteredMessages.map(msg => {
                     const isMine = msg.user_id === userId
                     const char = msg.characters
@@ -669,9 +542,7 @@ export default function Room() {
                     if (msg.type === 'narration') return (
                         <div key={msg.id} id={'msg-' + msg.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: '2px 0' }}>
                             <div style={{ display: 'flex', gap: 3 }}>{[0, 1, 2].map(i => <div key={i} style={{ width: 3, height: 3, borderRadius: '50%', background: t.narrColor }} />)}</div>
-                            {msg.content.split('\n').map((line, i) => (
-                                <div key={i} style={{ fontSize: 11, color: t.narrColor, fontStyle: 'italic', textAlign: 'center', padding: '0 16px', lineHeight: 1.6 }}>{line}</div>
-                            ))}
+                            {msg.content.split('\n').map((line, i) => <div key={i} style={{ fontSize: 11, color: t.narrColor, fontStyle: 'italic', textAlign: 'center', padding: '0 16px', lineHeight: 1.6 }}>{line}</div>)}
                             <div style={{ display: 'flex', gap: 3 }}>{[0, 1, 2].map(i => <div key={i} style={{ width: 3, height: 3, borderRadius: '50%', background: t.narrColor }} />)}</div>
                         </div>
                     )
@@ -719,14 +590,9 @@ export default function Room() {
                                     </div>
                                 )}
                                 <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 2 }}>
-                                    {msg.user_id === userId && readReceipt !== 'none' && (msg.read_by || []).some(id => id !== msg.user_id) && (
-                                        <Eye size={10} color={t.subText} opacity={0.4} />
-                                    )}
+                                    {msg.user_id === userId && readReceipt !== 'none' && (msg.read_by || []).some(id => id !== msg.user_id) && <Eye size={10} color={t.subText} opacity={0.4} />}
                                     <div style={{ fontSize: 9, color: t.subText, opacity: 0.6 }}>
-                                        {searchQuery
-                                            ? new Date(msg.created_at).toLocaleDateString('ko-KR') + ' ' + new Date(msg.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
-                                            : new Date(msg.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
-                                        }
+                                        {searchQuery ? new Date(msg.created_at).toLocaleDateString('ko-KR') + ' ' + new Date(msg.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : new Date(msg.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
                                     </div>
                                 </div>
                             </div>
@@ -738,22 +604,10 @@ export default function Room() {
 
             {/* 입력 영역 */}
             <div style={{ background: t.panel, borderTop: `0.5px solid ${t.border}`, padding: '8px 10px 12px', touchAction: 'none', position: 'relative' }}>
-                {/* 토글 버튼 */}
                 {myChars.length > 0 && (
-                    <button
-                        onMouseDown={e => e.preventDefault()}
-                        onClick={() => setShowCharList(v => !v)}
-                        style={{
-                            position: 'absolute', top: -20, left: 10,
-                            background: t.panel, border: `0.5px solid ${t.border}`,
-                            borderRadius: '6px 6px 0 0', borderBottom: `1px solid ${t.panel}`,
-                            padding: '2px 10px', cursor: 'pointer',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center'
-                        }}>
-                        {showCharList
-                            ? <ChevronDown size={13} color={t.subText} />
-                            : <ChevronUp size={13} color={t.subText} />
-                        }
+                    <button onMouseDown={e => e.preventDefault()} onClick={() => setShowCharList(v => !v)}
+                        style={{ position: 'absolute', top: -20, left: 10, background: t.panel, border: `0.5px solid ${t.border}`, borderRadius: '6px 6px 0 0', borderBottom: `1px solid ${t.panel}`, padding: '2px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        {showCharList ? <ChevronDown size={13} color={t.subText} /> : <ChevronUp size={13} color={t.subText} />}
                     </button>
                 )}
                 {myChars.length > 0 && showCharList && (
@@ -762,12 +616,10 @@ export default function Room() {
                         <div style={{ display: 'flex', gap: 5, flex: 1, flexWrap: 'wrap' }}>
                             {myChars.map(c => (
                                 <button key={c.id} onMouseDown={e => e.preventDefault()} onClick={async () => {
-                                    setActiveChar(c)
-                                    setMode('chat')
+                                    setActiveChar(c); setMode('chat')
                                     const { data: { user } } = await supabase.auth.getUser()
                                     await supabase.from('room_members').update({ last_char_id: c.id }).eq('room_id', roomId).eq('user_id', user.id)
-                                }}
-                                    style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 8px 3px 4px', borderRadius: 20, border: activeChar?.id === c.id && mode === 'chat' ? `1.5px solid ${c.color || t.point}` : `1px solid ${t.border}`, background: activeChar?.id === c.id && mode === 'chat' ? (c.color + '22') : 'none', cursor: 'pointer' }}>
+                                }} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 8px 3px 4px', borderRadius: 20, border: activeChar?.id === c.id && mode === 'chat' ? `1.5px solid ${c.color || t.point}` : `1px solid ${t.border}`, background: activeChar?.id === c.id && mode === 'chat' ? (c.color + '22') : 'none', cursor: 'pointer' }}>
                                     <div style={{ width: 18, height: 18, borderRadius: '50%', background: c.color || t.point, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, color: c.text_color || '#fff', overflow: 'hidden', flexShrink: 0 }}>
                                         {c.image_url ? <img src={c.image_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : c.avatar_letter}
                                     </div>
@@ -787,26 +639,21 @@ export default function Room() {
                     </button>
                     <input type="file" accept="image/*,video/*,.gif" ref={fileInputRef} onChange={e => sendImage(e.target.files[0])} style={{ display: 'none' }} />
                     <div style={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'flex-end' }}>
-                        <textarea
-                            ref={inputRef}
-                            value={input}
+                        <textarea ref={inputRef} value={input}
                             onChange={e => { setInput(e.target.value); e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 80) + 'px' }}
-                            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() } }}
+                            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && window.innerWidth > 768) { e.preventDefault(); sendMessage() } }}
                             placeholder={isNarrActive ? '나레이션 입력...' : activeChar ? `${activeChar.name}으로 입력...` : '캐릭터를 먼저 추가해주세요'}
+                            enterKeyHint="enter"
                             rows={1}
                             style={{ flex: 1, background: t.inputBg, border: `0.5px solid ${isNarrActive ? t.point : t.border}`, borderRadius: 11, padding: '8px 11px', color: isNarrActive ? t.narrColor : t.inputText, fontSize: 13, outline: 'none', resize: 'none', lineHeight: 1.5, fontStyle: isNarrActive ? 'italic' : 'normal' }}
                         />
                         {myChars.length > 0 && (
                             <button onMouseDown={e => e.preventDefault()} onClick={() => setMode(mode === 'narration' ? 'chat' : 'narration')}
-                                style={{
-                                    position: 'absolute', right: 8, bottom: 7,
-                                    padding: '2px', borderRadius: 6, cursor: 'pointer',
-                                    border: 'none', background: 'none',
-                                    display: 'flex', alignItems: 'center'
-                                }}>
+                                style={{ position: 'absolute', right: 8, bottom: 7, padding: '2px', borderRadius: 6, cursor: 'pointer', border: 'none', background: 'none', display: 'flex', alignItems: 'center' }}>
                                 <Quote size={14} color={isNarrActive ? t.narrColor : t.subText} />
                             </button>
-                        )}</div>
+                        )}
+                    </div>
                     <button onMouseDown={e => e.preventDefault()} onClick={sendMessage}
                         style={{ width: 36, height: 36, borderRadius: '50%', border: 'none', background: t.point, cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         <ArrowUp size={18} color='#fff' strokeWidth={2.5} />
