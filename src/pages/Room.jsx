@@ -209,6 +209,7 @@ export default function Room() {
           setRoom(prev => ({ ...prev, ...payload.new }))
         })
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'room_members', filter: `room_id=eq.${roomId}` }, payload => {
+          console.log('room_members update:', payload)
           // 상대방 타이핑 감지
           if (payload.new.user_id !== userIdRef.current) {
             if (payload.new.is_typing && payload.new.typing_char_name) {
@@ -320,6 +321,10 @@ export default function Room() {
     // 뒤로가기(Backspace) 제외
     if (e.nativeEvent?.inputType === 'deleteContentBackward') return
     if (!activeChar || !userIdRef.current) return
+
+    console.log('typing update sent:', activeChar.name)
+    const { error } = await supabase.from('room_members').update({ is_typing: true, typing_char_name: activeChar.name }).eq('room_id', roomId).eq('user_id', userIdRef.current)
+    console.log('typing update error:', error)
 
     await supabase.from('room_members').update({ is_typing: true, typing_char_name: activeChar.name }).eq('room_id', roomId).eq('user_id', userIdRef.current)
 
