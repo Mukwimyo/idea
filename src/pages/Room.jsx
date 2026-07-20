@@ -595,6 +595,41 @@ export default function Room() {
                     저장
                   </button>
                 </div>
+                <div style={{ marginTop: 10 }}>
+                  <div style={{ fontSize: 12, color: t.subText, marginBottom: 6 }}>대표 이미지</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ width: 44, height: 44, borderRadius: '50%', background: t.bg, border: `0.5px solid ${t.border}`, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, color: t.subText, flexShrink: 0 }}>{room?.cover_image ? <img src={room.cover_image} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '✦'}</div>
+                    <label style={{ flex: 1, background: t.bg, border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '5px 12px', color: t.subText, fontSize: 12, cursor: 'pointer', textAlign: 'center' }}>
+                      이미지 선택
+                      <input
+                        type="file"
+                        accept="image/*"
+                        style={{ display: 'none' }}
+                        onChange={async e => {
+                          const file = e.target.files[0]
+                          if (!file) return
+                          const ext = file.name.split('.').pop()
+                          const path = `rooms/${roomId}/${Date.now()}.${ext}`
+                          const url = await uploadFile(file, path)
+                          if (url) {
+                            await supabase.from('rooms').update({ cover_image: url }).eq('id', roomId)
+                            setRoom(prev => ({ ...prev, cover_image: url }))
+                          }
+                        }}
+                      />
+                    </label>
+                    {room?.cover_image && (
+                      <button
+                        onClick={async () => {
+                          await supabase.from('rooms').update({ cover_image: null }).eq('id', roomId)
+                          setRoom(prev => ({ ...prev, cover_image: null }))
+                        }}
+                        style={{ background: 'none', border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '5px 10px', color: t.subText, fontSize: 12, cursor: 'pointer' }}>
+                        삭제
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -857,10 +892,9 @@ export default function Room() {
                 to { transform: translateX(0); }
             }
             @keyframes typing-dot {
-                @keyframes typing-dot {
-                    0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
-                    30% { transform: translateY(-4px); opacity: 1; }
-                }
+                0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+                30% { transform: translateY(-4px); opacity: 1; }
+            }
             `}</style>
     </div>
   )

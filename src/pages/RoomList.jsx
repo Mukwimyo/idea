@@ -390,21 +390,7 @@ export default function RoomList() {
                 border: `1px solid ${t.border}`,
                 boxShadow: `0 1px 4px rgba(0,0,0,0.15)`,
               }}>
-              <div
-                style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: '50%',
-                  background: t.point,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: 16,
-                  color: t.bg,
-                  flexShrink: 0,
-                }}>
-                ✦
-              </div>
+              <div style={{ width: 40, height: 40, borderRadius: '50%', background: t.point, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, color: t.bg, flexShrink: 0, overflow: 'hidden' }}>{room.cover_image ? <img src={room.cover_image} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '✦'}</div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 14, fontWeight: 500, color: t.theirText }}>{room.name}</div>
                 <div
