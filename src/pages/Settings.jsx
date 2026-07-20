@@ -150,6 +150,7 @@ export default function Settings() {
     const { data } = await supabase.from('profiles').select('theme_id, font_id, show_entering').eq('id', user.id).single()
     if (data?.theme_id) setMyThemeId(data.theme_id)
     if (data?.font_id) setMyFontId(data.font_id)
+    if (data?.show_entering !== undefined) setShowEntering(data.show_entering)
 
     if ('serviceWorker' in navigator) {
       const registration = await navigator.serviceWorker.getRegistration('/idea/sw.js')
