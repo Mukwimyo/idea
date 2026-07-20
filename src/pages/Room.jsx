@@ -147,7 +147,9 @@ export default function Room() {
   const [newMsgAlert, setNewMsgAlert] = useState(false)
   const [roomNameText, setRoomNameText] = useState('')
   const [showCharList, setShowCharList] = useState(true)
-  const [typingInfo, setTypingInfo] = useState(null) // { charName: string }
+  const [typingInfo, setTypingInfo] = useState(null)
+  const [showEntering, setShowEntering] = useState(true)
+  const [slideIn, setSlideIn] = useState(false)
   const scrollTimerRef = useRef(null)
   const typingTimerRef = useRef(null)
   const fileInputRef = useRef(null)
@@ -180,6 +182,9 @@ export default function Room() {
       setReadReceipt(roomData?.read_receipt_style || 'text')
       setActionStyle(roomData?.action_style || 'dim')
       setIsOwner(roomData?.created_by === user.id)
+      const enteringEnabled = roomData?.show_entering ?? true
+      setShowEntering(enteringEnabled)
+      if (!enteringEnabled) setSlideIn(true)
 
       const { data: profile } = await supabase.from('profiles').select('theme_id, last_char_id').eq('id', user.id).single()
       const myId = profile?.theme_id || 'dark-purple'
@@ -462,8 +467,17 @@ export default function Room() {
     )
 
   return (
-    <div style={{ height: '100dvh', background: t.bg, '--scrollbar-color': t.border, display: 'flex', flexDirection: 'column', maxWidth: 480, margin: '0 auto' }}>
-      {showSlot && room && <SlotEntrance roomName={room.name} bgColor={t.bg} pointColor={t.point} onDone={() => setShowSlot(false)} />}
+    <div style={{ height: '100dvh', background: t.bg, '--scrollbar-color': t.border, display: 'flex', flexDirection: 'column', maxWidth: 480, margin: '0 auto', animation: !showEntering ? 'slide-in-right 0.3s ease' : 'none' }}>
+      {showSlot && room && showEntering && (
+        <SlotEntrance
+          roomName={room.name}
+          bgColor={t.bg}
+          pointColor={t.point}
+          onDone={() => {
+            setShowSlot(false)
+          }}
+        />
+      )}
 
       {/* 헤더 */}
       <div style={{ background: t.panel, borderBottom: `0.5px solid ${t.border}`, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 8, position: 'sticky', top: 0, zIndex: 10 }}>
@@ -570,6 +584,18 @@ export default function Room() {
                     {s.label}
                   </button>
                 ))}
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 10, padding: '8px 10px', background: t.bg, borderRadius: 8, border: `0.5px solid ${t.border}` }}>
+              <div style={{ fontSize: 12, color: t.theirText }}>입장 애니메이션</div>
+              <div
+                onClick={async () => {
+                  const next = !showEntering
+                  setShowEntering(next)
+                  await supabase.from('rooms').update({ show_entering: next }).eq('id', roomId)
+                }}
+                style={{ width: 40, height: 22, borderRadius: 11, cursor: 'pointer', transition: 'background 0.2s', background: showEntering ? t.point : t.border, position: 'relative', flexShrink: 0 }}>
+                <div style={{ position: 'absolute', top: 3, left: showEntering ? 20 : 3, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
               </div>
             </div>
             {isOwner && (
@@ -838,6 +864,11 @@ export default function Room() {
       </div>
 
       <style>{`
+            @keyframes slide-in-right {
+                from { transform: translateX(100%); }
+                to { transform: translateX(0); }
+            }
+            @keyframes typing-dot {
                 @keyframes typing-dot {
                     0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
                     30% { transform: translateY(-4px); opacity: 1; }
