@@ -186,6 +186,9 @@ export default function Room() {
       setShowEntering(enteringEnabled)
 
       const { data: profile } = await supabase.from('profiles').select('theme_id, last_char_id, show_entering').eq('id', user.id).single()
+      const enteringEnabled = profile?.show_entering ?? true
+      setShowEntering(enteringEnabled)
+      if (!enteringEnabled) setShowSlot(false)
       const myId = profile?.theme_id || 'dark-purple'
       setMyThemeId(myId)
 
