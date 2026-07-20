@@ -182,11 +182,10 @@ export default function Room() {
       setReadReceipt(roomData?.read_receipt_style || 'text')
       setActionStyle(roomData?.action_style || 'dim')
       setIsOwner(roomData?.created_by === user.id)
-      const enteringEnabled = roomData?.show_entering ?? true
+      const enteringEnabled = profile?.show_entering ?? true
       setShowEntering(enteringEnabled)
-      if (!enteringEnabled) setSlideIn(true)
 
-      const { data: profile } = await supabase.from('profiles').select('theme_id, last_char_id').eq('id', user.id).single()
+      const { data: profile } = await supabase.from('profiles').select('theme_id, last_char_id, show_entering').eq('id', user.id).single()
       const myId = profile?.theme_id || 'dark-purple'
       setMyThemeId(myId)
 
@@ -584,18 +583,6 @@ export default function Room() {
                     {s.label}
                   </button>
                 ))}
-              </div>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 10, padding: '8px 10px', background: t.bg, borderRadius: 8, border: `0.5px solid ${t.border}` }}>
-              <div style={{ fontSize: 12, color: t.theirText }}>입장 애니메이션</div>
-              <div
-                onClick={async () => {
-                  const next = !showEntering
-                  setShowEntering(next)
-                  await supabase.from('rooms').update({ show_entering: next }).eq('id', roomId)
-                }}
-                style={{ width: 40, height: 22, borderRadius: 11, cursor: 'pointer', transition: 'background 0.2s', background: showEntering ? t.point : t.border, position: 'relative', flexShrink: 0 }}>
-                <div style={{ position: 'absolute', top: 3, left: showEntering ? 20 : 3, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
               </div>
             </div>
             {isOwner && (
