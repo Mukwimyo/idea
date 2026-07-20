@@ -182,8 +182,6 @@ export default function Room() {
       setReadReceipt(roomData?.read_receipt_style || 'text')
       setActionStyle(roomData?.action_style || 'dim')
       setIsOwner(roomData?.created_by === user.id)
-      const enteringEnabled = profile?.show_entering ?? true
-      setShowEntering(enteringEnabled)
 
       const { data: profile } = await supabase.from('profiles').select('theme_id, last_char_id, show_entering').eq('id', user.id).single()
       const enteringEnabled = profile?.show_entering ?? true
