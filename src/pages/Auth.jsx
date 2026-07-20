@@ -43,8 +43,7 @@ export default function Auth() {
         }}>
         <div style={{ textAlign: 'center', marginBottom: 8 }}>
           <div style={{ fontSize: 32, marginBottom: 6 }}>✦</div>
-          <div style={{ fontSize: 22, fontWeight: 600, color: '#fff' }}>이데아</div>
-          <div style={{ fontSize: 12, color: '#8b84c4', marginTop: 3 }}>역극 플랫폼</div>
+          <div style={{ fontSize: 22, fontWeight: 600, color: '#fff' }}>Idea</div>
         </div>
         <input
           type="email"
