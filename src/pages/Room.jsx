@@ -747,7 +747,7 @@ export default function Room() {
 
         {/* 입력중 표시 */}
         {typingInfo && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '2px 0' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '2px 0' }}>
             <div style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
               <div style={{ width: 5, height: 5, borderRadius: '50%', background: t.subText, opacity: 0.6, animation: 'typing-dot 1.2s infinite', animationDelay: '0s' }} />
               <div style={{ width: 5, height: 5, borderRadius: '50%', background: t.subText, opacity: 0.6, animation: 'typing-dot 1.2s infinite', animationDelay: '0.2s' }} />
