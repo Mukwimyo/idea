@@ -186,7 +186,7 @@ export default function Settings() {
       data: { user },
     } = await supabase.auth.getUser()
     if (pushEnabled) {
-      await unsubscribePush()
+      await unsubscribePush(user.id)
       setPushEnabled(false)
     } else {
       const result = await subscribePush(user.id)
@@ -199,6 +199,14 @@ export default function Settings() {
       }
     }
     setPushLoading(false)
+  }
+
+  const handleLogout = async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (user) await unsubscribePush(user.id)
+    await supabase.auth.signOut()
   }
 
   const t = getTheme(myThemeId)
@@ -511,7 +519,7 @@ export default function Settings() {
                 justifyContent: 'space-between',
                 cursor: 'pointer',
               }}
-              onClick={() => supabase.auth.signOut()}>
+              onClick={handleLogout}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <LogOut size={15} color="#f87171" />
                 <div style={{ fontSize: 13, color: '#f87171' }}>로그아웃</div>

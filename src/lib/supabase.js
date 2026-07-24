@@ -70,6 +70,11 @@ export const subscribePush = async userId => {
   }
 
   const subJson = subscription.toJSON()
+  const { error: cleanupError } = await supabase.from('push_subscriptions').delete().eq('endpoint', subJson.endpoint).neq('user_id', userId)
+  if (cleanupError) {
+    console.warn('stale push subscription cleanup skipped:', cleanupError.message)
+  }
+
   const { error } = await supabase.from('push_subscriptions').upsert(
     {
       user_id: userId,
@@ -84,12 +89,12 @@ export const subscribePush = async userId => {
   return { success: true }
 }
 
-export const unsubscribePush = async () => {
+export const unsubscribePush = async userId => {
   const registration = await navigator.serviceWorker.getRegistration('/idea/sw.js')
   if (registration) {
     const subscription = await registration.pushManager.getSubscription()
     if (subscription) {
-      await supabase.from('push_subscriptions').delete().eq('endpoint', subscription.endpoint)
+      await supabase.from('push_subscriptions').delete().eq('endpoint', subscription.endpoint).eq('user_id', userId)
       await subscription.unsubscribe()
     }
   }
