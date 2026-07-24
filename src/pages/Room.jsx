@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { supabase, uploadFile } from '../lib/supabase'
+import { supabase, uploadFile, validateImageFile } from '../lib/supabase'
 import { THEMES, getTheme } from '../lib/themes'
 import { ChevronLeft, Link2, BookmarkPlus, Settings, Search, Calendar, Paperclip, ArrowUp, Eye, ArrowDown, ChevronDown, ChevronUp, Quote } from 'lucide-react'
 
@@ -149,7 +149,6 @@ export default function Room() {
   const [showCharList, setShowCharList] = useState(true)
   const [typingInfo, setTypingInfo] = useState(null)
   const [showEntering, setShowEntering] = useState(true)
-  const [slideIn, setSlideIn] = useState(false)
   const scrollTimerRef = useRef(null)
   const typingTimerRef = useRef(null)
   const fileInputRef = useRef(null)
@@ -334,6 +333,26 @@ export default function Room() {
     }, 1500)
   }
 
+  const persistMessage = async (tempId, message) => {
+    setMessages(prev => prev.map(m => (m.id === tempId ? { ...m, delivery_state: 'sending' } : m)))
+    const { error } = await supabase.from('messages').insert(message)
+    if (error) {
+      console.error('message insert failed:', error.message)
+      setMessages(prev => prev.map(m => (m.id === tempId ? { ...m, delivery_state: 'failed' } : m)))
+      return false
+    }
+    return true
+  }
+
+  const retryMessage = msg =>
+    persistMessage(msg.id, {
+      room_id: msg.room_id,
+      user_id: msg.user_id,
+      character_id: msg.character_id,
+      type: msg.type,
+      content: msg.content,
+    })
+
   const sendMessage = async () => {
     if (!input.trim()) return
     // 전송 시 타이핑 상태 즉시 해제
@@ -375,13 +394,20 @@ export default function Room() {
       content,
       edited: false,
       created_at: new Date().toISOString(),
+      delivery_state: 'sending',
     }
     isAtBottomRef.current = true
     setMessages(prev => [...prev, tempMsg])
     setInput('')
     if (mode === 'narration') setMode('chat')
     inputRef.current?.focus()
-    await supabase.from('messages').insert({ room_id: roomId, user_id: user.id, character_id: isNarr ? null : activeChar?.id, type: isNarr ? 'narration' : 'chat', content })
+    await persistMessage(tempMsg.id, {
+      room_id: roomId,
+      user_id: user.id,
+      character_id: isNarr ? null : activeChar?.id,
+      type: isNarr ? 'narration' : 'chat',
+      content,
+    })
   }
 
   const editMessage = async id => {
@@ -425,6 +451,11 @@ export default function Room() {
 
   const sendImage = async file => {
     if (!file) return
+    const validationError = validateImageFile(file)
+    if (validationError) {
+      alert(validationError)
+      return
+    }
     const {
       data: { user },
     } = await supabase.auth.getUser()
@@ -442,9 +473,16 @@ export default function Room() {
       content: url,
       edited: false,
       created_at: new Date().toISOString(),
+      delivery_state: 'sending',
     }
     setMessages(prev => [...prev, tempMsg])
-    await supabase.from('messages').insert({ room_id: roomId, user_id: user.id, character_id: activeChar?.id, type: 'image', content: url })
+    await persistMessage(tempMsg.id, {
+      room_id: roomId,
+      user_id: user.id,
+      character_id: activeChar?.id,
+      type: 'image',
+      content: url,
+    })
   }
 
   const t = theme || getTheme('dark-purple')
@@ -734,6 +772,11 @@ export default function Room() {
                     <div key={i} style={{ width: 3, height: 3, borderRadius: '50%', background: t.narrColor }} />
                   ))}
                 </div>
+                {msg.delivery_state === 'failed' && (
+                  <button onClick={() => retryMessage(msg)} style={{ background: 'none', border: 0, color: '#f87171', fontSize: 10, cursor: 'pointer' }}>
+                    전송 실패 · 다시 시도
+                  </button>
+                )}
               </div>
             )
 
@@ -747,6 +790,11 @@ export default function Room() {
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMine ? 'flex-end' : 'flex-start' }}>
                   <img src={msg.content} style={{ maxWidth: 180, borderRadius: 10, cursor: 'pointer' }} onClick={() => window.open(msg.content, '_blank')} />
                   <div style={{ fontSize: 9, color: t.subText, marginTop: 2 }}>{new Date(msg.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}</div>
+                  {msg.delivery_state === 'failed' && (
+                    <button onClick={() => retryMessage(msg)} style={{ background: 'none', border: 0, color: '#f87171', fontSize: 10, cursor: 'pointer', padding: 0 }}>
+                      전송 실패 · 다시 시도
+                    </button>
+                  )}
                 </div>
               </div>
             )
@@ -788,6 +836,11 @@ export default function Room() {
                 <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 2 }}>
                   {msg.user_id === userId && readReceipt !== 'none' && (msg.read_by || []).some(id => id !== msg.user_id) && <Eye size={10} color={t.subText} opacity={0.4} />}
                   <div style={{ fontSize: 9, color: t.subText, opacity: 0.6 }}>{searchQuery ? new Date(msg.created_at).toLocaleDateString('ko-KR') + ' ' + new Date(msg.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : new Date(msg.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}</div>
+                  {msg.delivery_state === 'failed' && (
+                    <button onClick={() => retryMessage(msg)} style={{ background: 'none', border: 0, color: '#f87171', fontSize: 10, cursor: 'pointer', padding: 0 }}>
+                      전송 실패 · 다시 시도
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -852,7 +905,7 @@ export default function Room() {
           <button onMouseDown={e => e.preventDefault()} onClick={() => fileInputRef.current?.click()} style={{ width: 36, height: 36, borderRadius: '50%', border: `0.5px solid ${t.border}`, background: 'none', cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Paperclip size={16} color={t.subText} />
           </button>
-          <input type="file" accept="image/*,video/*,.gif" ref={fileInputRef} onChange={e => sendImage(e.target.files[0])} style={{ display: 'none' }} />
+          <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" ref={fileInputRef} onChange={e => sendImage(e.target.files[0])} style={{ display: 'none' }} />
           <div style={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'flex-end' }}>
             <textarea
               ref={inputRef}

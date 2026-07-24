@@ -5,11 +5,34 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL')
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
 const vapidPublicKey = Deno.env.get('VAPID_PUBLIC_KEY')
 const vapidPrivateKey = Deno.env.get('VAPID_PRIVATE_KEY')
+const webhookSecret = Deno.env.get('PUSH_WEBHOOK_SECRET')
 
 webpush.setVapidDetails('mailto:admin@example.com', vapidPublicKey, vapidPrivateKey)
 
 Deno.serve(async req => {
   try {
+    if (req.method !== 'POST') {
+      return new Response(JSON.stringify({ error: 'method not allowed' }), {
+        status: 405,
+        headers: { Allow: 'POST', 'Content-Type': 'application/json' },
+      })
+    }
+
+    if (!webhookSecret) {
+      console.error('PUSH_WEBHOOK_SECRET is not configured')
+      return new Response(JSON.stringify({ error: 'server misconfigured' }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }
+
+    if (req.headers.get('x-webhook-secret') !== webhookSecret) {
+      return new Response(JSON.stringify({ error: 'unauthorized' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }
+
     const payload = await req.json()
     const record = payload.record
 

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { supabase, uploadFile } from '../lib/supabase'
+import { supabase, uploadFile, validateImageFile } from '../lib/supabase'
 import { getTheme } from '../lib/themes'
 import { ChevronLeft, X, RotateCcw } from 'lucide-react'
 import Cropper from 'react-easy-crop'
@@ -90,6 +90,12 @@ export default function Characters() {
   const handleImageChange = e => {
     const file = e.target.files[0]
     if (!file) return
+    const validationError = validateImageFile(file)
+    if (validationError) {
+      alert(validationError)
+      e.target.value = ''
+      return
+    }
     const reader = new FileReader()
     reader.onload = () => {
       setCropSrc(reader.result)
@@ -101,6 +107,12 @@ export default function Characters() {
   const handleEditImageChange = e => {
     const file = e.target.files[0]
     if (!file) return
+    const validationError = validateImageFile(file)
+    if (validationError) {
+      alert(validationError)
+      e.target.value = ''
+      return
+    }
     const reader = new FileReader()
     reader.onload = () => {
       setEditCropSrc(reader.result)

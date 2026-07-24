@@ -5,8 +5,22 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
+export const MAX_IMAGE_SIZE = 5 * 1024 * 1024
+const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif'])
+
+export const validateImageFile = file => {
+  if (!file) return '이미지 파일을 선택해 주세요.'
+  if (!ALLOWED_IMAGE_TYPES.has(file.type)) return 'JPG, PNG, WebP, GIF 이미지만 업로드할 수 있습니다.'
+  if (file.size > MAX_IMAGE_SIZE) return '이미지는 5MB 이하만 업로드할 수 있습니다.'
+  return null
+}
+
 export const uploadFile = async (file, path) => {
-  const { data, error } = await supabase.storage.from('idea-uploads').upload(path, file, { upsert: true })
+  if (validateImageFile(file)) return null
+  const { error } = await supabase.storage.from('idea-uploads').upload(path, file, {
+    upsert: true,
+    contentType: file.type,
+  })
   if (error) return null
   const {
     data: { publicUrl },
@@ -70,7 +84,7 @@ export const subscribePush = async userId => {
   return { success: true }
 }
 
-export const unsubscribePush = async userId => {
+export const unsubscribePush = async () => {
   const registration = await navigator.serviceWorker.getRegistration('/idea/sw.js')
   if (registration) {
     const subscription = await registration.pushManager.getSubscription()
