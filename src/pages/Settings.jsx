@@ -186,7 +186,7 @@ export default function Settings() {
       data: { user },
     } = await supabase.auth.getUser()
     if (pushEnabled) {
-      await unsubscribePush(user.id)
+      await unsubscribePush()
       setPushEnabled(false)
     } else {
       const result = await subscribePush(user.id)
