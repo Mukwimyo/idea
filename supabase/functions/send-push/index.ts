@@ -36,6 +36,10 @@ Deno.serve(async req => {
     const payload = await req.json()
     const record = payload.record
 
+    if (payload.type && payload.type !== 'INSERT') {
+      return new Response(JSON.stringify({ message: 'event ignored' }), { status: 200 })
+    }
+
     if (!record || !record.room_id || !record.user_id) {
       return new Response(JSON.stringify({ error: 'invalid payload' }), { status: 400 })
     }
@@ -52,9 +56,25 @@ Deno.serve(async req => {
     const recipientIds = members.map(m => m.user_id)
 
     // 수신자들의 구독 정보 가져오기
-    const { data: subs } = await supabase.from('push_subscriptions').select('*').in('user_id', recipientIds)
+    const [{ data: recipientSubs, error: recipientSubsError }, { data: senderSubs, error: senderSubsError }] = await Promise.all([
+      supabase.from('push_subscriptions').select('*').in('user_id', recipientIds),
+      supabase.from('push_subscriptions').select('endpoint').eq('user_id', record.user_id),
+    ])
 
-    if (!subs || subs.length === 0) {
+    if (recipientSubsError || senderSubsError) {
+      console.error('push subscription lookup failed', recipientSubsError || senderSubsError)
+      return new Response(JSON.stringify({ error: 'subscription lookup failed' }), { status: 500 })
+    }
+
+    const senderEndpoints = new Set((senderSubs || []).map(sub => sub.endpoint))
+    const seenEndpoints = new Set<string>()
+    const subs = (recipientSubs || []).filter(sub => {
+      if (senderEndpoints.has(sub.endpoint) || seenEndpoints.has(sub.endpoint)) return false
+      seenEndpoints.add(sub.endpoint)
+      return true
+    })
+
+    if (subs.length === 0) {
       return new Response(JSON.stringify({ message: 'no subscriptions' }), { status: 200 })
     }
 
