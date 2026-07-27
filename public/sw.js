@@ -1,12 +1,13 @@
 self.addEventListener('push', event => {
   if (!event.data) return
   const data = event.data.json()
+  const targetUrl = data.url || '/idea/'
 
   const options = {
     body: data.body || '',
     icon: '/idea/icon-192.png',
     badge: '/idea/icon-192.png',
-    data: { url: data.url || '/idea/' },
+    data: { url: targetUrl },
     vibrate: [200, 100, 200],
     requireInteraction: false,
     silent: false,
@@ -14,7 +15,18 @@ self.addEventListener('push', event => {
     tag: 'idea-message',
   }
 
-  event.waitUntil(self.registration.showNotification(data.title || '이데아', options))
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clientList => {
+      const targetPath = new URL(targetUrl, self.location.origin).pathname
+      const roomIsVisible = clientList.some(client => {
+        const clientPath = new URL(client.url).pathname
+        return client.visibilityState === 'visible' && clientPath === targetPath
+      })
+
+      if (roomIsVisible) return
+      return self.registration.showNotification(data.title || '이데아', options)
+    })
+  )
 })
 
 self.addEventListener('notificationclick', event => {
