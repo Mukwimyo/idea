@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { supabase, uploadFile, validateImageFile } from '../lib/supabase'
 import { getTheme } from '../lib/themes'
-import { ChevronLeft, X, RotateCcw } from 'lucide-react'
+import { ChevronLeft, X, RotateCcw, Search, ArrowUp, ArrowDown, Check } from 'lucide-react'
 import Cropper from 'react-easy-crop'
 
 const COLORS = [
@@ -15,7 +15,14 @@ const COLORS = [
 ]
 
 export default function Characters() {
+  const { roomId } = useParams()
   const [chars, setChars] = useState([])
+  const [userId, setUserId] = useState(null)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [roomName, setRoomName] = useState('')
+  const [roomCharacterIds, setRoomCharacterIds] = useState([])
+  const [roomPoolSaving, setRoomPoolSaving] = useState(false)
+  const [roomPoolSaved, setRoomPoolSaved] = useState(false)
   const [showAdd, setShowAdd] = useState(false)
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
@@ -58,10 +65,15 @@ export default function Characters() {
     const {
       data: { user },
     } = await supabase.auth.getUser()
+    setUserId(user.id)
     const { data } = await supabase.from('profiles').select('theme_id').eq('id', user.id).single()
     const resolvedTheme = getTheme(data?.theme_id || 'dark-purple')
     setTheme(resolvedTheme)
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', resolvedTheme.panel)
+    if (roomId) {
+      const { data: room } = await supabase.from('rooms').select('name').eq('id', roomId).single()
+      setRoomName(room?.name || '')
+    }
     fetchChars(user.id)
   }
 
@@ -69,8 +81,81 @@ export default function Characters() {
     const {
       data: { user },
     } = uid ? { data: { user: { id: uid } } } : await supabase.auth.getUser()
-    const { data } = await supabase.from('characters').select().eq('user_id', user.id).eq('is_archived', false)
-    if (data) setChars(data)
+    const { data } = await supabase.from('characters').select().eq('user_id', user.id).eq('is_archived', false).order('sort_order').order('created_at')
+    if (!data) return
+    setChars(data)
+    if (roomId) {
+      const { data: roomCharacters } = await supabase.from('room_characters').select('character_id, sort_order').eq('room_id', roomId).eq('user_id', user.id).order('sort_order')
+      const configuredIds = (roomCharacters || []).map(item => item.character_id).filter(id => data.some(character => character.id === id))
+      setRoomCharacterIds(configuredIds.length > 0 ? configuredIds : data.map(character => character.id))
+    }
+  }
+
+  const persistGlobalOrder = async orderedCharacters => {
+    setChars(orderedCharacters)
+    const results = await Promise.all(orderedCharacters.map((character, index) => supabase.from('characters').update({ sort_order: index }).eq('id', character.id).eq('user_id', userId)))
+    if (results.some(result => result.error)) {
+      alert('캐릭터 순서를 저장하지 못했어요.')
+      fetchChars(userId)
+    }
+  }
+
+  const moveGlobalCharacter = (characterId, direction) => {
+    const currentIndex = chars.findIndex(character => character.id === characterId)
+    const targetIndex = currentIndex + direction
+    if (currentIndex < 0 || targetIndex < 0 || targetIndex >= chars.length) return
+    const next = [...chars]
+    ;[next[currentIndex], next[targetIndex]] = [next[targetIndex], next[currentIndex]]
+    persistGlobalOrder(next)
+  }
+
+  const toggleRoomCharacter = characterId => {
+    setRoomPoolSaved(false)
+    setRoomCharacterIds(current => {
+      if (!current.includes(characterId)) return [...current, characterId]
+      if (current.length === 1) {
+        alert('방에서 사용할 캐릭터를 최소 1명 선택해 주세요.')
+        return current
+      }
+      return current.filter(id => id !== characterId)
+    })
+  }
+
+  const moveRoomCharacter = (characterId, direction) => {
+    setRoomPoolSaved(false)
+    setRoomCharacterIds(current => {
+      const currentIndex = current.indexOf(characterId)
+      const targetIndex = currentIndex + direction
+      if (currentIndex < 0 || targetIndex < 0 || targetIndex >= current.length) return current
+      const next = [...current]
+      ;[next[currentIndex], next[targetIndex]] = [next[targetIndex], next[currentIndex]]
+      return next
+    })
+  }
+
+  const saveRoomCharacterPool = async () => {
+    if (!roomId || !userId || roomCharacterIds.length === 0) return
+    setRoomPoolSaving(true)
+    setRoomPoolSaved(false)
+    const { error: deleteError } = await supabase.from('room_characters').delete().eq('room_id', roomId).eq('user_id', userId)
+    if (deleteError) {
+      alert('방 캐릭터 목록을 저장하지 못했어요.')
+      setRoomPoolSaving(false)
+      return
+    }
+    const rows = roomCharacterIds.map((characterId, index) => ({
+      room_id: roomId,
+      user_id: userId,
+      character_id: characterId,
+      sort_order: index,
+    }))
+    const { error: insertError } = await supabase.from('room_characters').insert(rows)
+    setRoomPoolSaving(false)
+    if (insertError) {
+      alert('방 캐릭터 목록을 저장하지 못했어요.')
+      return
+    }
+    setRoomPoolSaved(true)
   }
 
   const fetchArchived = async () => {
@@ -82,7 +167,7 @@ export default function Characters() {
   }
 
   const restoreChar = async id => {
-    await supabase.from('characters').update({ is_archived: false }).eq('id', id)
+    await supabase.from('characters').update({ is_archived: false, sort_order: chars.length }).eq('id', id)
     fetchChars()
     fetchArchived()
   }
@@ -158,6 +243,7 @@ export default function Characters() {
       color: color.bg,
       text_color: color.text,
       image_url: imageUrl,
+      sort_order: chars.length,
     })
     setName('')
     setDescription('')
@@ -236,6 +322,73 @@ export default function Characters() {
     )
 
   const t = theme
+  const normalizedSearch = searchQuery.trim().toLocaleLowerCase('ko-KR')
+  const filteredChars = chars.filter(character => character.name.toLocaleLowerCase('ko-KR').includes(normalizedSearch))
+
+  if (roomId) {
+    const selectedCharacters = roomCharacterIds.map(id => chars.find(character => character.id === id)).filter(Boolean)
+    const availableCharacters = filteredChars.filter(character => !roomCharacterIds.includes(character.id))
+
+    return (
+      <div style={{ minHeight: '100vh', background: t.bg, padding: 16 }}>
+        <div style={{ maxWidth: 400, margin: '0 auto' }}>
+          <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16, paddingTop: 8 }}>
+            <button onClick={() => navigate(-1)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 4px', marginRight: 8, display: 'flex', alignItems: 'center' }}>
+              <ChevronLeft size={22} color={t.subText} />
+            </button>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 16, color: t.theirText, fontWeight: 500 }}>방 캐릭터 설정</div>
+              <div style={{ fontSize: 10, color: t.subText, marginTop: 2 }}>{roomName}</div>
+            </div>
+            <button onClick={saveRoomCharacterPool} disabled={roomPoolSaving} style={{ background: t.point, border: 'none', borderRadius: 8, padding: '7px 14px', color: '#fff', fontSize: 12, cursor: 'pointer', opacity: roomPoolSaving ? 0.6 : 1 }}>
+              {roomPoolSaving ? '저장 중...' : roomPoolSaved ? '저장됨' : '저장'}
+            </button>
+          </div>
+
+          <div style={{ position: 'relative', marginBottom: 18 }}>
+            <Search size={15} color={t.subText} style={{ position: 'absolute', left: 11, top: 10 }} />
+            <input value={searchQuery} onChange={event => setSearchQuery(event.target.value)} placeholder="캐릭터 이름 검색" style={{ width: '100%', boxSizing: 'border-box', background: t.panel, border: `1px solid ${t.border}`, borderRadius: 10, padding: '9px 12px 9px 34px', color: t.inputText, fontSize: 12, outline: 'none' }} />
+          </div>
+
+          <div style={{ fontSize: 11, color: t.subText, marginBottom: 8 }}>이 방에서 사용할 캐릭터 · {selectedCharacters.length}명</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginBottom: 22 }}>
+            {selectedCharacters
+              .filter(character => character.name.toLocaleLowerCase('ko-KR').includes(normalizedSearch))
+              .map(character => {
+                const index = roomCharacterIds.indexOf(character.id)
+                return (
+                  <div key={character.id} style={{ display: 'flex', alignItems: 'center', gap: 10, background: t.panel, border: `1px solid ${t.border}`, borderRadius: 11, padding: '10px 11px' }}>
+                    <button onClick={() => toggleRoomCharacter(character.id)} style={{ width: 24, height: 24, borderRadius: 7, border: 0, background: t.point, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                      <Check size={15} color="#fff" />
+                    </button>
+                    <div style={{ width: 36, height: 36, borderRadius: '50%', background: character.color, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', color: character.text_color, flexShrink: 0 }}>{character.image_url ? <img src={character.image_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : character.avatar_letter}</div>
+                    <div style={{ flex: 1, color: t.theirText, fontSize: 13 }}>{character.name}</div>
+                    <button disabled={index === 0} onClick={() => moveRoomCharacter(character.id, -1)} style={{ background: 'none', border: 0, padding: 4, cursor: 'pointer', opacity: index === 0 ? 0.25 : 1 }}>
+                      <ArrowUp size={16} color={t.subText} />
+                    </button>
+                    <button disabled={index === selectedCharacters.length - 1} onClick={() => moveRoomCharacter(character.id, 1)} style={{ background: 'none', border: 0, padding: 4, cursor: 'pointer', opacity: index === selectedCharacters.length - 1 ? 0.25 : 1 }}>
+                      <ArrowDown size={16} color={t.subText} />
+                    </button>
+                  </div>
+                )
+              })}
+          </div>
+
+          <div style={{ fontSize: 11, color: t.subText, marginBottom: 8 }}>전체 풀에서 추가</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+            {availableCharacters.map(character => (
+              <button key={character.id} onClick={() => toggleRoomCharacter(character.id)} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', background: t.panel, border: `1px solid ${t.border}`, borderRadius: 11, padding: '10px 11px', cursor: 'pointer', textAlign: 'left' }}>
+                <div style={{ width: 24, height: 24, borderRadius: 7, border: `1px solid ${t.border}`, flexShrink: 0 }} />
+                <div style={{ width: 36, height: 36, borderRadius: '50%', background: character.color, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', color: character.text_color, flexShrink: 0 }}>{character.image_url ? <img src={character.image_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : character.avatar_letter}</div>
+                <div style={{ color: t.theirText, fontSize: 13 }}>{character.name}</div>
+              </button>
+            ))}
+            {availableCharacters.length === 0 && <div style={{ textAlign: 'center', color: t.subText, fontSize: 12, opacity: 0.55, padding: 20 }}>추가할 캐릭터가 없어요.</div>}
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <>
@@ -349,9 +502,20 @@ export default function Characters() {
             </div>
           )}
 
+          <div style={{ position: 'relative', marginBottom: 12 }}>
+            <Search size={16} color={t.subText} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
+            <input value={searchQuery} onChange={event => setSearchQuery(event.target.value)} placeholder="캐릭터 이름 검색" aria-label="캐릭터 이름 검색" style={{ width: '100%', boxSizing: 'border-box', background: t.panel, border: `0.5px solid ${t.border}`, borderRadius: 10, padding: '10px 36px', color: t.inputText, fontSize: 13, outline: 'none' }} />
+            {searchQuery && (
+              <button onClick={() => setSearchQuery('')} aria-label="검색어 지우기" style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', display: 'flex', padding: 4, border: 0, background: 'none', cursor: 'pointer' }}>
+                <X size={14} color={t.subText} />
+              </button>
+            )}
+          </div>
+
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {chars.length === 0 && !showAdd && <div style={{ textAlign: 'center', color: t.subText, fontSize: 13, marginTop: 40, opacity: 0.5 }}>캐릭터가 없어요</div>}
-            {chars.map(c => (
+            {chars.length > 0 && filteredChars.length === 0 && <div style={{ textAlign: 'center', color: t.subText, fontSize: 13, marginTop: 28, opacity: 0.65 }}>검색 결과가 없습니다.</div>}
+            {filteredChars.map(c => (
               <div key={c.id} style={{ background: t.panel, borderRadius: 12, padding: '13px 15px', border: `0.5px solid ${t.border}` }}>
                 {editingChar === c.id ? (
                   <div>
@@ -386,6 +550,14 @@ export default function Characters() {
                     <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => startEdit(c)}>
                       <div style={{ fontSize: 14, fontWeight: 500, color: t.theirText }}>{c.name}</div>
                       {c.description && <div style={{ fontSize: 11, color: t.subText, marginTop: 2 }}>{c.description}</div>}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <button onClick={() => moveGlobalCharacter(c.id, -1)} disabled={chars.findIndex(character => character.id === c.id) === 0} aria-label={`${c.name} 위로 이동`} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, opacity: chars.findIndex(character => character.id === c.id) === 0 ? 0.2 : 0.6, display: 'flex', alignItems: 'center' }}>
+                        <ArrowUp size={15} color={t.subText} />
+                      </button>
+                      <button onClick={() => moveGlobalCharacter(c.id, 1)} disabled={chars.findIndex(character => character.id === c.id) === chars.length - 1} aria-label={`${c.name} 아래로 이동`} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, opacity: chars.findIndex(character => character.id === c.id) === chars.length - 1 ? 0.2 : 0.6, display: 'flex', alignItems: 'center' }}>
+                        <ArrowDown size={15} color={t.subText} />
+                      </button>
                     </div>
                     <button onClick={() => deleteChar(c.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, opacity: 0.4, display: 'flex', alignItems: 'center' }}>
                       <X size={16} color={t.subText} />

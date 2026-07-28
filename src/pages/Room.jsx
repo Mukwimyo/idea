@@ -202,12 +202,14 @@ export default function Room() {
       setTheme(resolvedTheme)
       document.querySelector('meta[name="theme-color"]')?.setAttribute('content', resolvedTheme.panel)
 
-      const { data: chars } = await supabase.from('characters').select().eq('user_id', user.id).eq('is_archived', false)
-      setMyChars(chars || [])
-      if (chars && chars.length > 0) {
+      const { data: chars } = await supabase.from('characters').select().eq('user_id', user.id).eq('is_archived', false).order('sort_order', { ascending: true }).order('created_at', { ascending: true })
+      const { data: roomCharacterRows } = await supabase.from('room_characters').select('character_id, sort_order').eq('room_id', roomId).eq('user_id', user.id).order('sort_order', { ascending: true })
+      const roomChars = roomCharacterRows && roomCharacterRows.length > 0 ? roomCharacterRows.map(row => chars?.find(character => character.id === row.character_id)).filter(Boolean) : chars || []
+      setMyChars(roomChars)
+      if (roomChars.length > 0) {
         const { data: member } = await supabase.from('room_members').select('last_char_id').eq('room_id', roomId).eq('user_id', user.id).single()
-        const lastChar = chars.find(c => c.id === member?.last_char_id)
-        setActiveChar(lastChar || chars[0])
+        const lastChar = roomChars.find(c => c.id === member?.last_char_id)
+        setActiveChar(lastChar || roomChars[0])
       }
 
       await fetchMessages()
@@ -997,6 +999,9 @@ export default function Room() {
                 </button>
               ))}
             </div>
+            <button onMouseDown={e => e.preventDefault()} onClick={() => navigate(`/room/${roomId}/characters`)} style={{ flexShrink: 0, background: 'none', border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '4px 7px', color: t.subText, fontSize: 10, cursor: 'pointer' }}>
+              설정
+            </button>
           </div>
         )}
         {myChars.length === 0 && (
