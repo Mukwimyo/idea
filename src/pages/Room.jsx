@@ -149,8 +149,13 @@ export default function Room() {
   const [showCharList, setShowCharList] = useState(true)
   const [typingInfo, setTypingInfo] = useState(null)
   const [showEntering, setShowEntering] = useState(true)
+  const [messageMenuId, setMessageMenuId] = useState(null)
+  const [deletingMessageId, setDeletingMessageId] = useState(null)
   const scrollTimerRef = useRef(null)
   const typingTimerRef = useRef(null)
+  const longPressTimerRef = useRef(null)
+  const longPressStartRef = useRef(null)
+  const longPressTriggeredRef = useRef(false)
   const fileInputRef = useRef(null)
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
@@ -244,6 +249,8 @@ export default function Room() {
             }
           } else if (payload.eventType === 'UPDATE') {
             setMessages(prev => prev.map(m => (m.id === payload.new.id ? { ...m, read_by: payload.new.read_by, edited: payload.new.edited, content: payload.new.content } : m)))
+          } else if (payload.eventType === 'DELETE') {
+            setMessages(prev => prev.filter(m => m.id !== payload.old.id))
           }
         })
         .subscribe()
@@ -411,9 +418,67 @@ export default function Room() {
   }
 
   const editMessage = async id => {
-    await supabase.from('messages').update({ content: editText, edited: true }).eq('id', id)
+    if (!editText.trim()) return
+    const { error } = await supabase.from('messages').update({ content: editText.trim(), edited: true }).eq('id', id).eq('user_id', userId)
+    if (error) {
+      alert('메시지를 수정하지 못했어요.')
+      return
+    }
     setEditingId(null)
     setEditText('')
+  }
+
+  const startEditingMessage = msg => {
+    setMessageMenuId(null)
+    setEditingId(msg.id)
+    setEditText(msg.content)
+  }
+
+  const deleteMessage = async msg => {
+    if (!confirm('이 메시지를 삭제할까요?')) return
+    setMessageMenuId(null)
+    setDeletingMessageId(msg.id)
+    const { error } = await supabase.from('messages').delete().eq('id', msg.id).eq('user_id', userId)
+    setDeletingMessageId(null)
+    if (error) {
+      alert('메시지를 삭제하지 못했어요.')
+      return
+    }
+    setMessages(prev => prev.filter(m => m.id !== msg.id))
+  }
+
+  const cancelLongPress = () => {
+    clearTimeout(longPressTimerRef.current)
+    longPressTimerRef.current = null
+    longPressStartRef.current = null
+  }
+
+  const startLongPress = (event, msg) => {
+    if (msg.user_id !== userId || msg.id.toString().startsWith('temp-')) return
+    cancelLongPress()
+    longPressTriggeredRef.current = false
+    longPressStartRef.current = { x: event.clientX, y: event.clientY }
+    longPressTimerRef.current = setTimeout(() => {
+      longPressTriggeredRef.current = true
+      setMessageMenuId(msg.id)
+      longPressTimerRef.current = null
+    }, 550)
+  }
+
+  const moveLongPress = event => {
+    const start = longPressStartRef.current
+    if (!start) return
+    if (Math.abs(event.clientX - start.x) > 10 || Math.abs(event.clientY - start.y) > 10) {
+      cancelLongPress()
+    }
+  }
+
+  const openImageMessage = url => {
+    if (longPressTriggeredRef.current) {
+      longPressTriggeredRef.current = false
+      return
+    }
+    window.open(url, '_blank')
   }
 
   const addChapter = () => setShowChapterInput(true)
@@ -486,6 +551,36 @@ export default function Room() {
   }
 
   const t = theme || getTheme('dark-purple')
+
+  const renderMessageActions = (msg, canEdit = true) => {
+    if (messageMenuId !== msg.id) return null
+    return (
+      <div
+        onPointerDown={event => event.stopPropagation()}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          marginTop: 5,
+          border: `1px solid ${t.border}`,
+          borderRadius: 9,
+          overflow: 'hidden',
+          background: t.panel,
+          boxShadow: '0 3px 10px rgba(0,0,0,0.2)',
+        }}>
+        {canEdit && (
+          <>
+            <button onClick={() => startEditingMessage(msg)} style={{ border: 0, background: 'none', color: t.theirText, padding: '7px 13px', fontSize: 11, cursor: 'pointer' }}>
+              수정
+            </button>
+            <div style={{ width: 1, alignSelf: 'stretch', background: t.border }} />
+          </>
+        )}
+        <button disabled={deletingMessageId === msg.id} onClick={() => deleteMessage(msg)} style={{ border: 0, background: 'none', color: '#f87171', padding: '7px 13px', fontSize: 11, cursor: 'pointer' }}>
+          삭제
+        </button>
+      </div>
+    )
+  }
   const isNarrActive = mode === 'narration'
   const filteredMessages = messages.filter(msg => {
     if (!searchQuery) return true
@@ -756,22 +851,35 @@ export default function Room() {
 
           if (msg.type === 'narration')
             return (
-              <div key={msg.id} id={'msg-' + msg.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: '2px 0' }}>
+              <div key={msg.id} id={'msg-' + msg.id} onPointerDown={event => startLongPress(event, msg)} onPointerMove={moveLongPress} onPointerUp={cancelLongPress} onPointerCancel={cancelLongPress} onPointerLeave={cancelLongPress} onContextMenu={event => isMine && event.preventDefault()} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: '2px 0', touchAction: 'pan-y' }}>
                 <div style={{ display: 'flex', gap: 3 }}>
                   {[0, 1, 2].map(i => (
                     <div key={i} style={{ width: 3, height: 3, borderRadius: '50%', background: t.narrColor }} />
                   ))}
                 </div>
-                {msg.content.split('\n').map((line, i) => (
-                  <div key={i} style={{ fontSize: 11, color: t.narrColor, fontStyle: 'italic', textAlign: 'center', padding: '0 16px', lineHeight: 1.6 }}>
-                    {line}
+                {editingId === msg.id ? (
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <input value={editText} onChange={event => setEditText(event.target.value)} onKeyDown={event => event.key === 'Enter' && editMessage(msg.id)} style={{ background: t.bg, border: `0.5px solid ${t.point}`, borderRadius: 8, padding: '6px 10px', color: t.inputText, fontSize: 12, outline: 'none' }} />
+                    <button onClick={() => editMessage(msg.id)} style={{ background: t.point, border: 'none', borderRadius: 8, padding: '6px 10px', color: '#fff', fontSize: 11, cursor: 'pointer' }}>
+                      저장
+                    </button>
+                    <button onClick={() => setEditingId(null)} style={{ background: 'none', border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '6px 10px', color: t.subText, fontSize: 11, cursor: 'pointer' }}>
+                      취소
+                    </button>
                   </div>
-                ))}
+                ) : (
+                  msg.content.split('\n').map((line, i) => (
+                    <div key={i} style={{ fontSize: 11, color: t.narrColor, fontStyle: 'italic', textAlign: 'center', padding: '0 16px', lineHeight: 1.6 }}>
+                      {line}
+                    </div>
+                  ))
+                )}
                 <div style={{ display: 'flex', gap: 3 }}>
                   {[0, 1, 2].map(i => (
                     <div key={i} style={{ width: 3, height: 3, borderRadius: '50%', background: t.narrColor }} />
                   ))}
                 </div>
+                {renderMessageActions(msg)}
                 {msg.delivery_state === 'failed' && (
                   <button onClick={() => retryMessage(msg)} style={{ background: 'none', border: 0, color: '#f87171', fontSize: 10, cursor: 'pointer' }}>
                     전송 실패 · 다시 시도
@@ -782,14 +890,15 @@ export default function Room() {
 
           if (msg.type === 'image')
             return (
-              <div key={msg.id} id={'msg-' + msg.id} style={{ display: 'flex', flexDirection: isMine ? 'row-reverse' : 'row', alignItems: 'flex-end', gap: 6 }}>
+              <div key={msg.id} id={'msg-' + msg.id} onPointerDown={event => startLongPress(event, msg)} onPointerMove={moveLongPress} onPointerUp={cancelLongPress} onPointerCancel={cancelLongPress} onPointerLeave={cancelLongPress} onContextMenu={event => isMine && event.preventDefault()} style={{ display: 'flex', flexDirection: isMine ? 'row-reverse' : 'row', alignItems: 'flex-end', gap: 6, touchAction: 'pan-y' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, flexShrink: 0, width: 36 }}>
                   <div style={{ width: 36, height: 36, borderRadius: '50%', background: char?.color || t.border, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 500, color: char?.text_color || t.subText }}>{char?.image_url ? <img src={char.image_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : char?.avatar_letter || '?'}</div>
                   {char?.name && <div style={{ fontSize: 9, color: t.subText, whiteSpace: 'nowrap', maxWidth: 40, overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'center' }}>{char?.name}</div>}
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMine ? 'flex-end' : 'flex-start' }}>
-                  <img src={msg.content} style={{ maxWidth: 180, borderRadius: 10, cursor: 'pointer' }} onClick={() => window.open(msg.content, '_blank')} />
+                  <img src={msg.content} style={{ maxWidth: 180, borderRadius: 10, cursor: 'pointer' }} onClick={() => openImageMessage(msg.content)} />
                   <div style={{ fontSize: 9, color: t.subText, marginTop: 2 }}>{new Date(msg.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}</div>
+                  {renderMessageActions(msg, false)}
                   {msg.delivery_state === 'failed' && (
                     <button onClick={() => retryMessage(msg)} style={{ background: 'none', border: 0, color: '#f87171', fontSize: 10, cursor: 'pointer', padding: 0 }}>
                       전송 실패 · 다시 시도
@@ -804,7 +913,7 @@ export default function Room() {
           const actColor = isMine ? t.myAct : t.subText
 
           return (
-            <div key={msg.id} id={'msg-' + msg.id} style={{ display: 'flex', flexDirection: isMine ? 'row-reverse' : 'row', alignItems: 'flex-end', gap: 6 }}>
+            <div key={msg.id} id={'msg-' + msg.id} onPointerDown={event => startLongPress(event, msg)} onPointerMove={moveLongPress} onPointerUp={cancelLongPress} onPointerCancel={cancelLongPress} onPointerLeave={cancelLongPress} onContextMenu={event => isMine && event.preventDefault()} style={{ display: 'flex', flexDirection: isMine ? 'row-reverse' : 'row', alignItems: 'flex-end', gap: 6, touchAction: 'pan-y' }}>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, flexShrink: 0, width: 36 }}>
                 <div style={{ width: 36, height: 36, borderRadius: '50%', background: char?.color || t.border, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 500, color: char?.text_color || t.subText }}>{char?.image_url ? <img src={char.image_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : char?.avatar_letter || '?'}</div>
                 {char?.name && <div style={{ fontSize: 9, color: t.subText, whiteSpace: 'nowrap', maxWidth: 40, overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'center' }}>{char?.name}</div>}
@@ -821,18 +930,12 @@ export default function Room() {
                     </button>
                   </div>
                 ) : (
-                  <div
-                    onDoubleClick={() => {
-                      if (isMine) {
-                        setEditingId(msg.id)
-                        setEditText(msg.content)
-                      }
-                    }}
-                    style={{ background: bubbleBg, color: bubbleColor, padding: '7px 11px', borderRadius: 12, fontSize: 13, lineHeight: 1.6, border: 'none', cursor: isMine ? 'pointer' : 'default' }}>
+                  <div style={{ background: bubbleBg, color: bubbleColor, padding: '7px 11px', borderRadius: 12, fontSize: 13, lineHeight: 1.6, border: 'none', cursor: isMine ? 'pointer' : 'default' }}>
                     {parseContent(msg.content, actColor, actionStyle)}
                     {msg.edited && <span style={{ fontSize: 9, opacity: 0.5, marginLeft: 4 }}>수정됨</span>}
                   </div>
                 )}
+                {renderMessageActions(msg)}
                 <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 2 }}>
                   {msg.user_id === userId && readReceipt !== 'none' && (msg.read_by || []).some(id => id !== msg.user_id) && <Eye size={10} color={t.subText} opacity={0.4} />}
                   <div style={{ fontSize: 9, color: t.subText, opacity: 0.6 }}>{searchQuery ? new Date(msg.created_at).toLocaleDateString('ko-KR') + ' ' + new Date(msg.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : new Date(msg.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}</div>
