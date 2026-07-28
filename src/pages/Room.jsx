@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { supabase, uploadFile, validateImageFile } from '../lib/supabase'
 import { THEMES, getTheme } from '../lib/themes'
 import { ChevronLeft, Link2, BookmarkPlus, Settings, Search, Calendar, Paperclip, ArrowUp, Eye, ArrowDown, ChevronDown, ChevronUp, Quote } from 'lucide-react'
+import ProfileImageModal from '../components/ProfileImageModal'
 
 const DEFAULT_AVATAR = `${import.meta.env.BASE_URL}default-avatar.png`
 
@@ -153,6 +154,7 @@ export default function Room() {
   const [showEntering, setShowEntering] = useState(true)
   const [messageMenuId, setMessageMenuId] = useState(null)
   const [deletingMessageId, setDeletingMessageId] = useState(null)
+  const [profilePreview, setProfilePreview] = useState(null)
   const scrollTimerRef = useRef(null)
   const typingTimerRef = useRef(null)
   const longPressTimerRef = useRef(null)
@@ -608,6 +610,7 @@ export default function Room() {
 
   return (
     <div style={{ height: '100dvh', background: t.bg, '--scrollbar-color': t.border, display: 'flex', flexDirection: 'column', maxWidth: 480, margin: '0 auto', animation: !showEntering ? 'slide-in-right 0.3s ease' : 'none' }}>
+      <ProfileImageModal profile={profilePreview} onClose={() => setProfilePreview(null)} />
       {showSlot && room && showEntering && (
         <SlotEntrance
           roomName={room.name}
@@ -917,7 +920,7 @@ export default function Room() {
                 onContextMenu={event => isMine && event.preventDefault()}
                 style={{ display: 'flex', flexDirection: isMine ? 'row-reverse' : 'row', alignItems: 'flex-end', gap: 6, touchAction: 'pan-y' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, flexShrink: 0, width: 36 }}>
-                  <div style={{ width: 36, height: 36, borderRadius: '50%', background: char?.color || t.border, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 500, color: char?.text_color || t.subText }}><img src={char?.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>
+                  <div role="button" tabIndex={0} aria-label={`${char?.name || '프로필'} 사진 크게 보기`} onPointerDown={event => event.stopPropagation()} onClick={() => setProfilePreview({ url: char?.image_url || DEFAULT_AVATAR, name: char?.name })} onKeyDown={event => (event.key === 'Enter' || event.key === ' ') && setProfilePreview({ url: char?.image_url || DEFAULT_AVATAR, name: char?.name })} style={{ width: 36, height: 36, borderRadius: '50%', background: char?.color || t.border, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 500, color: char?.text_color || t.subText, cursor: 'zoom-in' }}><img src={char?.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>
                   {char?.name && <div style={{ fontSize: 9, color: t.subText, whiteSpace: 'nowrap', maxWidth: 40, overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'center' }}>{char?.name}</div>}
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMine ? 'flex-end' : 'flex-start' }}>
@@ -949,7 +952,7 @@ export default function Room() {
               onContextMenu={event => isMine && event.preventDefault()}
               style={{ display: 'flex', flexDirection: isMine ? 'row-reverse' : 'row', alignItems: 'flex-end', gap: 6, touchAction: 'pan-y' }}>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, flexShrink: 0, width: 36 }}>
-                <div style={{ width: 36, height: 36, borderRadius: '50%', background: char?.color || t.border, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 500, color: char?.text_color || t.subText }}><img src={char?.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>
+                <div role="button" tabIndex={0} aria-label={`${char?.name || '프로필'} 사진 크게 보기`} onPointerDown={event => event.stopPropagation()} onClick={() => setProfilePreview({ url: char?.image_url || DEFAULT_AVATAR, name: char?.name })} onKeyDown={event => (event.key === 'Enter' || event.key === ' ') && setProfilePreview({ url: char?.image_url || DEFAULT_AVATAR, name: char?.name })} style={{ width: 36, height: 36, borderRadius: '50%', background: char?.color || t.border, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 500, color: char?.text_color || t.subText, cursor: 'zoom-in' }}><img src={char?.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>
                 {char?.name && <div style={{ fontSize: 9, color: t.subText, whiteSpace: 'nowrap', maxWidth: 40, overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'center' }}>{char?.name}</div>}
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMine ? 'flex-end' : 'flex-start', maxWidth: '72%' }}>
@@ -1027,7 +1030,7 @@ export default function Room() {
                     await supabase.from('room_members').update({ last_char_id: c.id }).eq('room_id', roomId).eq('user_id', user.id)
                   }}
                   style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 8px 3px 4px', borderRadius: 20, border: activeChar?.id === c.id && mode === 'chat' ? `1.5px solid ${c.color || t.point}` : `1px solid ${t.border}`, background: activeChar?.id === c.id && mode === 'chat' ? c.color + '22' : 'none', cursor: 'pointer' }}>
-                  <div style={{ width: 18, height: 18, borderRadius: '50%', background: c.color || t.point, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, color: c.text_color || '#fff', overflow: 'hidden', flexShrink: 0 }}><img src={c.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>
+                  <div role="button" tabIndex={0} aria-label={`${c.name} 프로필 사진 크게 보기`} onClick={event => { event.stopPropagation(); setProfilePreview({ url: c.image_url || DEFAULT_AVATAR, name: c.name }) }} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); setProfilePreview({ url: c.image_url || DEFAULT_AVATAR, name: c.name }) } }} style={{ width: 18, height: 18, borderRadius: '50%', background: c.color || t.point, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, color: c.text_color || '#fff', overflow: 'hidden', flexShrink: 0, cursor: 'zoom-in' }}><img src={c.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>
                   <span style={{ fontSize: 11, color: activeChar?.id === c.id && mode === 'chat' ? t.theirText : t.subText }}>{c.name}</span>
                 </button>
               ))}

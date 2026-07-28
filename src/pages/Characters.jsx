@@ -7,6 +7,7 @@ import Cropper from 'react-easy-crop'
 import { DndContext, PointerSensor, TouchSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core'
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import ProfileImageModal from '../components/ProfileImageModal'
 
 const COLORS = [
   { bg: '#AFA9EC', text: '#26215C' },
@@ -41,6 +42,7 @@ export default function Characters() {
   const [roomPoolSaving, setRoomPoolSaving] = useState(false)
   const [roomPoolSaved, setRoomPoolSaved] = useState(false)
   const [alphabeticalView, setAlphabeticalView] = useState(false)
+  const [profilePreview, setProfilePreview] = useState(null)
   const [showAdd, setShowAdd] = useState(false)
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
@@ -375,6 +377,8 @@ export default function Characters() {
     const availableCharacters = visibleChars.filter(character => !roomCharacterIds.includes(character.id))
 
     return (
+      <>
+      <ProfileImageModal profile={profilePreview} onClose={() => setProfilePreview(null)} />
       <div style={{ minHeight: '100vh', background: t.bg, padding: 16 }}>
         <div style={{ maxWidth: 400, margin: '0 auto' }}>
           <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16, paddingTop: 8 }}>
@@ -417,7 +421,7 @@ export default function Characters() {
                   <button onClick={() => toggleRoomCharacter(character.id)} style={{ width: 24, height: 24, borderRadius: 7, border: 0, background: t.point, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
                     <Check size={15} color="#fff" />
                   </button>
-                  <div style={{ width: 36, height: 36, borderRadius: '50%', background: character.color, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', color: character.text_color, flexShrink: 0 }}>
+                  <div role="button" tabIndex={0} aria-label={`${character.name} 프로필 사진 크게 보기`} onClick={() => setProfilePreview({ url: character.image_url || DEFAULT_AVATAR, name: character.name })} onKeyDown={event => (event.key === 'Enter' || event.key === ' ') && setProfilePreview({ url: character.image_url || DEFAULT_AVATAR, name: character.name })} style={{ width: 36, height: 36, borderRadius: '50%', background: character.color, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', color: character.text_color, flexShrink: 0, cursor: 'zoom-in' }}>
                     <img src={character.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   </div>
                   <div style={{ flex: 1, color: t.theirText, fontSize: 13 }}>{character.name}</div>
@@ -440,7 +444,7 @@ export default function Characters() {
             {availableCharacters.map(character => (
               <button key={character.id} onClick={() => toggleRoomCharacter(character.id)} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', background: t.panel, border: `1px solid ${t.border}`, borderRadius: 11, padding: '10px 11px', cursor: 'pointer', textAlign: 'left' }}>
                 <div style={{ width: 24, height: 24, borderRadius: 7, border: `1px solid ${t.border}`, flexShrink: 0 }} />
-                <div style={{ width: 36, height: 36, borderRadius: '50%', background: character.color, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', color: character.text_color, flexShrink: 0 }}>
+                <div role="button" tabIndex={0} aria-label={`${character.name} 프로필 사진 크게 보기`} onClick={event => { event.stopPropagation(); setProfilePreview({ url: character.image_url || DEFAULT_AVATAR, name: character.name }) }} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); setProfilePreview({ url: character.image_url || DEFAULT_AVATAR, name: character.name }) } }} style={{ width: 36, height: 36, borderRadius: '50%', background: character.color, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', color: character.text_color, flexShrink: 0, cursor: 'zoom-in' }}>
                   <img src={character.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 </div>
                 <div style={{ color: t.theirText, fontSize: 13 }}>{character.name}</div>
@@ -450,11 +454,13 @@ export default function Characters() {
           </div>
         </div>
       </div>
+      </>
     )
   }
 
   return (
     <>
+      <ProfileImageModal profile={profilePreview} onClose={() => setProfilePreview(null)} />
       {/* 크롭 모달 - 새 캐릭터 */}
       {showCropper && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 200, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
@@ -628,7 +634,7 @@ export default function Characters() {
                     <button {...listeners} disabled={alphabeticalView} aria-label={`${c.name} 순서 이동`} style={{ display: 'flex', background: 'none', border: 0, padding: 1, cursor: alphabeticalView ? 'default' : 'grab', touchAction: 'none', opacity: alphabeticalView ? 0.25 : 0.65 }}>
                       <GripVertical size={17} color={t.subText} />
                     </button>
-                    <div style={{ width: 44, height: 44, borderRadius: '50%', background: c.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 500, color: c.text_color, flexShrink: 0, overflow: 'hidden' }}><img src={c.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>
+                    <div role="button" tabIndex={0} aria-label={`${c.name} 프로필 사진 크게 보기`} onClick={() => setProfilePreview({ url: c.image_url || DEFAULT_AVATAR, name: c.name })} onKeyDown={event => (event.key === 'Enter' || event.key === ' ') && setProfilePreview({ url: c.image_url || DEFAULT_AVATAR, name: c.name })} style={{ width: 44, height: 44, borderRadius: '50%', background: c.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 500, color: c.text_color, flexShrink: 0, overflow: 'hidden', cursor: 'zoom-in' }}><img src={c.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>
                     <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => startEdit(c)}>
                       <div style={{ fontSize: 14, fontWeight: 500, color: t.theirText }}>{c.name}</div>
                       {c.description && <div style={{ fontSize: 11, color: t.subText, marginTop: 2 }}>{c.description}</div>}
@@ -667,7 +673,7 @@ export default function Characters() {
               {archivedChars.length === 0 && <div style={{ textAlign: 'center', color: t.subText, fontSize: 12, opacity: 0.5 }}>보관된 캐릭터가 없어요</div>}
               {archivedChars.map(c => (
                 <div key={c.id} style={{ background: t.bg, borderRadius: 12, padding: '12px 15px', display: 'flex', alignItems: 'center', gap: 12, border: `0.5px solid ${t.border}`, marginBottom: 8, opacity: 0.6 }}>
-                  <div style={{ width: 40, height: 40, borderRadius: '50%', background: c.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 500, color: c.text_color, flexShrink: 0, overflow: 'hidden' }}><img src={c.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>
+                  <div role="button" tabIndex={0} aria-label={`${c.name} 프로필 사진 크게 보기`} onClick={() => setProfilePreview({ url: c.image_url || DEFAULT_AVATAR, name: c.name })} onKeyDown={event => (event.key === 'Enter' || event.key === ' ') && setProfilePreview({ url: c.image_url || DEFAULT_AVATAR, name: c.name })} style={{ width: 40, height: 40, borderRadius: '50%', background: c.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 500, color: c.text_color, flexShrink: 0, overflow: 'hidden', cursor: 'zoom-in' }}><img src={c.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 13, fontWeight: 500, color: t.theirText }}>{c.name}</div>
                     {c.description && <div style={{ fontSize: 11, color: t.subText, marginTop: 2 }}>{c.description}</div>}
