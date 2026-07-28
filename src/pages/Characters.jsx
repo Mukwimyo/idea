@@ -2,8 +2,11 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase, uploadFile, validateImageFile } from '../lib/supabase'
 import { getTheme } from '../lib/themes'
-import { ChevronLeft, X, RotateCcw, Search, ArrowUp, ArrowDown, Check } from 'lucide-react'
+import { ChevronLeft, X, RotateCcw, Search, ArrowUp, ArrowDown, Check, ArrowDownAZ, GripVertical } from 'lucide-react'
 import Cropper from 'react-easy-crop'
+import { DndContext, PointerSensor, TouchSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core'
+import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 
 const COLORS = [
   { bg: '#AFA9EC', text: '#26215C' },
@@ -14,6 +17,20 @@ const COLORS = [
   { bg: '#C8E6C9', text: '#1b5e20' },
 ]
 
+const DEFAULT_AVATAR = `${import.meta.env.BASE_URL}default-avatar.png`
+
+function SortableCard({ id, disabled, children }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id, disabled })
+  return (
+    <div
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition, position: 'relative', zIndex: isDragging ? 2 : 1, opacity: isDragging ? 0.72 : 1 }}
+      {...attributes}>
+      {children({ listeners })}
+    </div>
+  )
+}
+
 export default function Characters() {
   const { roomId } = useParams()
   const [chars, setChars] = useState([])
@@ -23,6 +40,7 @@ export default function Characters() {
   const [roomCharacterIds, setRoomCharacterIds] = useState([])
   const [roomPoolSaving, setRoomPoolSaving] = useState(false)
   const [roomPoolSaved, setRoomPoolSaved] = useState(false)
+  const [alphabeticalView, setAlphabeticalView] = useState(false)
   const [showAdd, setShowAdd] = useState(false)
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
@@ -56,6 +74,7 @@ export default function Characters() {
   const [editCroppedAreaPixels, setEditCroppedAreaPixels] = useState(null)
 
   const navigate = useNavigate()
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }), useSensor(TouchSensor, { activationConstraint: { delay: 220, tolerance: 6 } }))
 
   useEffect(() => {
     init()
@@ -93,7 +112,11 @@ export default function Characters() {
 
   const persistGlobalOrder = async orderedCharacters => {
     setChars(orderedCharacters)
-    const results = await Promise.all(orderedCharacters.map((character, index) => supabase.from('characters').update({ sort_order: index }).eq('id', character.id).eq('user_id', userId)))
+    const results = await Promise.all(
+      orderedCharacters.map((character, index) =>
+        supabase.from('characters').update({ sort_order: index }).eq('id', character.id).eq('user_id', userId)
+      )
+    )
     if (results.some(result => result.error)) {
       alert('캐릭터 순서를 저장하지 못했어요.')
       fetchChars(userId)
@@ -130,6 +153,25 @@ export default function Characters() {
       const next = [...current]
       ;[next[currentIndex], next[targetIndex]] = [next[targetIndex], next[currentIndex]]
       return next
+    })
+  }
+
+  const handleGlobalDragEnd = ({ active, over }) => {
+    if (!over || active.id === over.id || alphabeticalView) return
+    const oldIndex = chars.findIndex(character => character.id === active.id)
+    const newIndex = chars.findIndex(character => character.id === over.id)
+    if (oldIndex < 0 || newIndex < 0) return
+    persistGlobalOrder(arrayMove(chars, oldIndex, newIndex))
+  }
+
+  const handleRoomDragEnd = ({ active, over }) => {
+    if (!over || active.id === over.id || alphabeticalView) return
+    setRoomPoolSaved(false)
+    setRoomCharacterIds(current => {
+      const oldIndex = current.indexOf(active.id)
+      const newIndex = current.indexOf(over.id)
+      if (oldIndex < 0 || newIndex < 0) return current
+      return arrayMove(current, oldIndex, newIndex)
     })
   }
 
@@ -324,10 +366,13 @@ export default function Characters() {
   const t = theme
   const normalizedSearch = searchQuery.trim().toLocaleLowerCase('ko-KR')
   const filteredChars = chars.filter(character => character.name.toLocaleLowerCase('ko-KR').includes(normalizedSearch))
+  const visibleChars = alphabeticalView ? [...filteredChars].sort((a, b) => a.name.localeCompare(b.name, 'ko-KR')) : filteredChars
 
   if (roomId) {
     const selectedCharacters = roomCharacterIds.map(id => chars.find(character => character.id === id)).filter(Boolean)
-    const availableCharacters = filteredChars.filter(character => !roomCharacterIds.includes(character.id))
+    const filteredSelectedCharacters = selectedCharacters.filter(character => character.name.toLocaleLowerCase('ko-KR').includes(normalizedSearch))
+    const visibleSelectedCharacters = alphabeticalView ? [...filteredSelectedCharacters].sort((a, b) => a.name.localeCompare(b.name, 'ko-KR')) : filteredSelectedCharacters
+    const availableCharacters = visibleChars.filter(character => !roomCharacterIds.includes(character.id))
 
     return (
       <div style={{ minHeight: '100vh', background: t.bg, padding: 16 }}>
@@ -350,36 +395,54 @@ export default function Characters() {
             <input value={searchQuery} onChange={event => setSearchQuery(event.target.value)} placeholder="캐릭터 이름 검색" style={{ width: '100%', boxSizing: 'border-box', background: t.panel, border: `1px solid ${t.border}`, borderRadius: 10, padding: '9px 12px 9px 34px', color: t.inputText, fontSize: 12, outline: 'none' }} />
           </div>
 
+          <button
+            onClick={() => setAlphabeticalView(current => !current)}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '-8px 0 14px auto', background: alphabeticalView ? `${t.point}22` : 'none', border: `1px solid ${alphabeticalView ? t.point : t.border}`, borderRadius: 8, padding: '6px 9px', color: alphabeticalView ? t.point : t.subText, fontSize: 11, cursor: 'pointer' }}>
+            <ArrowDownAZ size={14} />
+            가나다순 보기
+          </button>
+
           <div style={{ fontSize: 11, color: t.subText, marginBottom: 8 }}>이 방에서 사용할 캐릭터 · {selectedCharacters.length}명</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginBottom: 22 }}>
-            {selectedCharacters
-              .filter(character => character.name.toLocaleLowerCase('ko-KR').includes(normalizedSearch))
-              .map(character => {
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleRoomDragEnd}>
+            <SortableContext items={visibleSelectedCharacters.map(character => character.id)} strategy={verticalListSortingStrategy}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginBottom: 22 }}>
+                {visibleSelectedCharacters.map(character => {
                 const index = roomCharacterIds.indexOf(character.id)
                 return (
-                  <div key={character.id} style={{ display: 'flex', alignItems: 'center', gap: 10, background: t.panel, border: `1px solid ${t.border}`, borderRadius: 11, padding: '10px 11px' }}>
-                    <button onClick={() => toggleRoomCharacter(character.id)} style={{ width: 24, height: 24, borderRadius: 7, border: 0, background: t.point, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-                      <Check size={15} color="#fff" />
-                    </button>
-                    <div style={{ width: 36, height: 36, borderRadius: '50%', background: character.color, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', color: character.text_color, flexShrink: 0 }}>{character.image_url ? <img src={character.image_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : character.avatar_letter}</div>
-                    <div style={{ flex: 1, color: t.theirText, fontSize: 13 }}>{character.name}</div>
-                    <button disabled={index === 0} onClick={() => moveRoomCharacter(character.id, -1)} style={{ background: 'none', border: 0, padding: 4, cursor: 'pointer', opacity: index === 0 ? 0.25 : 1 }}>
-                      <ArrowUp size={16} color={t.subText} />
-                    </button>
-                    <button disabled={index === selectedCharacters.length - 1} onClick={() => moveRoomCharacter(character.id, 1)} style={{ background: 'none', border: 0, padding: 4, cursor: 'pointer', opacity: index === selectedCharacters.length - 1 ? 0.25 : 1 }}>
-                      <ArrowDown size={16} color={t.subText} />
-                    </button>
+                <SortableCard key={character.id} id={character.id} disabled={alphabeticalView}>
+                  {({ listeners }) => <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: t.panel, border: `1px solid ${t.border}`, borderRadius: 11, padding: '10px 11px' }}>
+                  <button {...listeners} disabled={alphabeticalView} aria-label={`${character.name} 순서 이동`} style={{ display: 'flex', background: 'none', border: 0, padding: 2, cursor: alphabeticalView ? 'default' : 'grab', touchAction: 'none', opacity: alphabeticalView ? 0.25 : 0.65 }}>
+                    <GripVertical size={16} color={t.subText} />
+                  </button>
+                  <button onClick={() => toggleRoomCharacter(character.id)} style={{ width: 24, height: 24, borderRadius: 7, border: 0, background: t.point, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                    <Check size={15} color="#fff" />
+                  </button>
+                  <div style={{ width: 36, height: 36, borderRadius: '50%', background: character.color, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', color: character.text_color, flexShrink: 0 }}>
+                    <img src={character.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   </div>
+                  <div style={{ flex: 1, color: t.theirText, fontSize: 13 }}>{character.name}</div>
+                  <button disabled={alphabeticalView || index === 0} onClick={() => moveRoomCharacter(character.id, -1)} style={{ background: 'none', border: 0, padding: 4, cursor: 'pointer', opacity: alphabeticalView || index === 0 ? 0.25 : 1 }}>
+                    <ArrowUp size={16} color={t.subText} />
+                  </button>
+                  <button disabled={alphabeticalView || index === selectedCharacters.length - 1} onClick={() => moveRoomCharacter(character.id, 1)} style={{ background: 'none', border: 0, padding: 4, cursor: 'pointer', opacity: alphabeticalView || index === selectedCharacters.length - 1 ? 0.25 : 1 }}>
+                    <ArrowDown size={16} color={t.subText} />
+                  </button>
+                  </div>}
+                </SortableCard>
                 )
               })}
-          </div>
+              </div>
+            </SortableContext>
+          </DndContext>
 
           <div style={{ fontSize: 11, color: t.subText, marginBottom: 8 }}>전체 풀에서 추가</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
             {availableCharacters.map(character => (
               <button key={character.id} onClick={() => toggleRoomCharacter(character.id)} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', background: t.panel, border: `1px solid ${t.border}`, borderRadius: 11, padding: '10px 11px', cursor: 'pointer', textAlign: 'left' }}>
                 <div style={{ width: 24, height: 24, borderRadius: 7, border: `1px solid ${t.border}`, flexShrink: 0 }} />
-                <div style={{ width: 36, height: 36, borderRadius: '50%', background: character.color, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', color: character.text_color, flexShrink: 0 }}>{character.image_url ? <img src={character.image_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : character.avatar_letter}</div>
+                <div style={{ width: 36, height: 36, borderRadius: '50%', background: character.color, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', color: character.text_color, flexShrink: 0 }}>
+                  <img src={character.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                </div>
                 <div style={{ color: t.theirText, fontSize: 13 }}>{character.name}</div>
               </button>
             ))}
@@ -504,7 +567,13 @@ export default function Characters() {
 
           <div style={{ position: 'relative', marginBottom: 12 }}>
             <Search size={16} color={t.subText} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
-            <input value={searchQuery} onChange={event => setSearchQuery(event.target.value)} placeholder="캐릭터 이름 검색" aria-label="캐릭터 이름 검색" style={{ width: '100%', boxSizing: 'border-box', background: t.panel, border: `0.5px solid ${t.border}`, borderRadius: 10, padding: '10px 36px', color: t.inputText, fontSize: 13, outline: 'none' }} />
+            <input
+              value={searchQuery}
+              onChange={event => setSearchQuery(event.target.value)}
+              placeholder="캐릭터 이름 검색"
+              aria-label="캐릭터 이름 검색"
+              style={{ width: '100%', boxSizing: 'border-box', background: t.panel, border: `0.5px solid ${t.border}`, borderRadius: 10, padding: '10px 36px', color: t.inputText, fontSize: 13, outline: 'none' }}
+            />
             {searchQuery && (
               <button onClick={() => setSearchQuery('')} aria-label="검색어 지우기" style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', display: 'flex', padding: 4, border: 0, background: 'none', cursor: 'pointer' }}>
                 <X size={14} color={t.subText} />
@@ -512,11 +581,21 @@ export default function Characters() {
             )}
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {chars.length === 0 && !showAdd && <div style={{ textAlign: 'center', color: t.subText, fontSize: 13, marginTop: 40, opacity: 0.5 }}>캐릭터가 없어요</div>}
-            {chars.length > 0 && filteredChars.length === 0 && <div style={{ textAlign: 'center', color: t.subText, fontSize: 13, marginTop: 28, opacity: 0.65 }}>검색 결과가 없습니다.</div>}
-            {filteredChars.map(c => (
-              <div key={c.id} style={{ background: t.panel, borderRadius: 12, padding: '13px 15px', border: `0.5px solid ${t.border}` }}>
+          <button
+            onClick={() => setAlphabeticalView(current => !current)}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '0 0 12px auto', background: alphabeticalView ? `${t.point}22` : 'none', border: `1px solid ${alphabeticalView ? t.point : t.border}`, borderRadius: 8, padding: '6px 9px', color: alphabeticalView ? t.point : t.subText, fontSize: 11, cursor: 'pointer' }}>
+            <ArrowDownAZ size={14} />
+            가나다순 보기
+          </button>
+
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleGlobalDragEnd}>
+            <SortableContext items={visibleChars.map(character => character.id)} strategy={verticalListSortingStrategy}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {chars.length === 0 && !showAdd && <div style={{ textAlign: 'center', color: t.subText, fontSize: 13, marginTop: 40, opacity: 0.5 }}>캐릭터가 없어요</div>}
+                {chars.length > 0 && filteredChars.length === 0 && <div style={{ textAlign: 'center', color: t.subText, fontSize: 13, marginTop: 28, opacity: 0.65 }}>검색 결과가 없습니다.</div>}
+                {visibleChars.map(c => (
+              <SortableCard key={c.id} id={c.id} disabled={alphabeticalView}>
+                {({ listeners }) => <div style={{ background: t.panel, borderRadius: 12, padding: '13px 15px', border: `0.5px solid ${t.border}` }}>
                 {editingChar === c.id ? (
                   <div>
                     <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
@@ -546,16 +625,27 @@ export default function Characters() {
                   </div>
                 ) : (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <div style={{ width: 44, height: 44, borderRadius: '50%', background: c.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 500, color: c.text_color, flexShrink: 0, overflow: 'hidden' }}>{c.image_url ? <img src={c.image_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : c.avatar_letter}</div>
+                    <button {...listeners} disabled={alphabeticalView} aria-label={`${c.name} 순서 이동`} style={{ display: 'flex', background: 'none', border: 0, padding: 1, cursor: alphabeticalView ? 'default' : 'grab', touchAction: 'none', opacity: alphabeticalView ? 0.25 : 0.65 }}>
+                      <GripVertical size={17} color={t.subText} />
+                    </button>
+                    <div style={{ width: 44, height: 44, borderRadius: '50%', background: c.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 500, color: c.text_color, flexShrink: 0, overflow: 'hidden' }}><img src={c.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>
                     <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => startEdit(c)}>
                       <div style={{ fontSize: 14, fontWeight: 500, color: t.theirText }}>{c.name}</div>
                       {c.description && <div style={{ fontSize: 11, color: t.subText, marginTop: 2 }}>{c.description}</div>}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                      <button onClick={() => moveGlobalCharacter(c.id, -1)} disabled={chars.findIndex(character => character.id === c.id) === 0} aria-label={`${c.name} 위로 이동`} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, opacity: chars.findIndex(character => character.id === c.id) === 0 ? 0.2 : 0.6, display: 'flex', alignItems: 'center' }}>
+                      <button
+                        onClick={() => moveGlobalCharacter(c.id, -1)}
+                        disabled={alphabeticalView || chars.findIndex(character => character.id === c.id) === 0}
+                        aria-label={`${c.name} 위로 이동`}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, opacity: alphabeticalView || chars.findIndex(character => character.id === c.id) === 0 ? 0.2 : 0.6, display: 'flex', alignItems: 'center' }}>
                         <ArrowUp size={15} color={t.subText} />
                       </button>
-                      <button onClick={() => moveGlobalCharacter(c.id, 1)} disabled={chars.findIndex(character => character.id === c.id) === chars.length - 1} aria-label={`${c.name} 아래로 이동`} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, opacity: chars.findIndex(character => character.id === c.id) === chars.length - 1 ? 0.2 : 0.6, display: 'flex', alignItems: 'center' }}>
+                      <button
+                        onClick={() => moveGlobalCharacter(c.id, 1)}
+                        disabled={alphabeticalView || chars.findIndex(character => character.id === c.id) === chars.length - 1}
+                        aria-label={`${c.name} 아래로 이동`}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, opacity: alphabeticalView || chars.findIndex(character => character.id === c.id) === chars.length - 1 ? 0.2 : 0.6, display: 'flex', alignItems: 'center' }}>
                         <ArrowDown size={15} color={t.subText} />
                       </button>
                     </div>
@@ -564,9 +654,12 @@ export default function Characters() {
                     </button>
                   </div>
                 )}
+                </div>}
+              </SortableCard>
+                ))}
               </div>
-            ))}
-          </div>
+            </SortableContext>
+          </DndContext>
 
           {showArchive && (
             <div style={{ marginTop: 16 }}>
@@ -574,7 +667,7 @@ export default function Characters() {
               {archivedChars.length === 0 && <div style={{ textAlign: 'center', color: t.subText, fontSize: 12, opacity: 0.5 }}>보관된 캐릭터가 없어요</div>}
               {archivedChars.map(c => (
                 <div key={c.id} style={{ background: t.bg, borderRadius: 12, padding: '12px 15px', display: 'flex', alignItems: 'center', gap: 12, border: `0.5px solid ${t.border}`, marginBottom: 8, opacity: 0.6 }}>
-                  <div style={{ width: 40, height: 40, borderRadius: '50%', background: c.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 500, color: c.text_color, flexShrink: 0, overflow: 'hidden' }}>{c.image_url ? <img src={c.image_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : c.avatar_letter}</div>
+                  <div style={{ width: 40, height: 40, borderRadius: '50%', background: c.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 500, color: c.text_color, flexShrink: 0, overflow: 'hidden' }}><img src={c.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 13, fontWeight: 500, color: t.theirText }}>{c.name}</div>
                     {c.description && <div style={{ fontSize: 11, color: t.subText, marginTop: 2 }}>{c.description}</div>}
