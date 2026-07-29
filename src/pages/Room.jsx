@@ -893,6 +893,13 @@ export default function Room() {
         {filteredMessages.map(msg => {
           const isMine = msg.user_id === userId
           const char = msg.characters
+          const ownMessageLongPressStyle = isMine
+            ? {
+                userSelect: 'none',
+                WebkitUserSelect: 'none',
+                WebkitTouchCallout: 'none',
+              }
+            : {}
 
           if (msg.type === 'chapter')
             return (
@@ -905,7 +912,7 @@ export default function Room() {
 
           if (msg.type === 'narration')
             return (
-              <div key={msg.id} id={'msg-' + msg.id} onPointerDown={event => startLongPress(event, msg)} onPointerMove={moveLongPress} onPointerUp={cancelLongPress} onPointerCancel={cancelLongPress} onPointerLeave={cancelLongPress} onContextMenu={event => isMine && event.preventDefault()} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: '2px 0', touchAction: 'pan-y' }}>
+              <div key={msg.id} id={'msg-' + msg.id} onPointerDown={event => startLongPress(event, msg)} onPointerMove={moveLongPress} onPointerUp={cancelLongPress} onPointerCancel={cancelLongPress} onPointerLeave={cancelLongPress} onContextMenu={event => isMine && event.preventDefault()} onSelectStart={event => isMine && event.preventDefault()} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: '2px 0', touchAction: 'pan-y', ...ownMessageLongPressStyle }}>
                 <div style={{ display: 'flex', gap: 3 }}>
                   {[0, 1, 2].map(i => (
                     <div key={i} style={{ width: 3, height: 3, borderRadius: '50%', background: t.narrColor }} />
@@ -944,7 +951,7 @@ export default function Room() {
 
           if (msg.type === 'image')
             return (
-              <div key={msg.id} id={'msg-' + msg.id} onPointerDown={event => startLongPress(event, msg)} onPointerMove={moveLongPress} onPointerUp={cancelLongPress} onPointerCancel={cancelLongPress} onPointerLeave={cancelLongPress} onContextMenu={event => isMine && event.preventDefault()} style={{ display: 'flex', flexDirection: isMine ? 'row-reverse' : 'row', alignItems: 'flex-end', gap: 6, touchAction: 'pan-y' }}>
+              <div key={msg.id} id={'msg-' + msg.id} onPointerDown={event => startLongPress(event, msg)} onPointerMove={moveLongPress} onPointerUp={cancelLongPress} onPointerCancel={cancelLongPress} onPointerLeave={cancelLongPress} onContextMenu={event => isMine && event.preventDefault()} onSelectStart={event => isMine && event.preventDefault()} style={{ display: 'flex', flexDirection: isMine ? 'row-reverse' : 'row', alignItems: 'flex-end', gap: 6, touchAction: 'pan-y', ...ownMessageLongPressStyle }}>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, flexShrink: 0, width: 36 }}>
                   <div role="button" tabIndex={0} aria-label={`${char?.name || '프로필'} 사진 크게 보기`} onPointerDown={event => event.stopPropagation()} onClick={() => setProfilePreview({ url: char?.image_url || DEFAULT_AVATAR, name: char?.name })} onKeyDown={event => (event.key === 'Enter' || event.key === ' ') && setProfilePreview({ url: char?.image_url || DEFAULT_AVATAR, name: char?.name })} style={{ width: 36, height: 36, borderRadius: '50%', background: char?.color || t.border, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 500, color: char?.text_color || t.subText, cursor: 'zoom-in' }}>
                     <img src={char?.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -969,7 +976,7 @@ export default function Room() {
           const actColor = isMine ? t.myAct : t.subText
 
           return (
-            <div key={msg.id} id={'msg-' + msg.id} onPointerDown={event => startLongPress(event, msg)} onPointerMove={moveLongPress} onPointerUp={cancelLongPress} onPointerCancel={cancelLongPress} onPointerLeave={cancelLongPress} onContextMenu={event => isMine && event.preventDefault()} style={{ display: 'flex', flexDirection: isMine ? 'row-reverse' : 'row', alignItems: 'flex-end', gap: 6, touchAction: 'pan-y' }}>
+            <div key={msg.id} id={'msg-' + msg.id} onPointerDown={event => startLongPress(event, msg)} onPointerMove={moveLongPress} onPointerUp={cancelLongPress} onPointerCancel={cancelLongPress} onPointerLeave={cancelLongPress} onContextMenu={event => isMine && event.preventDefault()} onSelectStart={event => isMine && event.preventDefault()} style={{ display: 'flex', flexDirection: isMine ? 'row-reverse' : 'row', alignItems: 'flex-end', gap: 6, touchAction: 'pan-y', ...ownMessageLongPressStyle }}>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, flexShrink: 0, width: 36 }}>
                 <div role="button" tabIndex={0} aria-label={`${char?.name || '프로필'} 사진 크게 보기`} onPointerDown={event => event.stopPropagation()} onClick={() => setProfilePreview({ url: char?.image_url || DEFAULT_AVATAR, name: char?.name })} onKeyDown={event => (event.key === 'Enter' || event.key === ' ') && setProfilePreview({ url: char?.image_url || DEFAULT_AVATAR, name: char?.name })} style={{ width: 36, height: 36, borderRadius: '50%', background: char?.color || t.border, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 500, color: char?.text_color || t.subText, cursor: 'zoom-in' }}>
                   <img src={char?.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
