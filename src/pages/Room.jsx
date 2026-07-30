@@ -882,7 +882,7 @@ export default function Room() {
       )}
 
       {/* 메시지 목록 */}
-      <div ref={messageListRef} onScroll={handleScroll} className={`chat-scroll${hideScroll ? ' hide-scroll' : ''}`} style={{ position: 'relative', flex: 1, minHeight: 0, padding: '12px 10px', display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto', background: t.bg }}>
+      <div ref={messageListRef} onScroll={handleScroll} className={`chat-scroll${hideScroll ? ' hide-scroll' : ''}`} style={{ position: 'relative', flex: 1, minHeight: 0, padding: `12px 10px ${showCharList && myChars.length > 0 ? 126 : 82}px`, display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto', background: t.bg }}>
         {filteredMessages.map((msg, messageIndex) => {
           const isMine = msg.user_id === userId
           const char = msg.characters
@@ -1035,14 +1035,14 @@ export default function Room() {
       </div>
 
       {/* 입력 영역 */}
-      <div style={{ background: t.panel, borderTop: `0.5px solid ${t.border}`, padding: '8px 10px 12px', touchAction: 'none', position: 'relative', flexShrink: 0 }}>
+      <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 15, padding: '8px 10px calc(10px + env(safe-area-inset-bottom))', touchAction: 'none', pointerEvents: 'none' }}>
         {myChars.length > 0 && (
-          <button onMouseDown={e => e.preventDefault()} onClick={() => setShowCharList(v => !v)} style={{ position: 'absolute', top: -20, left: 10, background: t.panel, border: `0.5px solid ${t.border}`, borderRadius: '6px 6px 0 0', borderBottom: `1px solid ${t.panel}`, padding: '2px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <button onMouseDown={e => e.preventDefault()} onClick={() => setShowCharList(v => !v)} style={{ position: 'absolute', top: -18, left: 14, background: `color-mix(in srgb, ${t.panel} 78%, transparent)`, backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)', border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '3px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'auto' }}>
             {showCharList ? <ChevronDown size={13} color={t.subText} /> : <ChevronUp size={13} color={t.subText} />}
           </button>
         )}
         {myChars.length > 0 && showCharList && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 7, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, marginBottom: 7, padding: '7px 9px', borderRadius: 14, background: `color-mix(in srgb, ${t.panel} 76%, transparent)`, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: `1px solid ${t.border}`, boxShadow: '0 8px 24px rgba(0,0,0,0.16)', pointerEvents: 'auto' }}>
             <span style={{ fontSize: 10, color: t.subText, flexShrink: 0 }}>나</span>
             <div className="character-strip" style={{ display: 'flex', gap: 5, flex: 1, minWidth: 0, flexWrap: 'nowrap', overflowX: 'auto', overflowY: 'hidden', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', touchAction: 'pan-x', paddingBottom: 2 }}>
               {myChars.map(c => (
@@ -1086,43 +1086,41 @@ export default function Room() {
           </div>
         )}
         {myChars.length === 0 && (
-          <button onClick={() => navigate('/characters')} style={{ width: '100%', background: 'none', border: `0.5px dashed ${t.border}`, borderRadius: 10, padding: '8px', color: t.subText, fontSize: 12, cursor: 'pointer', marginBottom: 8 }}>
+          <button onClick={() => navigate('/characters')} style={{ width: '100%', background: `color-mix(in srgb, ${t.panel} 76%, transparent)`, backdropFilter: 'blur(16px)', border: `0.5px dashed ${t.border}`, borderRadius: 12, padding: '8px', color: t.subText, fontSize: 12, cursor: 'pointer', marginBottom: 8, pointerEvents: 'auto' }}>
             + 캐릭터 추가하기
           </button>
         )}
-        <div style={{ display: 'flex', gap: 7, alignItems: 'flex-end' }}>
-          <button onMouseDown={e => e.preventDefault()} onClick={() => fileInputRef.current?.click()} style={{ width: 36, height: 36, borderRadius: '50%', border: `0.5px solid ${t.border}`, background: 'none', cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ display: 'flex', gap: 5, alignItems: 'flex-end', width: '100%', minHeight: 48, padding: 6, borderRadius: 24, background: `color-mix(in srgb, ${t.panel} 78%, transparent)`, backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)', border: `1px solid ${t.border}`, boxShadow: '0 10px 30px rgba(0,0,0,0.24)', pointerEvents: 'auto' }}>
+          <button onMouseDown={e => e.preventDefault()} onClick={() => fileInputRef.current?.click()} aria-label="이미지 업로드" style={{ width: 36, height: 36, borderRadius: '50%', border: 'none', background: `${t.border}88`, cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Paperclip size={16} color={t.subText} />
           </button>
           <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" ref={fileInputRef} onChange={e => sendImage(e.target.files[0])} style={{ display: 'none' }} />
-          <div style={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'flex-end' }}>
-            <textarea
-              ref={inputRef}
-              value={input}
-              onChange={e => {
-                setInput(e.target.value)
-                e.target.style.height = 'auto'
-                e.target.style.height = Math.min(e.target.scrollHeight, 80) + 'px'
-                handleTyping(e)
-              }}
-              onKeyDown={e => {
-                if (e.key === 'Enter' && !e.shiftKey && window.innerWidth > 768) {
-                  e.preventDefault()
-                  sendMessage()
-                }
-              }}
-              placeholder={isNarrActive ? '나레이션 입력...' : activeChar ? `${activeChar.name}으로 입력...` : '캐릭터를 먼저 추가해주세요'}
-              enterKeyHint="enter"
-              rows={1}
-              style={{ flex: 1, background: t.inputBg, border: `0.5px solid ${isNarrActive ? t.point : t.border}`, borderRadius: 11, padding: '8px 11px', color: isNarrActive ? t.narrColor : t.inputText, fontSize: 13, outline: 'none', resize: 'none', lineHeight: 1.5, fontStyle: isNarrActive ? 'italic' : 'normal' }}
-            />
-            {myChars.length > 0 && (
-              <button onMouseDown={e => e.preventDefault()} onClick={() => setMode(mode === 'narration' ? 'chat' : 'narration')} style={{ position: 'absolute', right: 8, bottom: 7, padding: '2px', borderRadius: 6, cursor: 'pointer', border: 'none', background: 'none', display: 'flex', alignItems: 'center' }}>
-                <Quote size={14} color={isNarrActive ? t.narrColor : t.subText} />
-              </button>
-            )}
-          </div>
-          <button onMouseDown={e => e.preventDefault()} onClick={sendMessage} style={{ width: 36, height: 36, borderRadius: '50%', border: 'none', background: t.point, cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <textarea
+            ref={inputRef}
+            value={input}
+            onChange={e => {
+              setInput(e.target.value)
+              e.target.style.height = 'auto'
+              e.target.style.height = Math.min(e.target.scrollHeight, 80) + 'px'
+              handleTyping(e)
+            }}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && !e.shiftKey && window.innerWidth > 768) {
+                e.preventDefault()
+                sendMessage()
+              }
+            }}
+            placeholder={isNarrActive ? '나레이션 입력...' : activeChar ? `${activeChar.name}으로 입력...` : '캐릭터를 먼저 추가해주세요'}
+            enterKeyHint="enter"
+            rows={1}
+            style={{ flex: 1, minWidth: 0, minHeight: 36, maxHeight: 80, background: 'transparent', border: 'none', borderRadius: 0, padding: '8px 7px', color: isNarrActive ? t.narrColor : t.inputText, fontSize: 13, outline: 'none', resize: 'none', lineHeight: 1.5, fontStyle: isNarrActive ? 'italic' : 'normal' }}
+          />
+          {myChars.length > 0 && (
+            <button onMouseDown={e => e.preventDefault()} onClick={() => setMode(mode === 'narration' ? 'chat' : 'narration')} aria-label="나레이션 전환" style={{ width: 36, height: 36, flexShrink: 0, padding: 0, borderRadius: '50%', cursor: 'pointer', border: `1px solid ${isNarrActive ? t.point : 'transparent'}`, background: isNarrActive ? `${t.point}2f` : `${t.border}66`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Quote size={16} color={isNarrActive ? t.narrColor : t.subText} />
+            </button>
+          )}
+          <button onMouseDown={e => e.preventDefault()} onClick={sendMessage} aria-label="전송" style={{ width: 36, height: 36, borderRadius: '50%', border: 'none', background: t.point, cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <ArrowUp size={18} color="#fff" strokeWidth={2.5} />
           </button>
         </div>
