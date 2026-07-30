@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase, uploadFile, validateImageFile } from '../lib/supabase'
 import { THEMES, getTheme } from '../lib/themes'
-import { ChevronLeft, Link2, Settings, Search, Calendar, Paperclip, ArrowUp, Eye, ArrowDown, ChevronDown, ChevronUp, Quote } from 'lucide-react'
+import { ChevronLeft, Link2, Settings, Search, Calendar, Paperclip, ArrowUp, Eye, ArrowDown, ChevronDown, ChevronUp, Quote, Download, RotateCcw, AlertCircle } from 'lucide-react'
 import ProfileImageModal from '../components/ProfileImageModal'
 
 const DEFAULT_AVATAR = `${import.meta.env.BASE_URL}default-avatar.png`
@@ -162,6 +162,7 @@ export default function Room() {
   const [messageMenuId, setMessageMenuId] = useState(null)
   const [deletingMessageId, setDeletingMessageId] = useState(null)
   const [profilePreview, setProfilePreview] = useState(null)
+  const [initialUnreadId, setInitialUnreadId] = useState(null)
   const [viewportHeight, setViewportHeight] = useState(() => window.visualViewport?.height || window.innerHeight)
   const [viewportOffsetTop, setViewportOffsetTop] = useState(() => window.visualViewport?.offsetTop || 0)
   const scrollTimerRef = useRef(null)
@@ -177,6 +178,11 @@ export default function Room() {
   const initialScrollDone = useRef(false)
   const channelRef = useRef(null)
   const userIdRef = useRef(null)
+  const messagesRef = useRef([])
+
+  useEffect(() => {
+    messagesRef.current = messages
+  }, [messages])
 
   const openPanel = panel => {
     setShowInvite(panel === 'invite')
@@ -403,6 +409,10 @@ export default function Room() {
   const fetchMessages = async () => {
     const { data } = await supabase.from('messages').select('*, characters(name, color, text_color, avatar_letter, image_url)').eq('room_id', roomId).order('created_at', { ascending: true })
     if (data) {
+      if (!initialScrollDone.current && userIdRef.current) {
+        const firstUnread = data.find(message => message.user_id !== userIdRef.current && !(message.read_by || []).includes(userIdRef.current))
+        setInitialUnreadId(firstUnread?.id || null)
+      }
       setMessages(data)
       markAsRead(data)
       const dates = [...new Set(data.map(m => new Date(m.created_at).toLocaleDateString('ko-KR')))]
@@ -446,8 +456,12 @@ export default function Room() {
     if (error) {
       console.error('message insert failed:', error.message)
       setMessages(prev => prev.map(m => (m.id === tempId ? { ...m, delivery_state: 'failed' } : m)))
+      const queue = JSON.parse(localStorage.getItem('idea-pending-messages') || '[]').filter(item => item.tempId !== tempId)
+      localStorage.setItem('idea-pending-messages', JSON.stringify([...queue, { tempId, message, roomId }]))
       return false
     }
+    const queue = JSON.parse(localStorage.getItem('idea-pending-messages') || '[]').filter(item => item.tempId !== tempId)
+    localStorage.setItem('idea-pending-messages', JSON.stringify(queue))
     return true
   }
 
@@ -459,6 +473,23 @@ export default function Room() {
       type: msg.type,
       content: msg.content,
     })
+
+  useEffect(() => {
+    const retryPending = async () => {
+      if (!navigator.onLine) return
+      const queue = JSON.parse(localStorage.getItem('idea-pending-messages') || '[]').filter(item => item.roomId === roomId)
+      for (const item of queue) {
+        const existing = messagesRef.current.find(message => message.id === item.tempId)
+        if (!existing) {
+          setMessages(current => [...current, { ...item.message, id: item.tempId, created_at: new Date().toISOString(), delivery_state: 'failed' }])
+        }
+        await persistMessage(item.tempId, item.message)
+      }
+    }
+    window.addEventListener('online', retryPending)
+    retryPending()
+    return () => window.removeEventListener('online', retryPending)
+  }, [roomId])
 
   const sendMessage = async () => {
     if (!input.trim()) return
@@ -638,6 +669,36 @@ export default function Room() {
     })
   }
 
+  const sendImages = async fileList => {
+    const files = Array.from(fileList || [])
+    if (files.length === 0) return
+    const invalid = files.map(validateImageFile).find(Boolean)
+    if (invalid) {
+      alert(invalid)
+      return
+    }
+    for (const file of files) await sendImage(file)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  const exportChat = () => {
+    const lines = messages
+      .filter(message => !message.id.toString().startsWith('temp-'))
+      .map(message => {
+        const time = new Date(message.created_at).toLocaleString('ko-KR')
+        const speaker = message.type === 'narration' ? '나레이션' : message.characters?.name || '알 수 없음'
+        const content = message.type === 'image' ? `[이미지] ${message.content}` : message.content
+        return `[${time}] ${speaker}\n${content}`
+      })
+    const blob = new Blob([`${room?.name || 'IDEA 채팅'}\n\n${lines.join('\n\n')}`], { type: 'text/plain;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `${(room?.name || 'idea-chat').replace(/[\\/:*?"<>|]/g, '_')}.txt`
+    anchor.click()
+    URL.revokeObjectURL(url)
+  }
+
   const t = theme || getTheme('dark-purple')
 
   const renderMessageActions = (msg, canEdit = true) => {
@@ -669,6 +730,20 @@ export default function Room() {
           삭제
         </button>
       </div>
+    )
+  }
+  const renderDeliveryStatus = msg => {
+    if (msg.delivery_state === 'sending') return <span style={{ marginTop: 3, color: t.subText, fontSize: 10, opacity: 0.7 }}>전송 중…</span>
+    if (msg.delivery_state !== 'failed') return null
+    return (
+      <button
+        onClick={() => retryMessage(msg)}
+        style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 4, padding: '5px 8px', border: '1px solid #f8717188', borderRadius: 9, color: '#fca5a5', background: '#f8717114', fontSize: 10, cursor: 'pointer' }}>
+        <AlertCircle size={12} />
+        전송 실패
+        <RotateCcw size={12} />
+        다시 시도
+      </button>
     )
   }
   const isNarrActive = mode === 'narration'
@@ -726,6 +801,9 @@ export default function Room() {
         </button>
         <button {...iconBtn(() => openPanel(showCalendar ? null : 'calendar'), null, showCalendar)}>
           <Calendar size={15} color={showCalendar ? t.point : t.subText} />
+        </button>
+        <button {...iconBtn(exportChat, null, false)} aria-label="채팅 내보내기" title="채팅 내보내기">
+          <Download size={15} color={t.subText} />
         </button>
       </div>
 
@@ -910,6 +988,29 @@ export default function Room() {
           const char = msg.characters
           const previousMessage = filteredMessages[messageIndex - 1]
           const nextMessage = filteredMessages[messageIndex + 1]
+          const currentDateKey = new Date(msg.created_at).toLocaleDateString('ko-KR')
+          const previousDateKey = previousMessage ? new Date(previousMessage.created_at).toLocaleDateString('ko-KR') : null
+          const showDateDivider = currentDateKey !== previousDateKey
+          const showUnreadDivider = msg.id === initialUnreadId
+          const timelineMarkerHeight = (showDateDivider ? 30 : 0) + (showUnreadDivider ? 28 : 0)
+          const timelineMarkers = timelineMarkerHeight > 0 && (
+            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: timelineMarkerHeight, display: 'flex', flexDirection: 'column', justifyContent: 'space-around', pointerEvents: 'none' }}>
+              {showDateDivider && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                  <span style={{ flex: 1, height: 1, background: t.border, opacity: 0.55 }} />
+                  <span style={{ padding: '3px 9px', borderRadius: 10, color: t.subText, background: `${t.panel}cc`, border: `1px solid ${t.border}`, fontSize: 10 }}>{currentDateKey}</span>
+                  <span style={{ flex: 1, height: 1, background: t.border, opacity: 0.55 }} />
+                </div>
+              )}
+              {showUnreadDivider && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 9, color: t.point, fontSize: 10, fontWeight: 600 }}>
+                  <span style={{ flex: 1, height: 1, background: t.point, opacity: 0.65 }} />
+                  <span>여기부터 안 읽은 메시지</span>
+                  <span style={{ flex: 1, height: 1, background: t.point, opacity: 0.65 }} />
+                </div>
+              )}
+            </div>
+          )
           const showMessageIdentity =
             !previousMessage ||
             previousMessage.type === 'chapter' ||
@@ -921,7 +1022,7 @@ export default function Room() {
           const nextMessageHasTime = nextMessage && nextMessage.type !== 'chapter' && nextMessage.type !== 'narration'
           const showMessageTimestamp = showMessageTime && (!nextMessageHasTime || Math.floor(currentMinute / 60000) !== Math.floor(nextMinute / 60000))
           const showReadReceipt = readReceipt !== 'none' && msg.id === lastReadMessageId
-          const showMessageMeta = showMessageTimestamp || showReadReceipt || msg.delivery_state === 'failed'
+          const showMessageMeta = showMessageTimestamp || showReadReceipt || Boolean(msg.delivery_state)
           const ownMessageLongPressStyle = isMine
             ? {
                 userSelect: 'none',
@@ -947,7 +1048,8 @@ export default function Room() {
                 onPointerLeave={cancelLongPress}
                 onContextMenu={event => isMine && event.preventDefault()}
                 onSelectStart={event => isMine && event.preventDefault()}
-                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: '2px 0', touchAction: 'pan-y', ...ownMessageLongPressStyle }}>
+                style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: `${timelineMarkerHeight + 2}px 0 2px`, touchAction: 'pan-y', ...ownMessageLongPressStyle }}>
+                {timelineMarkers}
                 <div style={{ display: 'flex', gap: 3 }}>
                   {[0, 1, 2].map(i => (
                     <div key={i} style={{ width: 3, height: 3, borderRadius: '50%', background: t.narrColor }} />
@@ -976,11 +1078,7 @@ export default function Room() {
                   ))}
                 </div>
                 {renderMessageActions(msg)}
-                {msg.delivery_state === 'failed' && (
-                  <button onClick={() => retryMessage(msg)} style={{ background: 'none', border: 0, color: '#f87171', fontSize: 10, cursor: 'pointer' }}>
-                    전송 실패 · 다시 시도
-                  </button>
-                )}
+                {renderDeliveryStatus(msg)}
               </div>
             )
 
@@ -998,7 +1096,8 @@ export default function Room() {
                 onPointerLeave={cancelLongPress}
                 onContextMenu={event => isMine && event.preventDefault()}
                 onSelectStart={event => isMine && event.preventDefault()}
-                style={{ display: 'flex', flexDirection: isMine ? 'row-reverse' : 'row', alignItems: 'flex-start', gap: 6, touchAction: 'pan-y', ...ownMessageLongPressStyle }}>
+                style={{ position: 'relative', display: 'flex', flexDirection: isMine ? 'row-reverse' : 'row', alignItems: 'flex-start', gap: 6, paddingTop: timelineMarkerHeight, touchAction: 'pan-y', ...ownMessageLongPressStyle }}>
+                {timelineMarkers}
                 <div style={{ flexShrink: 0, width: 36, height: showMessageIdentity ? 36 : 0 }}>
                   {showMessageIdentity && <div role="button" tabIndex={0} aria-label={`${char?.name || '프로필'} 사진 크게 보기`} onPointerDown={event => event.stopPropagation()} onClick={() => setProfilePreview({ url: char?.image_url || DEFAULT_AVATAR, name: char?.name })} onKeyDown={event => (event.key === 'Enter' || event.key === ' ') && setProfilePreview({ url: char?.image_url || DEFAULT_AVATAR, name: char?.name })} style={{ width: 36, height: 36, borderRadius: '50%', background: char?.color || t.border, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 500, color: char?.text_color || t.subText, cursor: 'zoom-in' }}><img src={char?.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>}
                 </div>
@@ -1007,11 +1106,7 @@ export default function Room() {
                   <img src={msg.content} style={{ maxWidth: 180, borderRadius: 10, cursor: 'pointer' }} onClick={() => openImageMessage(msg.content)} />
                   {showMessageTimestamp && <div style={{ fontSize: 10, color: t.subText, marginTop: 2, opacity: 0.72 }}>{new Date(msg.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}</div>}
                   {renderMessageActions(msg, false)}
-                  {msg.delivery_state === 'failed' && (
-                    <button onClick={() => retryMessage(msg)} style={{ background: 'none', border: 0, color: '#f87171', fontSize: 10, cursor: 'pointer', padding: 0 }}>
-                      전송 실패 · 다시 시도
-                    </button>
-                  )}
+                  {renderDeliveryStatus(msg)}
                 </div>
               </div>
             )
@@ -1033,7 +1128,8 @@ export default function Room() {
               onPointerLeave={cancelLongPress}
               onContextMenu={event => isMine && event.preventDefault()}
               onSelectStart={event => isMine && event.preventDefault()}
-              style={{ display: 'flex', flexDirection: isMine ? 'row-reverse' : 'row', alignItems: 'flex-start', gap: 6, touchAction: 'pan-y', ...ownMessageLongPressStyle }}>
+              style={{ position: 'relative', display: 'flex', flexDirection: isMine ? 'row-reverse' : 'row', alignItems: 'flex-start', gap: 6, paddingTop: timelineMarkerHeight, touchAction: 'pan-y', ...ownMessageLongPressStyle }}>
+              {timelineMarkers}
               <div style={{ flexShrink: 0, width: 36, height: showMessageIdentity ? 36 : 0 }}>
                 {showMessageIdentity && <div role="button" tabIndex={0} aria-label={`${char?.name || '프로필'} 사진 크게 보기`} onPointerDown={event => event.stopPropagation()} onClick={() => setProfilePreview({ url: char?.image_url || DEFAULT_AVATAR, name: char?.name })} onKeyDown={event => (event.key === 'Enter' || event.key === ' ') && setProfilePreview({ url: char?.image_url || DEFAULT_AVATAR, name: char?.name })} style={{ width: 36, height: 36, borderRadius: '50%', background: char?.color || t.border, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 500, color: char?.text_color || t.subText, cursor: 'zoom-in' }}><img src={char?.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>}
               </div>
@@ -1061,11 +1157,7 @@ export default function Room() {
                 {showMessageMeta && <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 2 }}>
                   {showReadReceipt && <Eye size={10} color={t.subText} opacity={0.4} />}
                   {showMessageTimestamp && <div style={{ fontSize: 10, color: t.subText, opacity: 0.72 }}>{searchQuery ? new Date(msg.created_at).toLocaleDateString('ko-KR') + ' ' + new Date(msg.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : new Date(msg.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}</div>}
-                  {msg.delivery_state === 'failed' && (
-                    <button onClick={() => retryMessage(msg)} style={{ background: 'none', border: 0, color: '#f87171', fontSize: 10, cursor: 'pointer', padding: 0 }}>
-                      전송 실패 · 다시 시도
-                    </button>
-                  )}
+                  {renderDeliveryStatus(msg)}
                 </div>}
               </div>
             </div>
@@ -1149,7 +1241,7 @@ export default function Room() {
           <button onMouseDown={e => e.preventDefault()} onClick={() => fileInputRef.current?.click()} aria-label="이미지 업로드" style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: `${t.border}88`, cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Paperclip size={16} color={t.subText} />
           </button>
-          <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" ref={fileInputRef} onChange={e => sendImage(e.target.files[0])} style={{ display: 'none' }} />
+          <input type="file" multiple accept="image/jpeg,image/png,image/webp,image/gif" ref={fileInputRef} onChange={e => sendImages(e.target.files)} style={{ display: 'none' }} />
           <textarea
               ref={inputRef}
               value={input}

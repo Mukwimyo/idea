@@ -6,6 +6,7 @@ import RoomList from './pages/RoomList'
 import Room from './pages/Room'
 import Characters from './pages/Characters'
 import Settings from './pages/Settings'
+import PwaPrompts from './components/PwaPrompts'
 
 const FONT_MAP = {
   'godo-b': 'GodoB',
@@ -86,15 +87,18 @@ export default function App() {
     )
 
   return (
-    <BrowserRouter basename="/idea">
-      <Routes>
-        <Route path="/auth" element={!session ? <Auth /> : <Navigate to="/" />} />
-        <Route path="/" element={session ? <RoomList /> : <Navigate to="/auth" />} />
-        <Route path="/room/:roomId" element={session ? <Room /> : <Navigate to="/auth" />} />
-        <Route path="/room/:roomId/characters" element={session ? <Characters /> : <Navigate to="/auth" />} />
-        <Route path="/characters" element={session ? <Characters /> : <Navigate to="/auth" />} />
-        <Route path="/settings" element={session ? <Settings /> : <Navigate to="/auth" />} />
-      </Routes>
-    </BrowserRouter>
+    <>
+      <PwaPrompts />
+      <BrowserRouter basename="/idea">
+        <Routes>
+          <Route path="/auth" element={!session ? <Auth /> : <Navigate to="/" />} />
+          <Route path="/" element={session ? <RoomList /> : <Navigate to="/auth" />} />
+          <Route path="/room/:roomId" element={session ? <Room /> : <Navigate to="/auth" />} />
+          <Route path="/room/:roomId/characters" element={session ? <Characters /> : <Navigate to="/auth" />} />
+          <Route path="/characters" element={session ? <Characters /> : <Navigate to="/auth" />} />
+          <Route path="/settings" element={session ? <Settings /> : <Navigate to="/auth" />} />
+        </Routes>
+      </BrowserRouter>
+    </>
   )
 }
