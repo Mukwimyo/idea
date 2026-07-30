@@ -166,6 +166,7 @@ export default function Room() {
   const [profilePreview, setProfilePreview] = useState(null)
   const [showCommunication, setShowCommunication] = useState(false)
   const [showRoleplayMenu, setShowRoleplayMenu] = useState(false)
+  const [dividerText, setDividerText] = useState('')
   const [initialUnreadId, setInitialUnreadId] = useState(null)
   const [viewportHeight, setViewportHeight] = useState(() => window.visualViewport?.height || window.innerHeight)
   const [viewportOffsetTop, setViewportOffsetTop] = useState(() => window.visualViewport?.offsetTop || 0)
@@ -672,13 +673,14 @@ export default function Room() {
       data: { user },
     } = await supabase.auth.getUser()
     if (!user) return
+    const content = dividerText.trim() || '구분선'
     const divider = {
       id: 'temp-' + Date.now(),
       room_id: roomId,
       user_id: user.id,
       character_id: null,
       type: 'chapter',
-      content: '구분선',
+      content,
       edited: false,
       created_at: new Date().toISOString(),
       delivery_state: 'sending',
@@ -691,8 +693,9 @@ export default function Room() {
       user_id: user.id,
       character_id: null,
       type: 'chapter',
-      content: '구분선',
+      content,
     })
+    setDividerText('')
   }
 
   const sendImages = async fileList => {
@@ -1072,7 +1075,7 @@ export default function Room() {
               <div key={msg.id} id={'msg-' + msg.id} style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 10, padding: `${timelineMarkerHeight + 8}px 8px 8px` }}>
                 {timelineMarkers}
                 <span style={{ flex: 1, height: 1, background: t.border }} />
-                <span style={{ color: t.subText, fontSize: 10 }}>구분선</span>
+                <span style={{ color: t.subText, fontSize: 10 }}>{msg.content || '구분선'}</span>
                 <span style={{ flex: 1, height: 1, background: t.border }} />
               </div>
             )
@@ -1273,10 +1276,24 @@ export default function Room() {
               <span style={{ flex: 1, textAlign: 'left' }}>나레이션</span>
               <span style={{ fontSize: 10, color: t.subText }}>{isNarrActive ? '사용 중' : '전환'}</span>
             </button>
-            <button onMouseDown={event => event.preventDefault()} onClick={sendDivider} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 11px', borderRadius: 10, border: `1px solid ${t.border}`, background: 'none', color: t.theirText }}>
-              <Minus size={16} />
-              <span>구분선</span>
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+              <Minus size={16} color={t.subText} style={{ flexShrink: 0 }} />
+              <input
+                value={dividerText}
+                onChange={event => setDividerText(event.target.value)}
+                onKeyDown={event => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault()
+                    sendDivider()
+                  }
+                }}
+                placeholder="구분선 문구"
+                style={{ flex: 1, minWidth: 0, padding: '8px 9px', borderRadius: 9, border: `1px solid ${t.border}`, background: t.bg, color: t.inputText, outline: 'none' }}
+              />
+              <button onMouseDown={event => event.preventDefault()} onClick={sendDivider} style={{ flexShrink: 0, padding: '8px 11px', borderRadius: 9, border: 0, background: t.point, color: '#fff' }}>
+                추가
+              </button>
+            </div>
             <button
               onMouseDown={event => event.preventDefault()}
               onClick={() => {

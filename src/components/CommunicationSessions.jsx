@@ -28,6 +28,8 @@ export default function CommunicationSessions({ roomId, userId, myChars, theme, 
   const characterById = useMemo(() => Object.fromEntries(characters.map(character => [character.id, character])), [characters])
   const receiverOptions = characters.filter(character => character.user_id !== userId)
   const effectiveSenderId = myChars.some(character => character.id === senderId) ? senderId : myChars[0]?.id || ''
+  const selectedSender = myChars.find(character => character.id === effectiveSenderId)
+  const selectedReceiver = receiverOptions.find(character => character.id === receiverId)
 
   const fetchSessions = async () => {
     const { data } = await supabase.from('communication_sessions').select('*').eq('room_id', roomId).order('created_at', { ascending: false })
@@ -159,24 +161,30 @@ export default function CommunicationSessions({ roomId, userId, myChars, theme, 
             </div>
             <label style={{ display: 'block', color: t.subText, fontSize: 12, marginBottom: 10 }}>
               발신인
-              <select value={effectiveSenderId} onChange={event => setSenderId(event.target.value)} style={{ width: '100%', marginTop: 5, padding: 9, borderRadius: 10, background: t.bg, color: t.inputText, border: `1px solid ${t.border}` }}>
-                {myChars.map(character => (
-                  <option key={character.id} value={character.id}>
-                    {character.name}
-                  </option>
-                ))}
-              </select>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 5, padding: '5px 8px', borderRadius: 10, background: t.bg, border: `1px solid ${t.border}` }}>
+                <img src={selectedSender?.image_url || DEFAULT_AVATAR} alt="" style={{ width: 30, height: 30, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                <select value={effectiveSenderId} onChange={event => setSenderId(event.target.value)} style={{ flex: 1, minWidth: 0, padding: 4, border: 0, outline: 'none', background: t.bg, color: t.inputText }}>
+                  {myChars.map(character => (
+                    <option key={character.id} value={character.id}>
+                      {character.name}
+                    </option>
+                  ))}
+                </select>
+              </span>
             </label>
             <label style={{ display: 'block', color: t.subText, fontSize: 12 }}>
               수신인
-              <select value={receiverId} onChange={event => setReceiverId(event.target.value)} style={{ width: '100%', marginTop: 5, padding: 9, borderRadius: 10, background: t.bg, color: t.inputText, border: `1px solid ${t.border}` }}>
-                {receiverOptions.length === 0 && <option value="">선택 가능한 상대 캐릭터 없음</option>}
-                {receiverOptions.map(character => (
-                  <option key={character.id} value={character.id}>
-                    {character.name}
-                  </option>
-                ))}
-              </select>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 5, padding: '5px 8px', borderRadius: 10, background: t.bg, border: `1px solid ${t.border}` }}>
+                <img src={selectedReceiver?.image_url || DEFAULT_AVATAR} alt="" style={{ width: 30, height: 30, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                <select value={receiverId} onChange={event => setReceiverId(event.target.value)} style={{ flex: 1, minWidth: 0, padding: 4, border: 0, outline: 'none', background: t.bg, color: t.inputText }}>
+                  {receiverOptions.length === 0 && <option value="">선택 가능한 상대 캐릭터 없음</option>}
+                  {receiverOptions.map(character => (
+                    <option key={character.id} value={character.id}>
+                      {character.name}
+                    </option>
+                  ))}
+                </select>
+              </span>
             </label>
             {characterLoadError && (
               <div role="status" style={{ marginTop: 8, color: t.subText, fontSize: 11, lineHeight: 1.5 }}>
