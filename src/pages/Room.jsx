@@ -2,8 +2,9 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase, uploadFile, validateImageFile } from '../lib/supabase'
 import { THEMES, getTheme } from '../lib/themes'
-import { ChevronLeft, Link2, Settings, Search, Calendar, Paperclip, ArrowUp, Eye, ArrowDown, ChevronDown, ChevronUp, Quote, Download, RotateCcw, AlertCircle } from 'lucide-react'
+import { ChevronLeft, Link2, Settings, Search, Calendar, Paperclip, ArrowUp, Eye, ArrowDown, ChevronDown, ChevronUp, Quote, Download, RotateCcw, AlertCircle, Sparkles, Minus, Phone, MessageSquare } from 'lucide-react'
 import ProfileImageModal from '../components/ProfileImageModal'
+import CommunicationSessions from '../components/CommunicationSessions'
 
 const DEFAULT_AVATAR = `${import.meta.env.BASE_URL}default-avatar.png`
 
@@ -162,6 +163,8 @@ export default function Room() {
   const [messageMenuId, setMessageMenuId] = useState(null)
   const [deletingMessageId, setDeletingMessageId] = useState(null)
   const [profilePreview, setProfilePreview] = useState(null)
+  const [showCommunication, setShowCommunication] = useState(false)
+  const [showRoleplayMenu, setShowRoleplayMenu] = useState(false)
   const [initialUnreadId, setInitialUnreadId] = useState(null)
   const [viewportHeight, setViewportHeight] = useState(() => window.visualViewport?.height || window.innerHeight)
   const [viewportOffsetTop, setViewportOffsetTop] = useState(() => window.visualViewport?.offsetTop || 0)
@@ -206,10 +209,7 @@ export default function Room() {
       setActionStyle(roomData?.action_style || 'dim')
       setIsOwner(roomData?.created_by === user.id)
 
-      const [{ data: profile }, { data: messageTimeSetting }] = await Promise.all([
-        supabase.from('profiles').select('theme_id, last_char_id, show_entering').eq('id', user.id).single(),
-        supabase.from('profiles').select('show_message_time').eq('id', user.id).maybeSingle(),
-      ])
+      const [{ data: profile }, { data: messageTimeSetting }] = await Promise.all([supabase.from('profiles').select('theme_id, last_char_id, show_entering').eq('id', user.id).single(), supabase.from('profiles').select('show_message_time').eq('id', user.id).maybeSingle()])
       const enteringEnabled = profile?.show_entering ?? true
       setShowEntering(enteringEnabled)
       setShowMessageTime(messageTimeSetting?.show_message_time ?? true)
@@ -227,10 +227,7 @@ export default function Room() {
 
       const { data: chars } = await supabase.from('characters').select().eq('user_id', user.id).eq('is_archived', false).order('sort_order', { ascending: true }).order('created_at', { ascending: true })
       const { data: roomCharacterRows } = await supabase.from('room_characters').select('character_id, sort_order').eq('room_id', roomId).eq('user_id', user.id).order('sort_order', { ascending: true })
-      const roomChars =
-        roomCharacterRows && roomCharacterRows.length > 0
-          ? roomCharacterRows.map(row => chars?.find(character => character.id === row.character_id)).filter(Boolean)
-          : chars || []
+      const roomChars = roomCharacterRows && roomCharacterRows.length > 0 ? roomCharacterRows.map(row => chars?.find(character => character.id === row.character_id)).filter(Boolean) : chars || []
       setMyChars(roomChars)
       if (roomChars.length > 0) {
         const { data: member } = await supabase.from('room_members').select('last_char_id').eq('room_id', roomId).eq('user_id', user.id).single()
@@ -669,6 +666,34 @@ export default function Room() {
     })
   }
 
+  const sendDivider = async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) return
+    const divider = {
+      id: 'temp-' + Date.now(),
+      room_id: roomId,
+      user_id: user.id,
+      character_id: null,
+      type: 'chapter',
+      content: '구분선',
+      edited: false,
+      created_at: new Date().toISOString(),
+      delivery_state: 'sending',
+      entrance_side: 'right',
+    }
+    setMessages(current => [...current, divider])
+    setShowRoleplayMenu(false)
+    await persistMessage(divider.id, {
+      room_id: roomId,
+      user_id: user.id,
+      character_id: null,
+      type: 'chapter',
+      content: '구분선',
+    })
+  }
+
   const sendImages = async fileList => {
     const files = Array.from(fileList || [])
     if (files.length === 0) return
@@ -736,9 +761,7 @@ export default function Room() {
     if (msg.delivery_state === 'sending') return <span style={{ marginTop: 3, color: t.subText, fontSize: 10, opacity: 0.7 }}>전송 중…</span>
     if (msg.delivery_state !== 'failed') return null
     return (
-      <button
-        onClick={() => retryMessage(msg)}
-        style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 4, padding: '5px 8px', border: '1px solid #f8717188', borderRadius: 9, color: '#fca5a5', background: '#f8717114', fontSize: 10, cursor: 'pointer' }}>
+      <button onClick={() => retryMessage(msg)} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 4, padding: '5px 8px', border: '1px solid #f8717188', borderRadius: 9, color: '#fca5a5', background: '#f8717114', fontSize: 10, cursor: 'pointer' }}>
         <AlertCircle size={12} />
         전송 실패
         <RotateCcw size={12} />
@@ -771,6 +794,7 @@ export default function Room() {
   return (
     <div style={{ height: viewportHeight + viewportOffsetTop, overflow: 'hidden', background: t.bg, '--scrollbar-color': t.border, display: 'flex', flexDirection: 'column', maxWidth: 480, margin: '0 auto', animation: !showEntering ? 'slide-in-right 0.3s ease' : 'none' }}>
       <ProfileImageModal profile={profilePreview} onClose={() => setProfilePreview(null)} />
+      <CommunicationSessions roomId={roomId} userId={userId} myChars={myChars} theme={t} open={showCommunication} onClose={() => setShowCommunication(false)} />
       {showSlot && room && showEntering && (
         <SlotEntrance
           roomName={room.name}
@@ -1011,12 +1035,7 @@ export default function Room() {
               )}
             </div>
           )
-          const showMessageIdentity =
-            !previousMessage ||
-            previousMessage.type === 'chapter' ||
-            previousMessage.type === 'narration' ||
-            previousMessage.character_id !== msg.character_id ||
-            previousMessage.user_id !== msg.user_id
+          const showMessageIdentity = !previousMessage || previousMessage.type === 'chapter' || previousMessage.type === 'narration' || previousMessage.character_id !== msg.character_id || previousMessage.user_id !== msg.user_id
           const currentMinute = new Date(msg.created_at).getTime()
           const nextMinute = nextMessage ? new Date(nextMessage.created_at).getTime() : NaN
           const nextMessageHasTime = nextMessage && nextMessage.type !== 'chapter' && nextMessage.type !== 'narration'
@@ -1032,23 +1051,18 @@ export default function Room() {
             : {}
 
           if (msg.type === 'chapter')
-            return null
+            return (
+              <div key={msg.id} id={'msg-' + msg.id} style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 10, padding: `${timelineMarkerHeight + 8}px 8px 8px` }}>
+                {timelineMarkers}
+                <span style={{ flex: 1, height: 1, background: t.border }} />
+                <span style={{ color: t.subText, fontSize: 10 }}>구분선</span>
+                <span style={{ flex: 1, height: 1, background: t.border }} />
+              </div>
+            )
 
           if (msg.type === 'narration')
             return (
-              <div
-                className={messageEntranceClass}
-                onAnimationEnd={() => messageEntranceClass && finishMessageEntrance(msg.id)}
-                key={msg.id}
-                id={'msg-' + msg.id}
-                onPointerDown={event => startLongPress(event, msg)}
-                onPointerMove={moveLongPress}
-                onPointerUp={cancelLongPress}
-                onPointerCancel={cancelLongPress}
-                onPointerLeave={cancelLongPress}
-                onContextMenu={event => isMine && event.preventDefault()}
-                onSelectStart={event => isMine && event.preventDefault()}
-                style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: `${timelineMarkerHeight + 2}px 0 2px`, touchAction: 'pan-y', ...ownMessageLongPressStyle }}>
+              <div className={messageEntranceClass} onAnimationEnd={() => messageEntranceClass && finishMessageEntrance(msg.id)} key={msg.id} id={'msg-' + msg.id} onPointerDown={event => startLongPress(event, msg)} onPointerMove={moveLongPress} onPointerUp={cancelLongPress} onPointerCancel={cancelLongPress} onPointerLeave={cancelLongPress} onContextMenu={event => isMine && event.preventDefault()} onSelectStart={event => isMine && event.preventDefault()} style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: `${timelineMarkerHeight + 2}px 0 2px`, touchAction: 'pan-y', ...ownMessageLongPressStyle }}>
                 {timelineMarkers}
                 <div style={{ display: 'flex', gap: 3 }}>
                   {[0, 1, 2].map(i => (
@@ -1084,22 +1098,14 @@ export default function Room() {
 
           if (msg.type === 'image')
             return (
-              <div
-                className={messageEntranceClass}
-                onAnimationEnd={() => messageEntranceClass && finishMessageEntrance(msg.id)}
-                key={msg.id}
-                id={'msg-' + msg.id}
-                onPointerDown={event => startLongPress(event, msg)}
-                onPointerMove={moveLongPress}
-                onPointerUp={cancelLongPress}
-                onPointerCancel={cancelLongPress}
-                onPointerLeave={cancelLongPress}
-                onContextMenu={event => isMine && event.preventDefault()}
-                onSelectStart={event => isMine && event.preventDefault()}
-                style={{ position: 'relative', display: 'flex', flexDirection: isMine ? 'row-reverse' : 'row', alignItems: 'flex-start', gap: 6, paddingTop: timelineMarkerHeight, touchAction: 'pan-y', ...ownMessageLongPressStyle }}>
+              <div className={messageEntranceClass} onAnimationEnd={() => messageEntranceClass && finishMessageEntrance(msg.id)} key={msg.id} id={'msg-' + msg.id} onPointerDown={event => startLongPress(event, msg)} onPointerMove={moveLongPress} onPointerUp={cancelLongPress} onPointerCancel={cancelLongPress} onPointerLeave={cancelLongPress} onContextMenu={event => isMine && event.preventDefault()} onSelectStart={event => isMine && event.preventDefault()} style={{ position: 'relative', display: 'flex', flexDirection: isMine ? 'row-reverse' : 'row', alignItems: 'flex-start', gap: 6, paddingTop: timelineMarkerHeight, touchAction: 'pan-y', ...ownMessageLongPressStyle }}>
                 {timelineMarkers}
                 <div style={{ flexShrink: 0, width: 36, height: showMessageIdentity ? 36 : 0 }}>
-                  {showMessageIdentity && <div role="button" tabIndex={0} aria-label={`${char?.name || '프로필'} 사진 크게 보기`} onPointerDown={event => event.stopPropagation()} onClick={() => setProfilePreview({ url: char?.image_url || DEFAULT_AVATAR, name: char?.name })} onKeyDown={event => (event.key === 'Enter' || event.key === ' ') && setProfilePreview({ url: char?.image_url || DEFAULT_AVATAR, name: char?.name })} style={{ width: 36, height: 36, borderRadius: '50%', background: char?.color || t.border, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 500, color: char?.text_color || t.subText, cursor: 'zoom-in' }}><img src={char?.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>}
+                  {showMessageIdentity && (
+                    <div role="button" tabIndex={0} aria-label={`${char?.name || '프로필'} 사진 크게 보기`} onPointerDown={event => event.stopPropagation()} onClick={() => setProfilePreview({ url: char?.image_url || DEFAULT_AVATAR, name: char?.name })} onKeyDown={event => (event.key === 'Enter' || event.key === ' ') && setProfilePreview({ url: char?.image_url || DEFAULT_AVATAR, name: char?.name })} style={{ width: 36, height: 36, borderRadius: '50%', background: char?.color || t.border, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 500, color: char?.text_color || t.subText, cursor: 'zoom-in' }}>
+                      <img src={char?.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    </div>
+                  )}
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMine ? 'flex-end' : 'flex-start', maxWidth: '72%' }}>
                   {showMessageIdentity && char?.name && <div style={{ maxWidth: '100%', marginBottom: 4, color: t.subText, fontSize: 11, lineHeight: 1.35, overflowWrap: 'anywhere', textAlign: isMine ? 'right' : 'left' }}>{char.name}</div>}
@@ -1116,22 +1122,14 @@ export default function Room() {
           const actColor = isMine ? t.myAct : t.subText
 
           return (
-              <div
-              className={messageEntranceClass}
-              onAnimationEnd={() => messageEntranceClass && finishMessageEntrance(msg.id)}
-              key={msg.id}
-              id={'msg-' + msg.id}
-              onPointerDown={event => startLongPress(event, msg)}
-              onPointerMove={moveLongPress}
-              onPointerUp={cancelLongPress}
-              onPointerCancel={cancelLongPress}
-              onPointerLeave={cancelLongPress}
-              onContextMenu={event => isMine && event.preventDefault()}
-              onSelectStart={event => isMine && event.preventDefault()}
-              style={{ position: 'relative', display: 'flex', flexDirection: isMine ? 'row-reverse' : 'row', alignItems: 'flex-start', gap: 6, paddingTop: timelineMarkerHeight, touchAction: 'pan-y', ...ownMessageLongPressStyle }}>
+            <div className={messageEntranceClass} onAnimationEnd={() => messageEntranceClass && finishMessageEntrance(msg.id)} key={msg.id} id={'msg-' + msg.id} onPointerDown={event => startLongPress(event, msg)} onPointerMove={moveLongPress} onPointerUp={cancelLongPress} onPointerCancel={cancelLongPress} onPointerLeave={cancelLongPress} onContextMenu={event => isMine && event.preventDefault()} onSelectStart={event => isMine && event.preventDefault()} style={{ position: 'relative', display: 'flex', flexDirection: isMine ? 'row-reverse' : 'row', alignItems: 'flex-start', gap: 6, paddingTop: timelineMarkerHeight, touchAction: 'pan-y', ...ownMessageLongPressStyle }}>
               {timelineMarkers}
               <div style={{ flexShrink: 0, width: 36, height: showMessageIdentity ? 36 : 0 }}>
-                {showMessageIdentity && <div role="button" tabIndex={0} aria-label={`${char?.name || '프로필'} 사진 크게 보기`} onPointerDown={event => event.stopPropagation()} onClick={() => setProfilePreview({ url: char?.image_url || DEFAULT_AVATAR, name: char?.name })} onKeyDown={event => (event.key === 'Enter' || event.key === ' ') && setProfilePreview({ url: char?.image_url || DEFAULT_AVATAR, name: char?.name })} style={{ width: 36, height: 36, borderRadius: '50%', background: char?.color || t.border, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 500, color: char?.text_color || t.subText, cursor: 'zoom-in' }}><img src={char?.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>}
+                {showMessageIdentity && (
+                  <div role="button" tabIndex={0} aria-label={`${char?.name || '프로필'} 사진 크게 보기`} onPointerDown={event => event.stopPropagation()} onClick={() => setProfilePreview({ url: char?.image_url || DEFAULT_AVATAR, name: char?.name })} onKeyDown={event => (event.key === 'Enter' || event.key === ' ') && setProfilePreview({ url: char?.image_url || DEFAULT_AVATAR, name: char?.name })} style={{ width: 36, height: 36, borderRadius: '50%', background: char?.color || t.border, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 500, color: char?.text_color || t.subText, cursor: 'zoom-in' }}>
+                    <img src={char?.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  </div>
+                )}
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMine ? 'flex-end' : 'flex-start', maxWidth: '72%' }}>
                 {showMessageIdentity && char?.name && <div style={{ maxWidth: '100%', marginBottom: 4, color: t.subText, fontSize: 11, lineHeight: 1.35, overflowWrap: 'anywhere', textAlign: isMine ? 'right' : 'left' }}>{char.name}</div>}
@@ -1146,19 +1144,19 @@ export default function Room() {
                     </button>
                   </div>
                 ) : (
-                  <div
-                    data-message-bubble
-                    style={{ background: bubbleBg, color: bubbleColor, padding: '8px 12px', borderRadius: 13, fontSize: 14, lineHeight: 1.55, border: 'none', cursor: isMine ? 'pointer' : 'default' }}>
+                  <div data-message-bubble style={{ background: bubbleBg, color: bubbleColor, padding: '8px 12px', borderRadius: 13, fontSize: 14, lineHeight: 1.55, border: 'none', cursor: isMine ? 'pointer' : 'default' }}>
                     {parseContent(msg.content, actColor, actionStyle)}
                     {msg.edited && <span style={{ fontSize: 9, opacity: 0.5, marginLeft: 4 }}>수정됨</span>}
                   </div>
                 )}
                 {renderMessageActions(msg)}
-                {showMessageMeta && <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 2 }}>
-                  {showReadReceipt && <Eye size={10} color={t.subText} opacity={0.4} />}
-                  {showMessageTimestamp && <div style={{ fontSize: 10, color: t.subText, opacity: 0.72 }}>{searchQuery ? new Date(msg.created_at).toLocaleDateString('ko-KR') + ' ' + new Date(msg.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : new Date(msg.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}</div>}
-                  {renderDeliveryStatus(msg)}
-                </div>}
+                {showMessageMeta && (
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 2 }}>
+                    {showReadReceipt && <Eye size={10} color={t.subText} opacity={0.4} />}
+                    {showMessageTimestamp && <div style={{ fontSize: 10, color: t.subText, opacity: 0.72 }}>{searchQuery ? new Date(msg.created_at).toLocaleDateString('ko-KR') + ' ' + new Date(msg.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : new Date(msg.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}</div>}
+                    {renderDeliveryStatus(msg)}
+                  </div>
+                )}
               </div>
             </div>
           )
@@ -1198,7 +1196,7 @@ export default function Room() {
           }}
         />
         {myChars.length > 0 && (
-          <button onMouseDown={e => e.preventDefault()} onClick={() => setShowCharList(v => !v)} style={{ position: 'absolute', top: -18, left: 14, background: `color-mix(in srgb, ${t.panel} 78%, transparent)`, backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)', border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '3px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'auto' }}>
+          <button onMouseDown={e => e.preventDefault()} onClick={() => setShowCharList(v => !v)} aria-label="프로필 변경 메뉴" style={{ position: 'absolute', top: -18, left: '50%', transform: 'translateX(-50%)', background: `color-mix(in srgb, ${t.panel} 78%, transparent)`, backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)', border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '3px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'auto' }}>
             {showCharList ? <ChevronDown size={13} color={t.subText} /> : <ChevronUp size={13} color={t.subText} />}
           </button>
         )}
@@ -1219,15 +1217,14 @@ export default function Room() {
                     await supabase.from('room_members').update({ last_char_id: c.id }).eq('room_id', roomId).eq('user_id', user.id)
                   }}
                   style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, padding: '3px 8px 3px 4px', borderRadius: 20, border: activeChar?.id === c.id && mode === 'chat' ? `1.5px solid ${c.color || t.point}` : `1px solid ${t.border}`, background: activeChar?.id === c.id && mode === 'chat' ? c.color + '22' : 'none', cursor: 'pointer' }}>
-                  <div style={{ width: 18, height: 18, borderRadius: '50%', background: c.color || t.point, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, color: c.text_color || '#fff', overflow: 'hidden', flexShrink: 0 }}><img src={c.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>
+                  <div style={{ width: 18, height: 18, borderRadius: '50%', background: c.color || t.point, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, color: c.text_color || '#fff', overflow: 'hidden', flexShrink: 0 }}>
+                    <img src={c.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  </div>
                   <span style={{ fontSize: 11, color: activeChar?.id === c.id && mode === 'chat' ? t.theirText : t.subText }}>{c.name}</span>
                 </button>
               ))}
             </div>
-            <button
-              onMouseDown={e => e.preventDefault()}
-              onClick={() => navigate(`/room/${roomId}/characters`)}
-              style={{ flexShrink: 0, background: 'none', border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '4px 7px', color: t.subText, fontSize: 10, cursor: 'pointer' }}>
+            <button onMouseDown={e => e.preventDefault()} onClick={() => navigate(`/room/${roomId}/characters`)} style={{ flexShrink: 0, background: 'none', border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '4px 7px', color: t.subText, fontSize: 10, cursor: 'pointer' }}>
               설정
             </button>
           </div>
@@ -1237,47 +1234,78 @@ export default function Room() {
             + 캐릭터 추가하기
           </button>
         )}
+        {showRoleplayMenu && (
+          <div style={{ display: 'grid', gap: 6, marginBottom: 7, padding: 8, borderRadius: 14, background: `color-mix(in srgb, ${t.panel} 92%, transparent)`, backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)', border: `1px solid ${t.border}`, pointerEvents: 'auto' }}>
+            <button
+              onMouseDown={event => event.preventDefault()}
+              onClick={() => {
+                setMode(isNarrActive ? 'chat' : 'narration')
+                setShowRoleplayMenu(false)
+                inputRef.current?.focus()
+              }}
+              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 11px', borderRadius: 10, border: `1px solid ${isNarrActive ? t.point : t.border}`, background: isNarrActive ? `${t.point}22` : 'none', color: isNarrActive ? t.point : t.theirText }}>
+              <Quote size={16} />
+              <span style={{ flex: 1, textAlign: 'left' }}>나레이션</span>
+              <span style={{ fontSize: 10, color: t.subText }}>{isNarrActive ? '사용 중' : '전환'}</span>
+            </button>
+            <button onMouseDown={event => event.preventDefault()} onClick={sendDivider} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 11px', borderRadius: 10, border: `1px solid ${t.border}`, background: 'none', color: t.theirText }}>
+              <Minus size={16} />
+              <span>구분선</span>
+            </button>
+            <button
+              onMouseDown={event => event.preventDefault()}
+              onClick={() => {
+                setShowRoleplayMenu(false)
+                setShowCommunication(true)
+              }}
+              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 11px', borderRadius: 10, border: `1px solid ${t.border}`, background: 'none', color: t.theirText }}>
+              <Phone size={16} />
+              <MessageSquare size={16} />
+              <span>전화 · 문자</span>
+            </button>
+          </div>
+        )}
         <div style={{ display: 'flex', gap: 5, alignItems: 'flex-end', width: '100%', minHeight: 52, padding: 6, borderRadius: 26, background: `color-mix(in srgb, ${t.panel} 78%, transparent)`, backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)', border: `1px solid ${t.border}`, boxShadow: '0 10px 30px rgba(0,0,0,0.24)', pointerEvents: 'auto' }}>
           <button onMouseDown={e => e.preventDefault()} onClick={() => fileInputRef.current?.click()} aria-label="이미지 업로드" style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: `${t.border}88`, cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Paperclip size={16} color={t.subText} />
           </button>
           <input type="file" multiple accept="image/jpeg,image/png,image/webp,image/gif" ref={fileInputRef} onChange={e => sendImages(e.target.files)} style={{ display: 'none' }} />
           <textarea
-              ref={inputRef}
-              value={input}
-              onChange={e => {
-                setInput(e.target.value)
-                e.target.style.height = 'auto'
-                e.target.style.height = Math.min(e.target.scrollHeight, 80) + 'px'
-                handleTyping(e)
-              }}
-              onKeyDown={e => {
-                if (e.key === 'Enter' && !e.shiftKey && window.innerWidth > 768) {
-                  e.preventDefault()
-                  sendMessage()
-                }
-              }}
-              onFocus={() => {
-                ;[0, 140, 320].forEach(delay => {
-                  window.setTimeout(() => {
-                    if (window.visualViewport) {
-                      setViewportHeight(window.visualViewport.height)
-                      setViewportOffsetTop(window.visualViewport.offsetTop)
-                    }
-                    messagesEndRef.current?.scrollIntoView({ behavior: 'instant' })
-                  }, delay)
-                })
-              }}
-              placeholder={isNarrActive ? '나레이션 입력...' : activeChar ? `${activeChar.name}${instrumentalParticle(activeChar.name)} 입력...` : '캐릭터를 먼저 추가해주세요'}
-              enterKeyHint="enter"
-              rows={1}
-              style={{ flex: 1, minWidth: 0, minHeight: 40, maxHeight: 80, background: 'transparent', border: 'none', borderRadius: 0, padding: '9px 7px', color: isNarrActive ? t.narrColor : t.inputText, fontSize: 14, outline: 'none', resize: 'none', lineHeight: 1.5, fontStyle: isNarrActive ? 'italic' : 'normal' }}
-            />
-            {myChars.length > 0 && (
-              <button onMouseDown={e => e.preventDefault()} onClick={() => setMode(mode === 'narration' ? 'chat' : 'narration')} aria-label="나레이션 전환" style={{ width: 40, height: 40, flexShrink: 0, padding: 0, borderRadius: '50%', cursor: 'pointer', border: `1px solid ${isNarrActive ? t.point : 'transparent'}`, background: isNarrActive ? `${t.point}2f` : `${t.border}66`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Quote size={16} color={isNarrActive ? t.narrColor : t.subText} />
-              </button>
-            )}
+            ref={inputRef}
+            value={input}
+            onChange={e => {
+              setInput(e.target.value)
+              e.target.style.height = 'auto'
+              e.target.style.height = Math.min(e.target.scrollHeight, 80) + 'px'
+              handleTyping(e)
+            }}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && !e.shiftKey && window.innerWidth > 768) {
+                e.preventDefault()
+                sendMessage()
+              }
+            }}
+            onFocus={() => {
+              ;[0, 140, 320].forEach(delay => {
+                window.setTimeout(() => {
+                  if (window.visualViewport) {
+                    setViewportHeight(window.visualViewport.height)
+                    setViewportOffsetTop(window.visualViewport.offsetTop)
+                  }
+                  messagesEndRef.current?.scrollIntoView({ behavior: 'instant' })
+                }, delay)
+              })
+            }}
+            placeholder={isNarrActive ? '나레이션 입력...' : activeChar ? `${activeChar.name}${instrumentalParticle(activeChar.name)} 입력...` : '캐릭터를 먼저 추가해주세요'}
+            enterKeyHint="enter"
+            rows={1}
+            style={{ flex: 1, minWidth: 0, minHeight: 40, maxHeight: 80, background: 'transparent', border: 'none', borderRadius: 0, padding: '9px 7px', color: isNarrActive ? t.narrColor : t.inputText, fontSize: 14, outline: 'none', resize: 'none', lineHeight: 1.5, fontStyle: isNarrActive ? 'italic' : 'normal' }}
+          />
+          {myChars.length > 0 && (
+            <button onMouseDown={e => e.preventDefault()} onClick={() => setShowRoleplayMenu(value => !value)} aria-label="역극 편의기능 메뉴" style={{ width: 40, height: 40, flexShrink: 0, padding: 0, borderRadius: '50%', cursor: 'pointer', border: `1px solid ${showRoleplayMenu || isNarrActive ? t.point : 'transparent'}`, background: showRoleplayMenu || isNarrActive ? `${t.point}2f` : `${t.border}66`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Sparkles size={16} color={showRoleplayMenu || isNarrActive ? t.narrColor : t.subText} />
+            </button>
+          )}
           <button onMouseDown={e => e.preventDefault()} onClick={sendMessage} aria-label="전송" style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: t.point, cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <ArrowUp size={18} color="#fff" strokeWidth={2.5} />
           </button>
