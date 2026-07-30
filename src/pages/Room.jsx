@@ -5,6 +5,7 @@ import { THEMES, getTheme } from '../lib/themes'
 import { ChevronLeft, Link2, Settings, Search, Calendar, Paperclip, ArrowUp, Eye, ArrowDown, ChevronDown, ChevronUp, Quote, Download, RotateCcw, AlertCircle, Sparkles, Minus, Phone, MessageSquare } from 'lucide-react'
 import ProfileImageModal from '../components/ProfileImageModal'
 import CommunicationSessions from '../components/CommunicationSessions'
+import CommunicationRecord from '../components/CommunicationRecord'
 
 const DEFAULT_AVATAR = `${import.meta.env.BASE_URL}default-avatar.png`
 
@@ -792,7 +793,23 @@ export default function Room() {
     )
 
   return (
-    <div style={{ height: viewportHeight + viewportOffsetTop, overflow: 'hidden', background: t.bg, '--scrollbar-color': t.border, display: 'flex', flexDirection: 'column', maxWidth: 480, margin: '0 auto', animation: !showEntering ? 'slide-in-right 0.3s ease' : 'none' }}>
+    <div
+      style={{
+        position: 'fixed',
+        top: viewportOffsetTop,
+        left: 0,
+        right: 0,
+        width: '100%',
+        height: viewportHeight,
+        overflow: 'hidden',
+        background: t.bg,
+        '--scrollbar-color': t.border,
+        display: 'flex',
+        flexDirection: 'column',
+        maxWidth: 480,
+        margin: '0 auto',
+        animation: !showEntering ? 'slide-in-right 0.3s ease' : 'none',
+      }}>
       <ProfileImageModal profile={profilePreview} onClose={() => setProfilePreview(null)} />
       <CommunicationSessions roomId={roomId} userId={userId} myChars={myChars} theme={t} open={showCommunication} onClose={() => setShowCommunication(false)} />
       {showSlot && room && showEntering && (
@@ -1057,6 +1074,14 @@ export default function Room() {
                 <span style={{ flex: 1, height: 1, background: t.border }} />
                 <span style={{ color: t.subText, fontSize: 10 }}>구분선</span>
                 <span style={{ flex: 1, height: 1, background: t.border }} />
+              </div>
+            )
+
+          if (msg.type === 'communication')
+            return (
+              <div key={msg.id} id={'msg-' + msg.id} style={{ position: 'relative', paddingTop: timelineMarkerHeight }}>
+                {timelineMarkers}
+                <CommunicationRecord message={msg} theme={t} />
               </div>
             )
 

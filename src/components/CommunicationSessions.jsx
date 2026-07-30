@@ -108,7 +108,19 @@ export default function CommunicationSessions({ roomId, userId, myChars, theme, 
     const patch = { status }
     if (status === 'active') patch.started_at = new Date().toISOString()
     if (['declined', 'left', 'ended'].includes(status)) patch.ended_at = new Date().toISOString()
-    await supabase.from('communication_sessions').update(patch).eq('id', session.id)
+    const { data: updated, error } = await supabase.from('communication_sessions').update(patch).eq('id', session.id).select().single()
+    if (error || !updated || !['declined', 'left', 'ended'].includes(status)) return
+    const senderName = characterById[session.sender_character_id]?.name || '캐릭터'
+    const receiverName = characterById[session.receiver_character_id]?.name || '캐릭터'
+    const statusLabel = status === 'declined' ? '거절된 통화' : status === 'left' ? '입장하지 않은 문자' : `${session.kind === 'call' ? '통화' : '문자'} 종료`
+    const duration = session.kind === 'call' ? durationLabel(updated.started_at, updated.ended_at, Date.now()) : ''
+    await supabase.from('messages').insert({
+      room_id: roomId,
+      user_id: userId,
+      character_id: null,
+      type: 'communication',
+      content: JSON.stringify({ sessionId: session.id, kind: session.kind, title: `${senderName} × ${receiverName}`, statusLabel, duration }),
+    })
   }
 
   const sendMessage = async session => {
@@ -120,6 +132,7 @@ export default function CommunicationSessions({ roomId, userId, myChars, theme, 
 
   const sessionTitle = session => `${characterById[session.sender_character_id]?.name || '캐릭터'} × ${characterById[session.receiver_character_id]?.name || '캐릭터'}`
   const isReceiver = session => session.receiver_user_id === userId
+  const counterpartCharacter = session => characterById[session.sender_user_id === userId ? session.receiver_character_id : session.sender_character_id]
   const visible = open || (activeSession?.status === 'ringing' && isReceiver(activeSession))
 
   if (!visible) return null
@@ -145,7 +158,7 @@ export default function CommunicationSessions({ roomId, userId, myChars, theme, 
               </button>
             </div>
             <label style={{ display: 'block', color: t.subText, fontSize: 12, marginBottom: 10 }}>
-              발신자
+              발신인
               <select value={effectiveSenderId} onChange={event => setSenderId(event.target.value)} style={{ width: '100%', marginTop: 5, padding: 9, borderRadius: 10, background: t.bg, color: t.inputText, border: `1px solid ${t.border}` }}>
                 {myChars.map(character => (
                   <option key={character.id} value={character.id}>
@@ -155,7 +168,7 @@ export default function CommunicationSessions({ roomId, userId, myChars, theme, 
               </select>
             </label>
             <label style={{ display: 'block', color: t.subText, fontSize: 12 }}>
-              수신자
+              수신인
               <select value={receiverId} onChange={event => setReceiverId(event.target.value)} style={{ width: '100%', marginTop: 5, padding: 9, borderRadius: 10, background: t.bg, color: t.inputText, border: `1px solid ${t.border}` }}>
                 {receiverOptions.length === 0 && <option value="">선택 가능한 상대 캐릭터 없음</option>}
                 {receiverOptions.map(character => (
@@ -178,11 +191,9 @@ export default function CommunicationSessions({ roomId, userId, myChars, theme, 
 
         {activeSession?.status === 'ringing' && (
           <section style={{ marginTop: 32, textAlign: 'center' }}>
-            <img src={characterById[activeSession.sender_character_id]?.image_url || DEFAULT_AVATAR} alt="" style={{ width: 76, height: 76, objectFit: 'cover', borderRadius: '50%' }} />
+            <img src={counterpartCharacter(activeSession)?.image_url || DEFAULT_AVATAR} alt="" style={{ width: 76, height: 76, objectFit: 'cover', borderRadius: '50%' }} />
             <div style={{ marginTop: 10, fontSize: 12, color: t.subText }}>{activeSession.kind === 'call' ? '수신 전화' : '새 문자'}</div>
-            <h2 style={{ color: t.theirText }}>
-              {characterById[activeSession.sender_character_id]?.name}에게 {activeSession.kind === 'call' ? '전화가' : '문자가'} 왔습니다
-            </h2>
+            <h2 style={{ color: t.theirText }}>{isReceiver(activeSession) ? `${counterpartCharacter(activeSession)?.name || '상대방'}에게 ${activeSession.kind === 'call' ? '전화가' : '문자가'} 왔습니다` : `${counterpartCharacter(activeSession)?.name || '상대방'}의 응답을 기다리는 중…`}</h2>
             {isReceiver(activeSession) ? (
               activeSession.kind === 'call' ? (
                 <div style={{ display: 'flex', justifyContent: 'center', gap: 72, marginTop: 28 }}>
@@ -210,7 +221,7 @@ export default function CommunicationSessions({ roomId, userId, myChars, theme, 
                 </div>
               )
             ) : (
-              <div style={{ marginTop: 24, color: t.subText }}>응답을 기다리는 중…</div>
+              <div style={{ marginTop: 24, color: t.subText }}>{counterpartCharacter(activeSession)?.name || '상대방'}의 응답을 기다리는 중…</div>
             )}
           </section>
         )}
