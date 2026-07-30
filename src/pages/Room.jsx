@@ -194,10 +194,10 @@ export default function Room() {
       setActionStyle(roomData?.action_style || 'dim')
       setIsOwner(roomData?.created_by === user.id)
 
-      const { data: profile } = await supabase.from('profiles').select('theme_id, last_char_id, show_entering, show_message_time').eq('id', user.id).single()
+      const [{ data: profile }, { data: messageTimeSetting }] = await Promise.all([supabase.from('profiles').select('theme_id, last_char_id, show_entering').eq('id', user.id).single(), supabase.from('profiles').select('show_message_time').eq('id', user.id).maybeSingle()])
       const enteringEnabled = profile?.show_entering ?? true
       setShowEntering(enteringEnabled)
-      setShowMessageTime(profile?.show_message_time ?? true)
+      setShowMessageTime(messageTimeSetting?.show_message_time ?? true)
       if (!enteringEnabled) setShowSlot(false)
       const myId = profile?.theme_id || 'dark-purple'
       setMyThemeId(myId)

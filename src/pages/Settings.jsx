@@ -137,6 +137,7 @@ export default function Settings() {
   const [myFontId, setMyFontId] = useState('sans')
   const [pushEnabled, setPushEnabled] = useState(false)
   const [showEntering, setShowEntering] = useState(true)
+  const [showMessageTime, setShowMessageTime] = useState(true)
   const [pushLoading, setPushLoading] = useState(false)
 
   useEffect(() => {
@@ -147,10 +148,11 @@ export default function Settings() {
     const {
       data: { user },
     } = await supabase.auth.getUser()
-    const { data } = await supabase.from('profiles').select('theme_id, font_id, show_entering').eq('id', user.id).single()
+    const [{ data }, { data: messageTimeSetting }] = await Promise.all([supabase.from('profiles').select('theme_id, font_id, show_entering').eq('id', user.id).single(), supabase.from('profiles').select('show_message_time').eq('id', user.id).maybeSingle()])
     if (data?.theme_id) setMyThemeId(data.theme_id)
     if (data?.font_id) setMyFontId(data.font_id)
     if (data?.show_entering !== undefined) setShowEntering(data.show_entering)
+    if (messageTimeSetting?.show_message_time !== undefined) setShowMessageTime(messageTimeSetting.show_message_time)
 
     if ('serviceWorker' in navigator) {
       const registration = await navigator.serviceWorker.getRegistration('/idea/sw.js')
@@ -474,6 +476,24 @@ export default function Settings() {
               }}
               style={{ width: 40, height: 22, borderRadius: 11, cursor: 'pointer', transition: 'background 0.2s', background: showEntering ? t.point : t.border, position: 'relative', flexShrink: 0 }}>
               <div style={{ position: 'absolute', top: 3, left: showEntering ? 20 : 3, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
+            </div>
+          </div>
+          <div style={{ background: t.panel, border: `0.5px solid ${t.border}`, borderRadius: 12, padding: '12px 14px', marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div>
+              <div style={{ fontSize: 13, color: t.theirText }}>메시지 시간 표시</div>
+              <div style={{ fontSize: 10, color: t.subText, marginTop: 2 }}>같은 분의 마지막 메시지에만 표시돼요.</div>
+            </div>
+            <div
+              onClick={async () => {
+                const next = !showMessageTime
+                setShowMessageTime(next)
+                const {
+                  data: { user },
+                } = await supabase.auth.getUser()
+                await supabase.from('profiles').update({ show_message_time: next }).eq('id', user.id)
+              }}
+              style={{ width: 40, height: 22, borderRadius: 11, cursor: 'pointer', transition: 'background 0.2s', background: showMessageTime ? t.point : t.border, position: 'relative', flexShrink: 0 }}>
+              <div style={{ position: 'absolute', top: 3, left: showMessageTime ? 20 : 3, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
             </div>
           </div>
         </div>
