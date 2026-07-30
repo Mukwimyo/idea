@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase, uploadFile, validateImageFile } from '../lib/supabase'
 import { getTheme } from '../lib/themes'
-import { ChevronLeft, X, RotateCcw, Search, ArrowUp, ArrowDown, Check, ArrowDownAZ, GripVertical } from 'lucide-react'
+import { ChevronLeft, X, RotateCcw, Search, Check, ArrowDownAZ, GripVertical } from 'lucide-react'
 import Cropper from 'react-easy-crop'
 import { DndContext, PointerSensor, TouchSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core'
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
@@ -37,7 +37,6 @@ export default function Characters() {
   const [showAdd, setShowAdd] = useState(false)
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
-  const [avatarLetter, setAvatarLetter] = useState('')
   const [imageFile, setImageFile] = useState(null)
   const [imagePreview, setImagePreview] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -48,7 +47,6 @@ export default function Characters() {
   const [editingChar, setEditingChar] = useState(null)
   const [editName, setEditName] = useState('')
   const [editDescription, setEditDescription] = useState('')
-  const [editAvatarLetter, setEditAvatarLetter] = useState('')
   const [editImageFile, setEditImageFile] = useState(null)
   const [editImagePreview, setEditImagePreview] = useState(null)
 
@@ -110,15 +108,6 @@ export default function Characters() {
     }
   }
 
-  const moveGlobalCharacter = (characterId, direction) => {
-    const currentIndex = chars.findIndex(character => character.id === characterId)
-    const targetIndex = currentIndex + direction
-    if (currentIndex < 0 || targetIndex < 0 || targetIndex >= chars.length) return
-    const next = [...chars]
-    ;[next[currentIndex], next[targetIndex]] = [next[targetIndex], next[currentIndex]]
-    persistGlobalOrder(next)
-  }
-
   const toggleRoomCharacter = characterId => {
     setRoomPoolSaved(false)
     setRoomCharacterIds(current => {
@@ -128,18 +117,6 @@ export default function Characters() {
         return current
       }
       return current.filter(id => id !== characterId)
-    })
-  }
-
-  const moveRoomCharacter = (characterId, direction) => {
-    setRoomPoolSaved(false)
-    setRoomCharacterIds(current => {
-      const currentIndex = current.indexOf(characterId)
-      const targetIndex = currentIndex + direction
-      if (currentIndex < 0 || targetIndex < 0 || targetIndex >= current.length) return current
-      const next = [...current]
-      ;[next[currentIndex], next[targetIndex]] = [next[targetIndex], next[currentIndex]]
-      return next
     })
   }
 
@@ -267,7 +244,6 @@ export default function Characters() {
       user_id: user.id,
       name: name.trim(),
       description: description.trim(),
-      avatar_letter: avatarLetter || name[0],
       color: DEFAULT_CHARACTER_COLOR,
       text_color: DEFAULT_CHARACTER_TEXT_COLOR,
       image_url: imageUrl,
@@ -275,7 +251,6 @@ export default function Characters() {
     })
     setName('')
     setDescription('')
-    setAvatarLetter('')
     setImageFile(null)
     setImagePreview(null)
     setShowAdd(false)
@@ -287,7 +262,6 @@ export default function Characters() {
     setEditingChar(c.id)
     setEditName(c.name)
     setEditDescription(c.description || '')
-    setEditAvatarLetter(c.avatar_letter || '')
     setEditImagePreview(c.image_url || null)
     setEditImageFile(null)
   }
@@ -309,7 +283,6 @@ export default function Characters() {
       .update({
         name: editName.trim(),
         description: editDescription.trim(),
-        avatar_letter: editAvatarLetter || editName[0],
         image_url: imageUrl,
       })
       .eq('id', c.id)
@@ -389,7 +362,6 @@ export default function Characters() {
               <SortableContext items={visibleSelectedCharacters.map(character => character.id)} strategy={verticalListSortingStrategy}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginBottom: 22 }}>
                   {visibleSelectedCharacters.map(character => {
-                    const index = roomCharacterIds.indexOf(character.id)
                     return (
                       <SortableCard key={character.id} id={character.id} disabled={alphabeticalView}>
                         {({ listeners }) => (
@@ -404,12 +376,6 @@ export default function Characters() {
                               <img src={character.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                             </div>
                             <div style={{ flex: 1, color: t.theirText, fontSize: 13 }}>{character.name}</div>
-                            <button disabled={alphabeticalView || index === 0} onClick={() => moveRoomCharacter(character.id, -1)} style={{ background: 'none', border: 0, padding: 4, cursor: 'pointer', opacity: alphabeticalView || index === 0 ? 0.25 : 1 }}>
-                              <ArrowUp size={16} color={t.subText} />
-                            </button>
-                            <button disabled={alphabeticalView || index === selectedCharacters.length - 1} onClick={() => moveRoomCharacter(character.id, 1)} style={{ background: 'none', border: 0, padding: 4, cursor: 'pointer', opacity: alphabeticalView || index === selectedCharacters.length - 1 ? 0.25 : 1 }}>
-                              <ArrowDown size={16} color={t.subText} />
-                            </button>
                           </div>
                         )}
                       </SortableCard>
@@ -456,6 +422,18 @@ export default function Characters() {
   return (
     <>
       <ProfileImageModal profile={profilePreview} onClose={() => setProfilePreview(null)} />
+      <style>{`
+        @keyframes character-card-expand {
+          from {
+            opacity: 0;
+            transform: translateY(-10px) scaleY(0.94);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0) scaleY(1);
+          }
+        }
+      `}</style>
       {/* 크롭 모달 - 새 캐릭터 */}
       {showCropper && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 200, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
@@ -541,7 +519,6 @@ export default function Characters() {
                 </label>
               </div>
               <input value={name} onChange={e => setName(e.target.value)} placeholder="캐릭터 이름 *" style={{ width: '100%', background: t.bg, border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '9px 12px', color: t.inputText, fontSize: 13, outline: 'none', boxSizing: 'border-box', marginBottom: 8 }} />
-              <input value={avatarLetter} onChange={e => setAvatarLetter(e.target.value.slice(0, 2))} placeholder="아바타 글자 (이미지 없을 때 표시)" style={{ width: '100%', background: t.bg, border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '9px 12px', color: t.inputText, fontSize: 13, outline: 'none', boxSizing: 'border-box', marginBottom: 8 }} />
               <textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="캐릭터 설명 (선택)" style={{ width: '100%', background: t.bg, border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '9px 12px', color: t.inputText, fontSize: 13, outline: 'none', boxSizing: 'border-box', resize: 'none', height: 70, marginBottom: 10 }} />
               <div style={{ display: 'flex', gap: 8 }}>
                 <button onClick={addChar} disabled={loading} style={{ flex: 1, background: t.point, border: 'none', borderRadius: 8, padding: 9, color: '#fff', fontSize: 12, cursor: 'pointer' }}>
@@ -585,7 +562,7 @@ export default function Characters() {
                     {({ listeners }) => (
                       <div style={{ background: t.panel, borderRadius: 12, padding: '13px 15px', border: `0.5px solid ${t.border}` }}>
                         {editingChar === c.id ? (
-                          <div>
+                          <div style={{ transformOrigin: 'top', animation: 'character-card-expand 240ms cubic-bezier(0.2, 0.8, 0.2, 1)' }}>
                             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
                               <label style={{ cursor: 'pointer' }}>
                                 <div style={{ width: 72, height: 72, borderRadius: '50%', background: editImagePreview ? 'transparent' : t.bg, border: `0.5px dashed ${t.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>{editImagePreview ? <img src={editImagePreview} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 24, color: t.border }}>+</span>}</div>
@@ -594,7 +571,6 @@ export default function Characters() {
                               </label>
                             </div>
                             <input value={editName} onChange={e => setEditName(e.target.value)} placeholder="캐릭터 이름 *" style={{ width: '100%', background: t.bg, border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '9px 12px', color: t.inputText, fontSize: 13, outline: 'none', boxSizing: 'border-box', marginBottom: 8 }} />
-                            <input value={editAvatarLetter} onChange={e => setEditAvatarLetter(e.target.value.slice(0, 2))} placeholder="아바타 글자" style={{ width: '100%', background: t.bg, border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '9px 12px', color: t.inputText, fontSize: 13, outline: 'none', boxSizing: 'border-box', marginBottom: 8 }} />
                             <textarea value={editDescription} onChange={e => setEditDescription(e.target.value)} placeholder="캐릭터 설명 (선택)" style={{ width: '100%', background: t.bg, border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '9px 12px', color: t.inputText, fontSize: 13, outline: 'none', boxSizing: 'border-box', resize: 'none', height: 70, marginBottom: 10 }} />
                             <div style={{ display: 'flex', gap: 8 }}>
                               <button onClick={() => saveEdit(c)} disabled={loading} style={{ flex: 1, background: t.point, border: 'none', borderRadius: 8, padding: 9, color: '#fff', fontSize: 12, cursor: 'pointer' }}>
@@ -616,14 +592,6 @@ export default function Characters() {
                             <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => startEdit(c)}>
                               <div style={{ fontSize: 14, fontWeight: 500, color: t.theirText }}>{c.name}</div>
                               {c.description && <div style={{ fontSize: 11, color: t.subText, marginTop: 2 }}>{c.description}</div>}
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                              <button onClick={() => moveGlobalCharacter(c.id, -1)} disabled={alphabeticalView || chars.findIndex(character => character.id === c.id) === 0} aria-label={`${c.name} 위로 이동`} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, opacity: alphabeticalView || chars.findIndex(character => character.id === c.id) === 0 ? 0.2 : 0.6, display: 'flex', alignItems: 'center' }}>
-                                <ArrowUp size={15} color={t.subText} />
-                              </button>
-                              <button onClick={() => moveGlobalCharacter(c.id, 1)} disabled={alphabeticalView || chars.findIndex(character => character.id === c.id) === chars.length - 1} aria-label={`${c.name} 아래로 이동`} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, opacity: alphabeticalView || chars.findIndex(character => character.id === c.id) === chars.length - 1 ? 0.2 : 0.6, display: 'flex', alignItems: 'center' }}>
-                                <ArrowDown size={15} color={t.subText} />
-                              </button>
                             </div>
                             <button onClick={() => deleteChar(c.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, opacity: 0.4, display: 'flex', alignItems: 'center' }}>
                               <X size={16} color={t.subText} />

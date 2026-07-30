@@ -152,6 +152,7 @@ export default function Room() {
   const [showCharList, setShowCharList] = useState(true)
   const [typingInfo, setTypingInfo] = useState(null)
   const [showEntering, setShowEntering] = useState(true)
+  const [showMessageTime, setShowMessageTime] = useState(true)
   const [messageMenuId, setMessageMenuId] = useState(null)
   const [deletingMessageId, setDeletingMessageId] = useState(null)
   const [profilePreview, setProfilePreview] = useState(null)
@@ -193,9 +194,10 @@ export default function Room() {
       setActionStyle(roomData?.action_style || 'dim')
       setIsOwner(roomData?.created_by === user.id)
 
-      const { data: profile } = await supabase.from('profiles').select('theme_id, last_char_id, show_entering').eq('id', user.id).single()
+      const { data: profile } = await supabase.from('profiles').select('theme_id, last_char_id, show_entering, show_message_time').eq('id', user.id).single()
       const enteringEnabled = profile?.show_entering ?? true
       setShowEntering(enteringEnabled)
+      setShowMessageTime(profile?.show_message_time ?? true)
       if (!enteringEnabled) setShowSlot(false)
       const myId = profile?.theme_id || 'dark-purple'
       setMyThemeId(myId)
@@ -928,7 +930,14 @@ export default function Room() {
           const isMine = msg.user_id === userId
           const char = msg.characters
           const previousMessage = filteredMessages[messageIndex - 1]
+          const nextMessage = filteredMessages[messageIndex + 1]
           const showMessageIdentity = !previousMessage || previousMessage.type === 'chapter' || previousMessage.type === 'narration' || previousMessage.character_id !== msg.character_id || previousMessage.user_id !== msg.user_id
+          const currentMinute = new Date(msg.created_at).getTime()
+          const nextMinute = nextMessage ? new Date(nextMessage.created_at).getTime() : NaN
+          const nextMessageHasTime = nextMessage && nextMessage.type !== 'chapter' && nextMessage.type !== 'narration'
+          const showMessageTimestamp = showMessageTime && (!nextMessageHasTime || Math.floor(currentMinute / 60000) !== Math.floor(nextMinute / 60000))
+          const showReadReceipt = msg.user_id === userId && readReceipt !== 'none' && (msg.read_by || []).some(id => id !== msg.user_id)
+          const showMessageMeta = showMessageTimestamp || showReadReceipt || msg.delivery_state === 'failed'
           const ownMessageLongPressStyle = isMine
             ? {
                 userSelect: 'none',
@@ -998,7 +1007,7 @@ export default function Room() {
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMine ? 'flex-end' : 'flex-start', maxWidth: '72%' }}>
                   {showMessageIdentity && char?.name && <div style={{ maxWidth: '100%', marginBottom: 4, color: t.subText, fontSize: 10, lineHeight: 1.3, overflowWrap: 'anywhere', textAlign: isMine ? 'right' : 'left' }}>{char.name}</div>}
                   <img src={msg.content} style={{ maxWidth: 180, borderRadius: 10, cursor: 'pointer' }} onClick={() => openImageMessage(msg.content)} />
-                  <div style={{ fontSize: 9, color: t.subText, marginTop: 2 }}>{new Date(msg.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}</div>
+                  {showMessageTimestamp && <div style={{ fontSize: 9, color: t.subText, marginTop: 2 }}>{new Date(msg.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}</div>}
                   {renderMessageActions(msg, false)}
                   {msg.delivery_state === 'failed' && (
                     <button onClick={() => retryMessage(msg)} style={{ background: 'none', border: 0, color: '#f87171', fontSize: 10, cursor: 'pointer', padding: 0 }}>
@@ -1041,15 +1050,17 @@ export default function Room() {
                   </div>
                 )}
                 {renderMessageActions(msg)}
-                <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 2 }}>
-                  {msg.user_id === userId && readReceipt !== 'none' && (msg.read_by || []).some(id => id !== msg.user_id) && <Eye size={10} color={t.subText} opacity={0.4} />}
-                  <div style={{ fontSize: 9, color: t.subText, opacity: 0.6 }}>{searchQuery ? new Date(msg.created_at).toLocaleDateString('ko-KR') + ' ' + new Date(msg.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : new Date(msg.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}</div>
-                  {msg.delivery_state === 'failed' && (
-                    <button onClick={() => retryMessage(msg)} style={{ background: 'none', border: 0, color: '#f87171', fontSize: 10, cursor: 'pointer', padding: 0 }}>
-                      전송 실패 · 다시 시도
-                    </button>
-                  )}
-                </div>
+                {showMessageMeta && (
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 2 }}>
+                    {showReadReceipt && <Eye size={10} color={t.subText} opacity={0.4} />}
+                    {showMessageTimestamp && <div style={{ fontSize: 9, color: t.subText, opacity: 0.6 }}>{searchQuery ? new Date(msg.created_at).toLocaleDateString('ko-KR') + ' ' + new Date(msg.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : new Date(msg.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}</div>}
+                    {msg.delivery_state === 'failed' && (
+                      <button onClick={() => retryMessage(msg)} style={{ background: 'none', border: 0, color: '#f87171', fontSize: 10, cursor: 'pointer', padding: 0 }}>
+                        전송 실패 · 다시 시도
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           )
