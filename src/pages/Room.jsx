@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase, uploadFile, validateImageFile } from '../lib/supabase'
 import { THEMES, getTheme } from '../lib/themes'
-import { ChevronLeft, Link2, BookmarkPlus, Settings, Search, Calendar, Paperclip, ArrowUp, Eye, ArrowDown, ChevronDown, ChevronUp, Quote } from 'lucide-react'
+import { ChevronLeft, Link2, Settings, Search, Calendar, Paperclip, ArrowUp, Eye, ArrowDown, ChevronDown, ChevronUp, Quote } from 'lucide-react'
 import ProfileImageModal from '../components/ProfileImageModal'
 
 const DEFAULT_AVATAR = `${import.meta.env.BASE_URL}default-avatar.png`
@@ -143,8 +143,6 @@ export default function Room() {
   const [followShared, setFollowShared] = useState(true)
   const [myThemeId, setMyThemeId] = useState('dark-purple')
   const [isOwner, setIsOwner] = useState(false)
-  const [showChapterInput, setShowChapterInput] = useState(false)
-  const [chapterName, setChapterName] = useState('')
   const [showSlot, setShowSlot] = useState(true)
   const [hideScroll, setHideScroll] = useState(false)
   const [newMsgAlert, setNewMsgAlert] = useState(false)
@@ -569,25 +567,11 @@ export default function Room() {
     window.open(url, '_blank')
   }
 
-  const addChapter = () => setShowChapterInput(true)
-
   const saveRoomName = async () => {
     if (!roomNameText.trim()) return
     await supabase.from('rooms').update({ name: roomNameText.trim() }).eq('id', roomId)
     setRoom(prev => ({ ...prev, name: roomNameText.trim() }))
     setRoomNameText('')
-  }
-
-  const submitChapter = async () => {
-    if (!chapterName.trim()) return
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    const tempChapter = { id: 'temp-' + Date.now(), room_id: roomId, user_id: user.id, type: 'chapter', content: chapterName.trim(), created_at: new Date().toISOString() }
-    setMessages(prev => [...prev, tempChapter])
-    setChapterName('')
-    setShowChapterInput(false)
-    await supabase.from('messages').insert({ room_id: roomId, user_id: user.id, type: 'chapter', content: tempChapter.content })
   }
 
   const saveSharedTheme = async id => {
@@ -709,13 +693,9 @@ export default function Room() {
         </button>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 14, fontWeight: 500, color: t.theirText }}>{room?.name}</div>
-          <div style={{ fontSize: 10, color: t.subText }}>{room?.chapter}</div>
         </div>
         <button {...iconBtn(() => openPanel(showInvite ? null : 'invite'), null, showInvite)}>
           <Link2 size={15} color={showInvite ? t.point : t.subText} />
-        </button>
-        <button {...iconBtn(addChapter, null, false)} style={{ ...iconBtn(addChapter, null, false).style, fontSize: 12, color: t.subText, gap: 3 }}>
-          <BookmarkPlus size={15} color={t.subText} />
         </button>
         <button {...iconBtn(() => openPanel(showTheme ? null : 'theme'), null, showTheme)}>
           <Settings size={15} color={showTheme ? t.point : t.subText} />
@@ -894,29 +874,6 @@ export default function Room() {
         </div>
       )}
 
-      {/* 구분선 입력 모달 */}
-      {showChapterInput && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ background: t.panel, borderRadius: 16, padding: 20, width: 280, border: `0.5px solid ${t.border}` }}>
-            <div style={{ fontSize: 14, color: t.theirText, fontWeight: 500, marginBottom: 12 }}>구분선</div>
-            <input value={chapterName} onChange={e => setChapterName(e.target.value)} onKeyDown={e => e.key === 'Enter' && submitChapter()} placeholder="예) 2화 · 균열" autoFocus style={{ width: '100%', background: t.bg, border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '9px 12px', color: t.inputText, fontSize: 13, outline: 'none', boxSizing: 'border-box', marginBottom: 12 }} />
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={submitChapter} style={{ flex: 1, background: t.point, border: 'none', borderRadius: 8, padding: 9, color: '#fff', fontSize: 13, cursor: 'pointer' }}>
-                추가
-              </button>
-              <button
-                onClick={() => {
-                  setShowChapterInput(false)
-                  setChapterName('')
-                }}
-                style={{ flex: 1, background: 'none', border: `0.5px solid ${t.border}`, borderRadius: 8, padding: 9, color: t.subText, fontSize: 13, cursor: 'pointer' }}>
-                취소
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* 새 메시지 알림 버튼 */}
       {newMsgAlert && (
         <div onClick={scrollToBottom} style={{ position: 'fixed', bottom: 110, left: '50%', transform: 'translateX(-50%)', zIndex: 20, background: t.panel, border: `1px solid ${t.border}`, color: t.theirText, padding: '6px 16px', borderRadius: 20, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>
@@ -946,14 +903,7 @@ export default function Room() {
               }
             : {}
 
-          if (msg.type === 'chapter')
-            return (
-              <div key={msg.id} id={'msg-' + msg.id} style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '4px 0' }}>
-                <div style={{ flex: 1, height: 0.5, background: t.border }} />
-                <div style={{ fontSize: 11, color: t.chapColor, whiteSpace: 'nowrap' }}>{msg.content}</div>
-                <div style={{ flex: 1, height: 0.5, background: t.border }} />
-              </div>
-            )
+          if (msg.type === 'chapter') return null
 
           if (msg.type === 'narration')
             return (
@@ -1092,9 +1042,9 @@ export default function Room() {
           </button>
         )}
         {myChars.length > 0 && showCharList && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 7 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 7, minWidth: 0 }}>
             <span style={{ fontSize: 10, color: t.subText, flexShrink: 0 }}>나</span>
-            <div style={{ display: 'flex', gap: 5, flex: 1, flexWrap: 'wrap' }}>
+            <div className="character-strip" style={{ display: 'flex', gap: 5, flex: 1, minWidth: 0, flexWrap: 'nowrap', overflowX: 'auto', overflowY: 'hidden', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', touchAction: 'pan-x', paddingBottom: 2 }}>
               {myChars.map(c => (
                 <button
                   key={c.id}
@@ -1107,7 +1057,7 @@ export default function Room() {
                     } = await supabase.auth.getUser()
                     await supabase.from('room_members').update({ last_char_id: c.id }).eq('room_id', roomId).eq('user_id', user.id)
                   }}
-                  style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 8px 3px 4px', borderRadius: 20, border: activeChar?.id === c.id && mode === 'chat' ? `1.5px solid ${c.color || t.point}` : `1px solid ${t.border}`, background: activeChar?.id === c.id && mode === 'chat' ? c.color + '22' : 'none', cursor: 'pointer' }}>
+                  style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, padding: '3px 8px 3px 4px', borderRadius: 20, border: activeChar?.id === c.id && mode === 'chat' ? `1.5px solid ${c.color || t.point}` : `1px solid ${t.border}`, background: activeChar?.id === c.id && mode === 'chat' ? c.color + '22' : 'none', cursor: 'pointer' }}>
                   <div
                     role="button"
                     tabIndex={0}

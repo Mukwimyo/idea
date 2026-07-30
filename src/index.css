@@ -43,3 +43,7 @@ button {
 .chat-scroll.hide-scroll::-webkit-scrollbar-thumb {
     background: transparent;
 }
+
+.character-strip::-webkit-scrollbar {
+    display: none;
+}
