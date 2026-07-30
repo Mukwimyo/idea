@@ -172,11 +172,91 @@ export default function Room() {
   const fileInputRef = useRef(null)
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
+  const sendFlightNodesRef = useRef(new Set())
   const isAtBottomRef = useRef(true)
   const messageListRef = useRef(null)
   const initialScrollDone = useRef(false)
   const channelRef = useRef(null)
   const userIdRef = useRef(null)
+
+  const revealMessage = messageId => {
+    setMessages(prev => prev.map(message => (message.id === messageId ? { ...message, is_arriving: false } : message)))
+  }
+
+  const animateMessageFromInput = messageId => {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      revealMessage(messageId)
+      return
+    }
+
+    // Paint the cleared input first, then launch the blurred piece from its left edge.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const inputRect = inputRef.current?.getBoundingClientRect()
+        const messageElement = document.getElementById(`msg-${messageId}`)
+        const targetElement = messageElement?.querySelector('[data-message-bubble]') || messageElement
+
+        if (!inputRect || !targetElement) {
+          revealMessage(messageId)
+          return
+        }
+
+        const targetRect = targetElement.getBoundingClientRect()
+        const size = 18
+        const startX = inputRect.left + 2
+        const startY = inputRect.top + (inputRect.height - size) / 2
+        const endX = targetRect.right - size
+        const endY = targetRect.bottom - size
+        const flight = document.createElement('div')
+
+        flight.setAttribute('aria-hidden', 'true')
+        Object.assign(flight.style, {
+          position: 'fixed',
+          zIndex: '1000',
+          left: `${startX}px`,
+          top: `${startY}px`,
+          width: `${size}px`,
+          height: `${size}px`,
+          borderRadius: '6px',
+          pointerEvents: 'none',
+          background: `color-mix(in srgb, ${t.panel} 62%, transparent)`,
+          border: `1px solid color-mix(in srgb, ${t.border} 76%, transparent)`,
+          backdropFilter: 'blur(10px)',
+          WebkitBackdropFilter: 'blur(10px)',
+          boxShadow: '0 5px 14px rgba(0,0,0,0.18)',
+          willChange: 'transform, opacity',
+        })
+        document.body.appendChild(flight)
+        sendFlightNodesRef.current.add(flight)
+
+        const animation = flight.animate(
+          [
+            { transform: 'translate3d(0, 0, 0) scale(0.82)', opacity: 0 },
+            { transform: 'translate3d(0, 0, 0) scale(1)', opacity: 0.9, offset: 0.15 },
+            { transform: `translate3d(${endX - startX}px, ${endY - startY}px, 0) scale(1.08)`, opacity: 0.82, offset: 0.86 },
+            { transform: `translate3d(${endX - startX}px, ${endY - startY}px, 0) scale(1.28)`, opacity: 0 },
+          ],
+          { duration: 270, easing: 'cubic-bezier(0.2, 0.78, 0.24, 1)', fill: 'forwards' }
+        )
+
+        const finish = () => {
+          revealMessage(messageId)
+          sendFlightNodesRef.current.delete(flight)
+          flight.remove()
+        }
+        animation.addEventListener('finish', finish, { once: true })
+        animation.addEventListener('cancel', finish, { once: true })
+      })
+    })
+  }
+
+  useEffect(
+    () => () => {
+      sendFlightNodesRef.current.forEach(node => node.remove())
+      sendFlightNodesRef.current.clear()
+    },
+    []
+  )
 
   const openPanel = panel => {
     setShowInvite(panel === 'invite')
@@ -456,6 +536,10 @@ export default function Room() {
 
   const sendMessage = async () => {
     if (!input.trim()) return
+    const content = input.trim().replace(/\(([^)]*$)/g, '($1)')
+    setInput('')
+    if (inputRef.current) inputRef.current.style.height = 'auto'
+
     // 전송 시 타이핑 상태 즉시 해제
     clearTimeout(typingTimerRef.current)
     if (userIdRef.current) {
@@ -471,14 +555,11 @@ export default function Room() {
       data: { user },
     } = await supabase.auth.getUser()
     const isNarr = mode === 'narration'
-    const content = input.trim().replace(/\(([^)]*$)/g, '($1)')
-
     if (isNarr && messages.length > 0) {
       const last = messages[messages.length - 1]
       if (last.type === 'narration' && last.user_id === user.id) {
         const merged = last.content + '\n' + content
         setMessages(prev => prev.map(m => (m.id === last.id ? { ...m, content: merged } : m)))
-        setInput('')
         inputRef.current?.focus()
         await supabase.from('messages').update({ content: merged }).eq('id', last.id)
         return
@@ -496,12 +577,13 @@ export default function Room() {
       edited: false,
       created_at: new Date().toISOString(),
       delivery_state: 'sending',
+      is_arriving: true,
     }
     isAtBottomRef.current = true
     setMessages(prev => [...prev, tempMsg])
-    setInput('')
     if (mode === 'narration') setMode('chat')
     inputRef.current?.focus()
+    animateMessageFromInput(tempMsg.id)
     await persistMessage(tempMsg.id, {
       room_id: roomId,
       user_id: user.id,
@@ -636,6 +718,7 @@ export default function Room() {
     if (messageMenuId !== msg.id) return null
     return (
       <div
+        className="message-action-menu"
         data-message-menu="true"
         onPointerDown={event => event.stopPropagation()}
         style={{
@@ -719,8 +802,8 @@ export default function Room() {
 
       {/* 초대 코드 패널 */}
       {showInvite && (
-        <div style={{ position: 'fixed', top: 49, left: 0, right: 0, bottom: 0, zIndex: 50, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }} onClick={() => setShowInvite(false)}>
-          <div style={{ background: t.panel, padding: '14px 16px', borderBottom: `0.5px solid ${t.border}`, textAlign: 'center', maxWidth: 480, margin: '0 auto', width: '100%' }} onClick={e => e.stopPropagation()}>
+        <div className="top-panel-backdrop" style={{ position: 'fixed', top: 49, left: 0, right: 0, bottom: 0, zIndex: 50, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }} onClick={() => setShowInvite(false)}>
+          <div className="top-panel-sheet" style={{ background: t.panel, padding: '14px 16px', borderBottom: `0.5px solid ${t.border}`, textAlign: 'center', maxWidth: 480, margin: '0 auto', width: '100%' }} onClick={e => e.stopPropagation()}>
             <div style={{ fontSize: 11, color: t.subText, marginBottom: 4 }}>초대 코드</div>
             <div style={{ fontSize: 22, fontWeight: 600, color: t.point, letterSpacing: 3 }}>{room?.invite_code}</div>
             <div style={{ fontSize: 10, color: t.subText, marginTop: 4, opacity: 0.6 }}>상대방에게 이 코드를 알려주세요</div>
@@ -730,8 +813,8 @@ export default function Room() {
 
       {/* 테마 패널 */}
       {showTheme && (
-        <div style={{ position: 'fixed', top: 49, left: 0, right: 0, bottom: 0, zIndex: 50, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }} onClick={() => setShowTheme(false)}>
-          <div style={{ background: t.panel, padding: '12px 14px', borderBottom: `0.5px solid ${t.border}`, maxWidth: 480, margin: '0 auto', width: '100%', overflowY: 'auto', maxHeight: '80vh' }} onClick={e => e.stopPropagation()}>
+        <div className="top-panel-backdrop" style={{ position: 'fixed', top: 49, left: 0, right: 0, bottom: 0, zIndex: 50, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }} onClick={() => setShowTheme(false)}>
+          <div className="top-panel-sheet" style={{ background: t.panel, padding: '12px 14px', borderBottom: `0.5px solid ${t.border}`, maxWidth: 480, margin: '0 auto', width: '100%', overflowY: 'auto', maxHeight: '80vh' }} onClick={e => e.stopPropagation()}>
             <div style={{ fontSize: 11, color: t.subText, marginBottom: 10 }}>채팅방 테마 설정</div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, padding: '8px 10px', background: t.bg, borderRadius: 8, border: `0.5px solid ${t.border}` }}>
               <div>
@@ -850,8 +933,8 @@ export default function Room() {
 
       {/* 검색 패널 */}
       {showSearch && (
-        <div style={{ position: 'fixed', top: 49, left: 0, right: 0, bottom: 0, zIndex: 50, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }} onClick={() => setShowSearch(false)}>
-          <div style={{ background: t.panel, padding: '10px 14px', borderBottom: `0.5px solid ${t.border}`, maxWidth: 480, margin: '0 auto', width: '100%' }} onClick={e => e.stopPropagation()}>
+        <div className="top-panel-backdrop" style={{ position: 'fixed', top: 49, left: 0, right: 0, bottom: 0, zIndex: 50, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }} onClick={() => setShowSearch(false)}>
+          <div className="top-panel-sheet" style={{ background: t.panel, padding: '10px 14px', borderBottom: `0.5px solid ${t.border}`, maxWidth: 480, margin: '0 auto', width: '100%' }} onClick={e => e.stopPropagation()}>
             <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="대사 검색..." autoFocus style={{ width: '100%', background: t.bg, border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '8px 12px', color: t.inputText, fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
             {searchQuery && <div style={{ marginTop: 8, fontSize: 11, color: t.subText }}>{filteredMessages.length}개 검색됨</div>}
           </div>
@@ -860,8 +943,8 @@ export default function Room() {
 
       {/* 날짜 이동 패널 */}
       {showCalendar && (
-        <div style={{ position: 'fixed', top: 49, left: 0, right: 0, bottom: 0, zIndex: 50, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }} onClick={() => setShowCalendar(false)}>
-          <div style={{ background: t.panel, padding: '10px 14px', borderBottom: `0.5px solid ${t.border}`, maxWidth: 480, margin: '0 auto', width: '100%' }} onClick={e => e.stopPropagation()}>
+        <div className="top-panel-backdrop" style={{ position: 'fixed', top: 49, left: 0, right: 0, bottom: 0, zIndex: 50, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }} onClick={() => setShowCalendar(false)}>
+          <div className="top-panel-sheet" style={{ background: t.panel, padding: '10px 14px', borderBottom: `0.5px solid ${t.border}`, maxWidth: 480, margin: '0 auto', width: '100%' }} onClick={e => e.stopPropagation()}>
             <div style={{ fontSize: 11, color: t.subText, marginBottom: 8 }}>날짜로 이동</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {availableDates.map(date => (
@@ -891,7 +974,7 @@ export default function Room() {
       )}
 
       {/* 메시지 목록 */}
-      <div ref={messageListRef} onScroll={handleScroll} className={`chat-scroll${hideScroll ? ' hide-scroll' : ''}`} style={{ position: 'relative', flex: 1, minHeight: 0, padding: `12px 10px ${showCharList && myChars.length > 0 ? 126 : 82}px`, display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto', background: t.bg }}>
+      <div ref={messageListRef} onScroll={handleScroll} className={`chat-scroll${hideScroll ? ' hide-scroll' : ''}`} style={{ position: 'relative', flex: 1, minHeight: 0, padding: `12px 10px ${showCharList && myChars.length > 0 ? 126 : 82}px`, display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto', background: t.bg, transition: 'padding-bottom 210ms cubic-bezier(0.2, 0.8, 0.2, 1)' }}>
         {filteredMessages.map((msg, messageIndex) => {
           const isMine = msg.user_id === userId
           const char = msg.characters
@@ -916,7 +999,7 @@ export default function Room() {
 
           if (msg.type === 'narration')
             return (
-              <div key={msg.id} id={'msg-' + msg.id} onPointerDown={event => startLongPress(event, msg)} onPointerMove={moveLongPress} onPointerUp={cancelLongPress} onPointerCancel={cancelLongPress} onPointerLeave={cancelLongPress} onContextMenu={event => isMine && event.preventDefault()} onSelectStart={event => isMine && event.preventDefault()} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: '2px 0', touchAction: 'pan-y', ...ownMessageLongPressStyle }}>
+              <div key={msg.id} id={'msg-' + msg.id} onPointerDown={event => startLongPress(event, msg)} onPointerMove={moveLongPress} onPointerUp={cancelLongPress} onPointerCancel={cancelLongPress} onPointerLeave={cancelLongPress} onContextMenu={event => isMine && event.preventDefault()} onSelectStart={event => isMine && event.preventDefault()} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: '2px 0', touchAction: 'pan-y', opacity: msg.is_arriving ? 0 : 1, ...ownMessageLongPressStyle }}>
                 <div style={{ display: 'flex', gap: 3 }}>
                   {[0, 1, 2].map(i => (
                     <div key={i} style={{ width: 3, height: 3, borderRadius: '50%', background: t.narrColor }} />
@@ -982,7 +1065,7 @@ export default function Room() {
           const actColor = isMine ? t.myAct : t.subText
 
           return (
-            <div key={msg.id} id={'msg-' + msg.id} onPointerDown={event => startLongPress(event, msg)} onPointerMove={moveLongPress} onPointerUp={cancelLongPress} onPointerCancel={cancelLongPress} onPointerLeave={cancelLongPress} onContextMenu={event => isMine && event.preventDefault()} onSelectStart={event => isMine && event.preventDefault()} style={{ display: 'flex', flexDirection: isMine ? 'row-reverse' : 'row', alignItems: 'flex-start', gap: 6, touchAction: 'pan-y', ...ownMessageLongPressStyle }}>
+            <div key={msg.id} id={'msg-' + msg.id} onPointerDown={event => startLongPress(event, msg)} onPointerMove={moveLongPress} onPointerUp={cancelLongPress} onPointerCancel={cancelLongPress} onPointerLeave={cancelLongPress} onContextMenu={event => isMine && event.preventDefault()} onSelectStart={event => isMine && event.preventDefault()} style={{ display: 'flex', flexDirection: isMine ? 'row-reverse' : 'row', alignItems: 'flex-start', gap: 6, touchAction: 'pan-y', opacity: msg.is_arriving ? 0 : 1, ...ownMessageLongPressStyle }}>
               <div style={{ flexShrink: 0, width: 36, height: showMessageIdentity ? 36 : 0 }}>
                 {showMessageIdentity && (
                   <div role="button" tabIndex={0} aria-label={`${char?.name || '프로필'} 사진 크게 보기`} onPointerDown={event => event.stopPropagation()} onClick={() => setProfilePreview({ url: char?.image_url || DEFAULT_AVATAR, name: char?.name })} onKeyDown={event => (event.key === 'Enter' || event.key === ' ') && setProfilePreview({ url: char?.image_url || DEFAULT_AVATAR, name: char?.name })} style={{ width: 36, height: 36, borderRadius: '50%', background: char?.color || t.border, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 500, color: char?.text_color || t.subText, cursor: 'zoom-in' }}>
@@ -1003,7 +1086,7 @@ export default function Room() {
                     </button>
                   </div>
                 ) : (
-                  <div style={{ background: bubbleBg, color: bubbleColor, padding: '7px 11px', borderRadius: 12, fontSize: 13, lineHeight: 1.6, border: 'none', cursor: isMine ? 'pointer' : 'default' }}>
+                  <div data-message-bubble style={{ background: bubbleBg, color: bubbleColor, padding: '7px 11px', borderRadius: 12, fontSize: 13, lineHeight: 1.6, border: 'none', cursor: isMine ? 'pointer' : 'default' }}>
                     {parseContent(msg.content, actColor, actionStyle)}
                     {msg.edited && <span style={{ fontSize: 9, opacity: 0.5, marginLeft: 4 }}>수정됨</span>}
                   </div>
@@ -1064,7 +1147,7 @@ export default function Room() {
           </button>
         )}
         {myChars.length > 0 && showCharList && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, marginBottom: 7, padding: '7px 9px', borderRadius: 14, background: `color-mix(in srgb, ${t.panel} 76%, transparent)`, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: `1px solid ${t.border}`, boxShadow: '0 8px 24px rgba(0,0,0,0.16)', pointerEvents: 'auto' }}>
+          <div className="profile-picker-reveal" style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, marginBottom: 7, padding: '7px 9px', borderRadius: 14, background: `color-mix(in srgb, ${t.panel} 76%, transparent)`, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: `1px solid ${t.border}`, boxShadow: '0 8px 24px rgba(0,0,0,0.16)', pointerEvents: 'auto' }}>
             <span style={{ fontSize: 10, color: t.subText, flexShrink: 0 }}>나</span>
             <div className="character-strip" style={{ display: 'flex', gap: 5, flex: 1, minWidth: 0, flexWrap: 'nowrap', overflowX: 'auto', overflowY: 'hidden', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', touchAction: 'pan-x', paddingBottom: 2 }}>
               {myChars.map(c => (

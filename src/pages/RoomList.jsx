@@ -238,6 +238,7 @@ export default function RoomList() {
         {/* 방 만들기 폼 */}
         {showCreate && (
           <div
+            className="inline-panel-reveal"
             style={{
               background: t.panel,
               borderRadius: 12,
@@ -303,6 +304,7 @@ export default function RoomList() {
         {/* 초대코드 입장 폼 */}
         {showJoin && (
           <div
+            className="inline-panel-reveal"
             style={{
               background: t.panel,
               borderRadius: 12,
@@ -366,7 +368,11 @@ export default function RoomList() {
         )}
 
         {/* 방 목록 */}
-        {reordering && <div style={{ color: t.subText, fontSize: 11, marginBottom: 8 }}>손잡이를 끌어 채팅방 순서를 변경하세요.</div>}
+        {reordering && (
+          <div className="reorder-mode-reveal" style={{ color: t.subText, fontSize: 11, marginBottom: 8 }}>
+            손잡이를 끌어 채팅방 순서를 변경하세요.
+          </div>
+        )}
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleRoomDragEnd}>
           <SortableContext items={filteredRooms.map(room => room.id)} strategy={verticalListSortingStrategy}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -387,6 +393,7 @@ export default function RoomList() {
                 <SortableRoomCard key={room.id} roomId={room.id} disabled={!reordering}>
                   {({ listeners }) => (
                     <div
+                      className="room-card-transition"
                       onClick={() => !reordering && navigate(`/room/${room.id}`)}
                       style={{
                         background: t.panel,
