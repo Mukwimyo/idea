@@ -19,8 +19,16 @@ const FONT_MAP = {
   aggro: 'SBAggroB',
 }
 
+const LAUNCH_LOGO = `${import.meta.env.BASE_URL}branding/idea-logo-launch-dark.png`
+
 export default function App() {
   const [session, setSession] = useState(undefined)
+  const [splashReady, setSplashReady] = useState(false)
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSplashReady(true), 650)
+    return () => window.clearTimeout(timer)
+  }, [])
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => setSession(session))
@@ -45,7 +53,7 @@ export default function App() {
     return () => subscription.unsubscribe()
   }, [])
 
-  if (session === undefined)
+  if (session === undefined || !splashReady)
     return (
       <div
         style={{
@@ -55,7 +63,25 @@ export default function App() {
           alignItems: 'center',
           justifyContent: 'center',
         }}>
-        <div style={{ color: '#7F77DD', fontSize: 28 }}>✦</div>
+        <img
+          className="app-launch-logo"
+          src={LAUNCH_LOGO}
+          alt="IDEA"
+          style={{
+            width: 'min(64vw, 300px)',
+            height: 'auto',
+            animation: 'app-logo-enter 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both',
+          }}
+        />
+        <style>{`
+          @keyframes app-logo-enter {
+            from { opacity: 0; transform: translateY(8px) scale(0.96); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+          }
+          @media (prefers-reduced-motion: reduce) {
+            .app-launch-logo { animation: none !important; }
+          }
+        `}</style>
       </div>
     )
 
