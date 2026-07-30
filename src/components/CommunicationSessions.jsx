@@ -145,7 +145,7 @@ export default function CommunicationSessions({ roomId, userId, myChars, theme, 
               </button>
             </div>
             <label style={{ display: 'block', color: t.subText, fontSize: 12, marginBottom: 10 }}>
-              보내는 캐릭터
+              발신자
               <select value={effectiveSenderId} onChange={event => setSenderId(event.target.value)} style={{ width: '100%', marginTop: 5, padding: 9, borderRadius: 10, background: t.bg, color: t.inputText, border: `1px solid ${t.border}` }}>
                 {myChars.map(character => (
                   <option key={character.id} value={character.id}>
@@ -155,7 +155,7 @@ export default function CommunicationSessions({ roomId, userId, myChars, theme, 
               </select>
             </label>
             <label style={{ display: 'block', color: t.subText, fontSize: 12 }}>
-              받는 캐릭터
+              수신자
               <select value={receiverId} onChange={event => setReceiverId(event.target.value)} style={{ width: '100%', marginTop: 5, padding: 9, borderRadius: 10, background: t.bg, color: t.inputText, border: `1px solid ${t.border}` }}>
                 {receiverOptions.length === 0 && <option value="">선택 가능한 상대 캐릭터 없음</option>}
                 {receiverOptions.map(character => (
