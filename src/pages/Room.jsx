@@ -172,91 +172,11 @@ export default function Room() {
   const fileInputRef = useRef(null)
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
-  const sendFlightNodesRef = useRef(new Set())
   const isAtBottomRef = useRef(true)
   const messageListRef = useRef(null)
   const initialScrollDone = useRef(false)
   const channelRef = useRef(null)
   const userIdRef = useRef(null)
-
-  const revealMessage = messageId => {
-    setMessages(prev => prev.map(message => (message.id === messageId ? { ...message, is_arriving: false } : message)))
-  }
-
-  const animateMessageFromInput = messageId => {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      revealMessage(messageId)
-      return
-    }
-
-    // Paint the cleared input first, then launch the blurred piece from its left edge.
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        const inputRect = inputRef.current?.getBoundingClientRect()
-        const messageElement = document.getElementById(`msg-${messageId}`)
-        const targetElement = messageElement?.querySelector('[data-message-bubble]') || messageElement
-
-        if (!inputRect || !targetElement) {
-          revealMessage(messageId)
-          return
-        }
-
-        const targetRect = targetElement.getBoundingClientRect()
-        const size = 18
-        const startX = inputRect.left + 2
-        const startY = inputRect.top + (inputRect.height - size) / 2
-        const endX = targetRect.right - size
-        const endY = targetRect.bottom - size
-        const flight = document.createElement('div')
-
-        flight.setAttribute('aria-hidden', 'true')
-        Object.assign(flight.style, {
-          position: 'fixed',
-          zIndex: '1000',
-          left: `${startX}px`,
-          top: `${startY}px`,
-          width: `${size}px`,
-          height: `${size}px`,
-          borderRadius: '6px',
-          pointerEvents: 'none',
-          background: `color-mix(in srgb, ${t.panel} 62%, transparent)`,
-          border: `1px solid color-mix(in srgb, ${t.border} 76%, transparent)`,
-          backdropFilter: 'blur(10px)',
-          WebkitBackdropFilter: 'blur(10px)',
-          boxShadow: '0 5px 14px rgba(0,0,0,0.18)',
-          willChange: 'transform, opacity',
-        })
-        document.body.appendChild(flight)
-        sendFlightNodesRef.current.add(flight)
-
-        const animation = flight.animate(
-          [
-            { transform: 'translate3d(0, 0, 0) scale(0.82)', opacity: 0 },
-            { transform: 'translate3d(0, 0, 0) scale(1)', opacity: 0.9, offset: 0.15 },
-            { transform: `translate3d(${endX - startX}px, ${endY - startY}px, 0) scale(1.08)`, opacity: 0.82, offset: 0.86 },
-            { transform: `translate3d(${endX - startX}px, ${endY - startY}px, 0) scale(1.28)`, opacity: 0 },
-          ],
-          { duration: 270, easing: 'cubic-bezier(0.2, 0.78, 0.24, 1)', fill: 'forwards' }
-        )
-
-        const finish = () => {
-          revealMessage(messageId)
-          sendFlightNodesRef.current.delete(flight)
-          flight.remove()
-        }
-        animation.addEventListener('finish', finish, { once: true })
-        animation.addEventListener('cancel', finish, { once: true })
-      })
-    })
-  }
-
-  useEffect(
-    () => () => {
-      sendFlightNodesRef.current.forEach(node => node.remove())
-      sendFlightNodesRef.current.clear()
-    },
-    []
-  )
 
   const openPanel = panel => {
     setShowInvite(panel === 'invite')
@@ -327,10 +247,10 @@ export default function Room() {
           if (payload.eventType === 'INSERT') {
             const newMsg = payload.new
             const { data: char } = await supabase.from('characters').select('name, color, text_color, avatar_letter, image_url').eq('id', newMsg.character_id).single()
-            const fullMsg = { ...newMsg, characters: char || null }
+            const fullMsg = { ...newMsg, characters: char || null, entrance_side: newMsg.user_id === userIdRef.current ? 'right' : 'left' }
             setMessages(prev => {
               const hastemp = prev.find(m => m.id.toString().startsWith('temp-') && m.content === newMsg.content && m.user_id === newMsg.user_id)
-              if (hastemp) return prev.map(m => (m.id === hastemp.id ? fullMsg : m))
+              if (hastemp) return prev.map(m => (m.id === hastemp.id ? { ...fullMsg, entrance_side: null } : m))
               return [...prev, fullMsg]
             })
             if (!isAtBottomRef.current) setNewMsgAlert(true)
@@ -577,13 +497,12 @@ export default function Room() {
       edited: false,
       created_at: new Date().toISOString(),
       delivery_state: 'sending',
-      is_arriving: true,
+      entrance_side: 'right',
     }
     isAtBottomRef.current = true
     setMessages(prev => [...prev, tempMsg])
     if (mode === 'narration') setMode('chat')
     inputRef.current?.focus()
-    animateMessageFromInput(tempMsg.id)
     await persistMessage(tempMsg.id, {
       room_id: roomId,
       user_id: user.id,
@@ -701,6 +620,7 @@ export default function Room() {
       edited: false,
       created_at: new Date().toISOString(),
       delivery_state: 'sending',
+      entrance_side: 'right',
     }
     setMessages(prev => [...prev, tempMsg])
     await persistMessage(tempMsg.id, {
@@ -746,6 +666,9 @@ export default function Room() {
     )
   }
   const isNarrActive = mode === 'narration'
+  const finishMessageEntrance = messageId => {
+    setMessages(prev => prev.map(message => (message.id === messageId ? { ...message, entrance_side: null } : message)))
+  }
   const filteredMessages = messages.filter(msg => {
     if (!searchQuery) return true
     return msg.content?.toLowerCase().includes(searchQuery.toLowerCase())
@@ -977,6 +900,7 @@ export default function Room() {
       <div ref={messageListRef} onScroll={handleScroll} className={`chat-scroll${hideScroll ? ' hide-scroll' : ''}`} style={{ position: 'relative', flex: 1, minHeight: 0, padding: `12px 10px ${showCharList && myChars.length > 0 ? 126 : 82}px`, display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto', background: t.bg, transition: 'padding-bottom 210ms cubic-bezier(0.2, 0.8, 0.2, 1)' }}>
         {filteredMessages.map((msg, messageIndex) => {
           const isMine = msg.user_id === userId
+          const messageEntranceClass = msg.entrance_side === 'right' ? 'message-enter-right' : msg.entrance_side === 'left' ? 'message-enter-left' : ''
           const char = msg.characters
           const previousMessage = filteredMessages[messageIndex - 1]
           const nextMessage = filteredMessages[messageIndex + 1]
@@ -999,7 +923,7 @@ export default function Room() {
 
           if (msg.type === 'narration')
             return (
-              <div key={msg.id} id={'msg-' + msg.id} onPointerDown={event => startLongPress(event, msg)} onPointerMove={moveLongPress} onPointerUp={cancelLongPress} onPointerCancel={cancelLongPress} onPointerLeave={cancelLongPress} onContextMenu={event => isMine && event.preventDefault()} onSelectStart={event => isMine && event.preventDefault()} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: '2px 0', touchAction: 'pan-y', opacity: msg.is_arriving ? 0 : 1, ...ownMessageLongPressStyle }}>
+              <div className={messageEntranceClass} onAnimationEnd={() => messageEntranceClass && finishMessageEntrance(msg.id)} key={msg.id} id={'msg-' + msg.id} onPointerDown={event => startLongPress(event, msg)} onPointerMove={moveLongPress} onPointerUp={cancelLongPress} onPointerCancel={cancelLongPress} onPointerLeave={cancelLongPress} onContextMenu={event => isMine && event.preventDefault()} onSelectStart={event => isMine && event.preventDefault()} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: '2px 0', touchAction: 'pan-y', ...ownMessageLongPressStyle }}>
                 <div style={{ display: 'flex', gap: 3 }}>
                   {[0, 1, 2].map(i => (
                     <div key={i} style={{ width: 3, height: 3, borderRadius: '50%', background: t.narrColor }} />
@@ -1038,7 +962,7 @@ export default function Room() {
 
           if (msg.type === 'image')
             return (
-              <div key={msg.id} id={'msg-' + msg.id} onPointerDown={event => startLongPress(event, msg)} onPointerMove={moveLongPress} onPointerUp={cancelLongPress} onPointerCancel={cancelLongPress} onPointerLeave={cancelLongPress} onContextMenu={event => isMine && event.preventDefault()} onSelectStart={event => isMine && event.preventDefault()} style={{ display: 'flex', flexDirection: isMine ? 'row-reverse' : 'row', alignItems: 'flex-start', gap: 6, touchAction: 'pan-y', ...ownMessageLongPressStyle }}>
+              <div className={messageEntranceClass} onAnimationEnd={() => messageEntranceClass && finishMessageEntrance(msg.id)} key={msg.id} id={'msg-' + msg.id} onPointerDown={event => startLongPress(event, msg)} onPointerMove={moveLongPress} onPointerUp={cancelLongPress} onPointerCancel={cancelLongPress} onPointerLeave={cancelLongPress} onContextMenu={event => isMine && event.preventDefault()} onSelectStart={event => isMine && event.preventDefault()} style={{ display: 'flex', flexDirection: isMine ? 'row-reverse' : 'row', alignItems: 'flex-start', gap: 6, touchAction: 'pan-y', ...ownMessageLongPressStyle }}>
                 <div style={{ flexShrink: 0, width: 36, height: showMessageIdentity ? 36 : 0 }}>
                   {showMessageIdentity && (
                     <div role="button" tabIndex={0} aria-label={`${char?.name || '프로필'} 사진 크게 보기`} onPointerDown={event => event.stopPropagation()} onClick={() => setProfilePreview({ url: char?.image_url || DEFAULT_AVATAR, name: char?.name })} onKeyDown={event => (event.key === 'Enter' || event.key === ' ') && setProfilePreview({ url: char?.image_url || DEFAULT_AVATAR, name: char?.name })} style={{ width: 36, height: 36, borderRadius: '50%', background: char?.color || t.border, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 500, color: char?.text_color || t.subText, cursor: 'zoom-in' }}>
@@ -1065,7 +989,7 @@ export default function Room() {
           const actColor = isMine ? t.myAct : t.subText
 
           return (
-            <div key={msg.id} id={'msg-' + msg.id} onPointerDown={event => startLongPress(event, msg)} onPointerMove={moveLongPress} onPointerUp={cancelLongPress} onPointerCancel={cancelLongPress} onPointerLeave={cancelLongPress} onContextMenu={event => isMine && event.preventDefault()} onSelectStart={event => isMine && event.preventDefault()} style={{ display: 'flex', flexDirection: isMine ? 'row-reverse' : 'row', alignItems: 'flex-start', gap: 6, touchAction: 'pan-y', opacity: msg.is_arriving ? 0 : 1, ...ownMessageLongPressStyle }}>
+            <div className={messageEntranceClass} onAnimationEnd={() => messageEntranceClass && finishMessageEntrance(msg.id)} key={msg.id} id={'msg-' + msg.id} onPointerDown={event => startLongPress(event, msg)} onPointerMove={moveLongPress} onPointerUp={cancelLongPress} onPointerCancel={cancelLongPress} onPointerLeave={cancelLongPress} onContextMenu={event => isMine && event.preventDefault()} onSelectStart={event => isMine && event.preventDefault()} style={{ display: 'flex', flexDirection: isMine ? 'row-reverse' : 'row', alignItems: 'flex-start', gap: 6, touchAction: 'pan-y', ...ownMessageLongPressStyle }}>
               <div style={{ flexShrink: 0, width: 36, height: showMessageIdentity ? 36 : 0 }}>
                 {showMessageIdentity && (
                   <div role="button" tabIndex={0} aria-label={`${char?.name || '프로필'} 사진 크게 보기`} onPointerDown={event => event.stopPropagation()} onClick={() => setProfilePreview({ url: char?.image_url || DEFAULT_AVATAR, name: char?.name })} onKeyDown={event => (event.key === 'Enter' || event.key === ' ') && setProfilePreview({ url: char?.image_url || DEFAULT_AVATAR, name: char?.name })} style={{ width: 36, height: 36, borderRadius: '50%', background: char?.color || t.border, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 500, color: char?.text_color || t.subText, cursor: 'zoom-in' }}>
