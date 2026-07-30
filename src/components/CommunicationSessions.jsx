@@ -27,6 +27,7 @@ export default function CommunicationSessions({ roomId, userId, myChars, theme, 
   const history = sessions.filter(session => !['ringing', 'active'].includes(session.status))
   const characterById = useMemo(() => Object.fromEntries(characters.map(character => [character.id, character])), [characters])
   const receiverOptions = characters.filter(character => character.user_id !== userId)
+  const effectiveSenderId = myChars.some(character => character.id === senderId) ? senderId : myChars[0]?.id || ''
 
   const fetchSessions = async () => {
     const { data } = await supabase.from('communication_sessions').select('*').eq('room_id', roomId).order('created_at', { ascending: false })
@@ -42,7 +43,7 @@ export default function CommunicationSessions({ roomId, userId, myChars, theme, 
     const load = async () => {
       setCharacterLoadError('')
       const [{ data: members, error: memberError }, { data: pool, error: poolError }] = await Promise.all([supabase.from('room_members').select('user_id').eq('room_id', roomId), supabase.from('room_characters').select('character_id, user_id, sort_order').eq('room_id', roomId).order('sort_order')])
-      const memberIds = [...new Set([userId, ...(members || []).map(member => member.user_id)])]
+      const memberIds = [...new Set([userId, ...(members || []).map(member => member.user_id), ...(pool || []).map(row => row.user_id)])]
       const { data: memberCharacters, error: characterError } = await supabase.from('characters').select('id, user_id, name, image_url, sort_order').in('user_id', memberIds).eq('is_archived', false).order('sort_order')
 
       const poolIds = new Set((pool || []).map(row => row.character_id))
@@ -53,7 +54,10 @@ export default function CommunicationSessions({ roomId, userId, myChars, theme, 
 
       setCharacters(roomCharacters)
       const firstReceiver = roomCharacters.find(character => character.user_id !== userId)
-      setReceiverId(current => current || firstReceiver?.id || '')
+      setReceiverId(current => {
+        const stillAvailable = roomCharacters.some(character => character.id === current && character.user_id !== userId)
+        return stillAvailable ? current : firstReceiver?.id || ''
+      })
       if (memberError || poolError || characterError) {
         setCharacterLoadError('상대 캐릭터 정보를 불러오지 못했습니다. Supabase 마이그레이션과 권한 설정을 확인해주세요.')
       } else if (!firstReceiver) {
@@ -71,7 +75,7 @@ export default function CommunicationSessions({ roomId, userId, myChars, theme, 
       })
       .subscribe()
     return () => supabase.removeChannel(channel)
-  }, [roomId, userId])
+  }, [roomId, userId, myChars])
 
   useEffect(() => {
     sessions
@@ -87,7 +91,7 @@ export default function CommunicationSessions({ roomId, userId, myChars, theme, 
   }, [])
 
   const createSession = async () => {
-    const sender = characterById[senderId]
+    const sender = characterById[effectiveSenderId] || myChars.find(character => character.id === effectiveSenderId)
     const receiver = characterById[receiverId]
     if (!sender || !receiver || sender.user_id === receiver.user_id) return
     await supabase.from('communication_sessions').insert({
@@ -142,7 +146,7 @@ export default function CommunicationSessions({ roomId, userId, myChars, theme, 
             </div>
             <label style={{ display: 'block', color: t.subText, fontSize: 12, marginBottom: 10 }}>
               보내는 캐릭터
-              <select value={senderId} onChange={event => setSenderId(event.target.value)} style={{ width: '100%', marginTop: 5, padding: 9, borderRadius: 10, background: t.bg, color: t.inputText, border: `1px solid ${t.border}` }}>
+              <select value={effectiveSenderId} onChange={event => setSenderId(event.target.value)} style={{ width: '100%', marginTop: 5, padding: 9, borderRadius: 10, background: t.bg, color: t.inputText, border: `1px solid ${t.border}` }}>
                 {myChars.map(character => (
                   <option key={character.id} value={character.id}>
                     {character.name}
@@ -166,7 +170,7 @@ export default function CommunicationSessions({ roomId, userId, myChars, theme, 
                 {characterLoadError}
               </div>
             )}
-            <button onClick={createSession} disabled={!senderId || !receiverId} style={{ width: '100%', marginTop: 14, padding: 11, border: 0, borderRadius: 12, background: t.point, color: '#fff' }}>
+            <button onClick={createSession} disabled={!effectiveSenderId || !receiverId} style={{ width: '100%', marginTop: 14, padding: 11, border: 0, borderRadius: 12, background: t.point, color: '#fff', opacity: !effectiveSenderId || !receiverId ? 0.45 : 1 }}>
               연락하기
             </button>
           </section>
