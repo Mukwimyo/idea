@@ -21,6 +21,34 @@ button {
     font-family: inherit;
 }
 
+button,
+[role="button"] {
+    transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease, opacity 160ms ease, transform 160ms ease;
+}
+
+button:not(:disabled):active,
+[role="button"]:active {
+    transform: scale(0.97);
+}
+
+button:focus-visible,
+[role="button"]:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--focus-color, #7f77dd) 78%, white);
+    outline-offset: 2px;
+}
+
+button:disabled {
+    cursor: default;
+    opacity: 0.55;
+}
+
+::placeholder {
+    color: currentColor;
+    opacity: 0.55;
+}
+
 ::-webkit-scrollbar {
     width: 4px;
     height: 4px;
@@ -119,12 +147,12 @@ button {
 }
 
 @keyframes message-slide-from-right {
-    from { opacity: 0; transform: translate3d(min(34vw, 150px), 3px, 0); }
+    from { opacity: 0; transform: translate3d(min(16vw, 64px), 2px, 0); }
     to { opacity: 1; transform: translate3d(0, 0, 0); }
 }
 
 @keyframes message-slide-from-left {
-    from { opacity: 0; transform: translate3d(max(-34vw, -150px), 3px, 0); }
+    from { opacity: 0; transform: translate3d(max(-16vw, -64px), 2px, 0); }
     to { opacity: 1; transform: translate3d(0, 0, 0); }
 }
 
@@ -141,6 +169,11 @@ button {
     }
 
     .room-card-transition {
+        transition: none;
+    }
+
+    button,
+    [role="button"] {
         transition: none;
     }
 }

@@ -148,7 +148,10 @@ export default function Settings() {
     const {
       data: { user },
     } = await supabase.auth.getUser()
-    const [{ data }, { data: messageTimeSetting }] = await Promise.all([supabase.from('profiles').select('theme_id, font_id, show_entering').eq('id', user.id).single(), supabase.from('profiles').select('show_message_time').eq('id', user.id).maybeSingle()])
+    const [{ data }, { data: messageTimeSetting }] = await Promise.all([
+      supabase.from('profiles').select('theme_id, font_id, show_entering').eq('id', user.id).single(),
+      supabase.from('profiles').select('show_message_time').eq('id', user.id).maybeSingle(),
+    ])
     if (data?.theme_id) setMyThemeId(data.theme_id)
     if (data?.font_id) setMyFontId(data.font_id)
     if (data?.show_entering !== undefined) setShowEntering(data.show_entering)
