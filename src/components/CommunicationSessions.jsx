@@ -20,6 +20,7 @@ export default function CommunicationSessions({ roomId, userId, myChars, theme, 
   const [messages, setMessages] = useState({})
   const [draft, setDraft] = useState('')
   const [now, setNow] = useState(Date.now())
+  const [characterLoadError, setCharacterLoadError] = useState('')
   const t = theme
 
   const activeSession = sessions.find(session => ['ringing', 'active'].includes(session.status))
@@ -39,11 +40,25 @@ export default function CommunicationSessions({ roomId, userId, myChars, theme, 
 
   useEffect(() => {
     const load = async () => {
-      const { data: pool } = await supabase.from('room_characters').select('character_id, characters(id, user_id, name, image_url)').eq('room_id', roomId)
-      const roomCharacters = (pool || []).map(row => row.characters).filter(Boolean)
+      setCharacterLoadError('')
+      const [{ data: members, error: memberError }, { data: pool, error: poolError }] = await Promise.all([supabase.from('room_members').select('user_id').eq('room_id', roomId), supabase.from('room_characters').select('character_id, user_id, sort_order').eq('room_id', roomId).order('sort_order')])
+      const memberIds = [...new Set([userId, ...(members || []).map(member => member.user_id)])]
+      const { data: memberCharacters, error: characterError } = await supabase.from('characters').select('id, user_id, name, image_url, sort_order').in('user_id', memberIds).eq('is_archived', false).order('sort_order')
+
+      const poolIds = new Set((pool || []).map(row => row.character_id))
+      const pooledCharacters = (memberCharacters || []).filter(character => poolIds.has(character.id))
+      const otherPooledCharacters = pooledCharacters.filter(character => character.user_id !== userId)
+      const otherMemberCharacters = (memberCharacters || []).filter(character => character.user_id !== userId)
+      const roomCharacters = [...myChars, ...(otherPooledCharacters.length > 0 ? otherPooledCharacters : otherMemberCharacters)].filter((character, index, list) => list.findIndex(item => item.id === character.id) === index)
+
       setCharacters(roomCharacters)
       const firstReceiver = roomCharacters.find(character => character.user_id !== userId)
       setReceiverId(current => current || firstReceiver?.id || '')
+      if (memberError || poolError || characterError) {
+        setCharacterLoadError('상대 캐릭터 정보를 불러오지 못했습니다. Supabase 마이그레이션과 권한 설정을 확인해주세요.')
+      } else if (!firstReceiver) {
+        setCharacterLoadError('이 방에서 상대방이 사용할 캐릭터가 아직 설정되지 않았습니다.')
+      }
       await fetchSessions()
     }
     load()
@@ -138,6 +153,7 @@ export default function CommunicationSessions({ roomId, userId, myChars, theme, 
             <label style={{ display: 'block', color: t.subText, fontSize: 12 }}>
               받는 캐릭터
               <select value={receiverId} onChange={event => setReceiverId(event.target.value)} style={{ width: '100%', marginTop: 5, padding: 9, borderRadius: 10, background: t.bg, color: t.inputText, border: `1px solid ${t.border}` }}>
+                {receiverOptions.length === 0 && <option value="">선택 가능한 상대 캐릭터 없음</option>}
                 {receiverOptions.map(character => (
                   <option key={character.id} value={character.id}>
                     {character.name}
@@ -145,6 +161,11 @@ export default function CommunicationSessions({ roomId, userId, myChars, theme, 
                 ))}
               </select>
             </label>
+            {characterLoadError && (
+              <div role="status" style={{ marginTop: 8, color: t.subText, fontSize: 11, lineHeight: 1.5 }}>
+                {characterLoadError}
+              </div>
+            )}
             <button onClick={createSession} disabled={!senderId || !receiverId} style={{ width: '100%', marginTop: 14, padding: 11, border: 0, borderRadius: 12, background: t.point, color: '#fff' }}>
               연락하기
             </button>
