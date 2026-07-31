@@ -179,6 +179,8 @@ export default function Room() {
   const longPressTimerRef = useRef(null)
   const longPressStartRef = useRef(null)
   const longPressTriggeredRef = useRef(false)
+  const profileGestureStartRef = useRef(null)
+  const profileGestureHandledRef = useRef(false)
   const fileInputRef = useRef(null)
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
@@ -1352,7 +1354,41 @@ export default function Room() {
           }}
         />
         {myChars.length > 0 && (
-          <button onMouseDown={e => e.preventDefault()} onClick={() => setShowCharList(v => !v)} aria-label="프로필 변경 메뉴" style={{ position: 'absolute', top: -18, left: 14, background: `color-mix(in srgb, ${t.panel} 78%, transparent)`, backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)', border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '3px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'auto' }}>
+          <button
+            onMouseDown={e => e.preventDefault()}
+            onPointerDown={event => {
+              profileGestureStartRef.current = event.clientY
+              profileGestureHandledRef.current = false
+              event.currentTarget.setPointerCapture?.(event.pointerId)
+            }}
+            onPointerMove={event => {
+              if (profileGestureStartRef.current === null || profileGestureHandledRef.current) return
+              const distance = profileGestureStartRef.current - event.clientY
+              if (distance > 24) {
+                profileGestureHandledRef.current = true
+                setShowCharList(true)
+              } else if (distance < -24) {
+                profileGestureHandledRef.current = true
+                setShowCharList(false)
+              }
+            }}
+            onPointerUp={event => {
+              profileGestureStartRef.current = null
+              event.currentTarget.releasePointerCapture?.(event.pointerId)
+            }}
+            onPointerCancel={() => {
+              profileGestureStartRef.current = null
+              profileGestureHandledRef.current = false
+            }}
+            onClick={() => {
+              if (profileGestureHandledRef.current) {
+                profileGestureHandledRef.current = false
+                return
+              }
+              setShowCharList(value => !value)
+            }}
+            aria-label="프로필 변경 메뉴"
+            style={{ position: 'absolute', top: -18, left: 14, background: `color-mix(in srgb, ${t.panel} 78%, transparent)`, backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)', border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '3px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'auto', touchAction: 'none' }}>
             {showCharList ? <ChevronDown size={13} color={t.subText} /> : <ChevronUp size={13} color={t.subText} />}
           </button>
         )}
