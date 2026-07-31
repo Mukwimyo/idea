@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { THEMES, getTheme } from '../lib/themes'
 import { ChevronLeft, ChevronRight, LogOut, Users, Bell, BellOff, CircleHelp } from 'lucide-react'
 import { supabase, subscribePush, unsubscribePush } from '../lib/supabase'
+import Toast, { useToast } from '../components/Toast'
 
 const FONTS = [
   { id: 'sans', name: '기본', family: 'sans-serif' },
@@ -132,6 +133,7 @@ function ThemePreview({ t }) {
 
 export default function Settings() {
   const navigate = useNavigate()
+  const { toast, showToast } = useToast()
   const [myThemeId, setMyThemeId] = useState('dark-purple')
   const [saving, setSaving] = useState(false)
   const [myFontId, setMyFontId] = useState('sans')
@@ -182,8 +184,9 @@ export default function Settings() {
     const {
       data: { user },
     } = await supabase.auth.getUser()
-    await supabase.from('profiles').update({ theme_id: id }).eq('id', user.id)
+    const { error } = await supabase.from('profiles').update({ theme_id: id }).eq('id', user.id)
     setSaving(false)
+    showToast(error ? '테마를 저장하지 못했어요.' : '테마가 저장됐어요.', error ? 'error' : 'success')
   }
 
   const saveFont = async id => {
@@ -191,8 +194,9 @@ export default function Settings() {
     const {
       data: { user },
     } = await supabase.auth.getUser()
-    await supabase.from('profiles').update({ font_id: id }).eq('id', user.id)
+    const { error } = await supabase.from('profiles').update({ font_id: id }).eq('id', user.id)
     document.body.style.fontFamily = FONTS.find(f => f.id === id)?.family || 'sans-serif'
+    showToast(error ? '폰트를 저장하지 못했어요.' : '폰트가 저장됐어요.', error ? 'error' : 'success')
   }
 
   const saveFontScale = async value => {
@@ -203,7 +207,8 @@ export default function Settings() {
     const {
       data: { user },
     } = await supabase.auth.getUser()
-    await supabase.from('profiles').update({ font_scale: scale }).eq('id', user.id)
+    const { error } = await supabase.from('profiles').update({ font_scale: scale }).eq('id', user.id)
+    showToast(error ? '글자 크기를 저장하지 못했어요.' : '글자 크기가 저장됐어요.', error ? 'error' : 'success')
   }
 
   const togglePush = async () => {
@@ -214,14 +219,18 @@ export default function Settings() {
     if (pushEnabled) {
       await unsubscribePush(user.id)
       setPushEnabled(false)
+      showToast('푸시 알림을 껐어요.')
     } else {
       const result = await subscribePush(user.id)
       if (result.success) {
         setPushEnabled(true)
+        showToast('푸시 알림을 켰어요.')
       } else if (result.reason === 'denied') {
         alert('알림 권한이 거부됐어요. 브라우저 설정에서 허용해주세요.')
+        showToast('알림 권한이 필요해요.', 'error')
       } else if (result.reason === 'unsupported') {
         alert('이 브라우저는 푸시 알림을 지원하지 않아요.')
+        showToast('푸시 알림을 지원하지 않는 브라우저예요.', 'error')
       }
     }
     setPushLoading(false)
@@ -257,6 +266,7 @@ export default function Settings() {
         background: t.bg,
         transition: 'background 0.3s',
       }}>
+      <Toast toast={toast} />
       <div style={{ maxWidth: 480, margin: '0 auto', padding: 16 }}>
         <div
           style={{
@@ -530,7 +540,8 @@ export default function Settings() {
                 const {
                   data: { user },
                 } = await supabase.auth.getUser()
-                await supabase.from('profiles').update({ show_entering: next }).eq('id', user.id)
+                const { error } = await supabase.from('profiles').update({ show_entering: next }).eq('id', user.id)
+                showToast(error ? '입장 애니메이션 설정을 저장하지 못했어요.' : '입장 애니메이션 설정이 저장됐어요.', error ? 'error' : 'success')
               }}
               style={{ width: 40, height: 22, borderRadius: 11, cursor: 'pointer', transition: 'background 0.2s', background: showEntering ? t.point : t.border, position: 'relative', flexShrink: 0 }}>
               <div style={{ position: 'absolute', top: 3, left: showEntering ? 20 : 3, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
@@ -548,7 +559,8 @@ export default function Settings() {
                 const {
                   data: { user },
                 } = await supabase.auth.getUser()
-                await supabase.from('profiles').update({ show_message_time: next }).eq('id', user.id)
+                const { error } = await supabase.from('profiles').update({ show_message_time: next }).eq('id', user.id)
+                showToast(error ? '시간 표시 설정을 저장하지 못했어요.' : '시간 표시 설정이 저장됐어요.', error ? 'error' : 'success')
               }}
               style={{ width: 40, height: 22, borderRadius: 11, cursor: 'pointer', transition: 'background 0.2s', background: showMessageTime ? t.point : t.border, position: 'relative', flexShrink: 0 }}>
               <div style={{ position: 'absolute', top: 3, left: showMessageTime ? 20 : 3, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
@@ -566,7 +578,8 @@ export default function Settings() {
                 const {
                   data: { user },
                 } = await supabase.auth.getUser()
-                await supabase.from('profiles').update({ show_edited_label: next }).eq('id', user.id)
+                const { error } = await supabase.from('profiles').update({ show_edited_label: next }).eq('id', user.id)
+                showToast(error ? '수정됨 표시 설정을 저장하지 못했어요.' : '수정됨 표시 설정이 저장됐어요.', error ? 'error' : 'success')
               }}
               role="switch"
               aria-checked={showEditedLabel}

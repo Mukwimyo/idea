@@ -6,6 +6,7 @@ import { ChevronLeft, Settings, Search, Images, Paperclip, ArrowUp, Eye, ArrowDo
 import ProfileImageModal from '../components/ProfileImageModal'
 import CommunicationSessions from '../components/CommunicationSessions'
 import CommunicationRecord from '../components/CommunicationRecord'
+import Toast, { useToast } from '../components/Toast'
 
 const DEFAULT_AVATAR = `${import.meta.env.BASE_URL}default-avatar.png`
 
@@ -131,6 +132,7 @@ function parseContent(text, actColor, actionStyle) {
 export default function Room() {
   const { roomId } = useParams()
   const navigate = useNavigate()
+  const { toast, showToast } = useToast()
   const [room, setRoom] = useState(null)
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
@@ -161,6 +163,7 @@ export default function Room() {
   const [newMsgAlert, setNewMsgAlert] = useState(false)
   const [roomNameText, setRoomNameText] = useState('')
   const [showCharList, setShowCharList] = useState(false)
+  const [closingCharList, setClosingCharList] = useState(false)
   const [typingInfo, setTypingInfo] = useState(null)
   const [talkingFramesByCharacter, setTalkingFramesByCharacter] = useState({})
   const [talkingFrameIndex, setTalkingFrameIndex] = useState(0)
@@ -174,6 +177,7 @@ export default function Room() {
   const [profilePreview, setProfilePreview] = useState(null)
   const [showCommunication, setShowCommunication] = useState(false)
   const [showRoleplayMenu, setShowRoleplayMenu] = useState(false)
+  const [closingRoleplayMenu, setClosingRoleplayMenu] = useState(false)
   const [dividerText, setDividerText] = useState('')
   const [initialUnreadId, setInitialUnreadId] = useState(null)
   const [viewportHeight, setViewportHeight] = useState(() => window.visualViewport?.height || window.innerHeight)
@@ -261,6 +265,34 @@ export default function Room() {
       setShowGallery(false)
       setClosingGallery(false)
     }, 220)
+  }
+
+  const openCharList = () => {
+    setClosingCharList(false)
+    setShowCharList(true)
+  }
+
+  const closeCharList = () => {
+    if (!showCharList || closingCharList) return
+    setClosingCharList(true)
+    window.setTimeout(() => {
+      setShowCharList(false)
+      setClosingCharList(false)
+    }, 190)
+  }
+
+  const openRoleplayMenu = () => {
+    setClosingRoleplayMenu(false)
+    setShowRoleplayMenu(true)
+  }
+
+  const closeRoleplayMenu = () => {
+    if (!showRoleplayMenu || closingRoleplayMenu) return
+    setClosingRoleplayMenu(true)
+    window.setTimeout(() => {
+      setShowRoleplayMenu(false)
+      setClosingRoleplayMenu(false)
+    }, 190)
   }
 
   useEffect(() => {
@@ -753,21 +785,28 @@ export default function Room() {
 
   const saveRoomName = async () => {
     if (!roomNameText.trim()) return
-    await supabase.from('rooms').update({ name: roomNameText.trim() }).eq('id', roomId)
+    const { error } = await supabase.from('rooms').update({ name: roomNameText.trim() }).eq('id', roomId)
+    if (error) {
+      showToast('대화방 이름을 저장하지 못했어요.', 'error')
+      return
+    }
     setRoom(prev => ({ ...prev, name: roomNameText.trim() }))
     setRoomNameText('')
+    showToast('대화방 이름이 저장됐어요.')
   }
 
   const saveSharedTheme = async id => {
     setSharedThemeId(id)
     if (followShared) setTheme(getTheme(id))
-    await supabase.from('rooms').update({ shared_theme_id: id }).eq('id', roomId)
+    const { error } = await supabase.from('rooms').update({ shared_theme_id: id }).eq('id', roomId)
+    showToast(error ? '공유 테마를 저장하지 못했어요.' : '공유 테마가 저장됐어요.', error ? 'error' : 'success')
   }
 
   const toggleFollow = async val => {
     setFollowShared(val)
     setTheme(getTheme(val ? sharedThemeId : myThemeId))
-    await supabase.from('rooms').update({ theme_follow: val }).eq('id', roomId)
+    const { error } = await supabase.from('rooms').update({ theme_follow: val }).eq('id', roomId)
+    showToast(error ? '테마 설정을 저장하지 못했어요.' : '테마 설정이 저장됐어요.', error ? 'error' : 'success')
   }
 
   const sendImage = async file => {
@@ -850,7 +889,7 @@ export default function Room() {
       entrance_side: 'right',
     }
     setMessages(current => [...current, divider])
-    setShowRoleplayMenu(false)
+    closeRoleplayMenu()
     await persistMessage(divider.id, {
       room_id: roomId,
       user_id: user.id,
@@ -1092,6 +1131,7 @@ export default function Room() {
         margin: '0 auto',
         animation: !showEntering ? 'slide-in-right 0.3s ease' : 'none',
       }}>
+      <Toast toast={toast} />
       <ProfileImageModal profile={profilePreview} onClose={() => setProfilePreview(null)} />
       <CommunicationSessions roomId={roomId} userId={userId} myChars={myChars} theme={t} open={showCommunication} onClose={() => setShowCommunication(false)} />
       {showSlot && room && showEntering && (
@@ -1229,7 +1269,8 @@ export default function Room() {
                     key={s}
                     onClick={async () => {
                       setReadReceipt(s)
-                      await supabase.from('rooms').update({ read_receipt_style: s }).eq('id', roomId)
+                      const { error } = await supabase.from('rooms').update({ read_receipt_style: s }).eq('id', roomId)
+                      showToast(error ? '읽음 확인 설정을 저장하지 못했어요.' : '읽음 확인 설정이 저장됐어요.', error ? 'error' : 'success')
                     }}
                     style={{ padding: '3px 9px', borderRadius: 10, fontSize: 11, cursor: 'pointer', border: readReceipt === s ? `1.5px solid ${t.point}` : `0.5px solid ${t.border}`, background: readReceipt === s ? t.point + '22' : 'none', color: readReceipt === s ? t.point : t.subText }}>
                     {s === 'text' ? '읽음' : s === 'number' ? '1' : '없음'}
@@ -1248,7 +1289,8 @@ export default function Room() {
                     key={s.val}
                     onClick={async () => {
                       setActionStyle(s.val)
-                      await supabase.from('rooms').update({ action_style: s.val }).eq('id', roomId)
+                      const { error } = await supabase.from('rooms').update({ action_style: s.val }).eq('id', roomId)
+                      showToast(error ? '지문 스타일을 저장하지 못했어요.' : '지문 스타일이 저장됐어요.', error ? 'error' : 'success')
                     }}
                     style={{ padding: '3px 9px', borderRadius: 10, fontSize: 11, cursor: 'pointer', border: actionStyle === s.val ? `1.5px solid ${t.point}` : `0.5px solid ${t.border}`, background: actionStyle === s.val ? t.point + '22' : 'none', color: actionStyle === s.val ? t.point : t.subText }}>
                     {s.label}
@@ -1273,6 +1315,7 @@ export default function Room() {
                   if (!next) setTypingInfo(null)
                   const { error } = await supabase.from('rooms').update({ show_typing_indicator: next }).eq('id', roomId)
                   if (error) setShowTypingIndicator(!next)
+                  showToast(error ? '입력 중 표시 설정을 저장하지 못했어요.' : '입력 중 표시 설정이 저장됐어요.', error ? 'error' : 'success')
                 }}
                 style={{ position: 'relative', width: 40, height: 22, flexShrink: 0, padding: 0, border: 0, borderRadius: 11, cursor: isOwner ? 'pointer' : 'default', opacity: isOwner ? 1 : 0.55, background: showTypingIndicator ? t.point : t.border }}>
                 <span style={{ position: 'absolute', top: 3, left: showTypingIndicator ? 21 : 3, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
@@ -1713,10 +1756,10 @@ export default function Room() {
               const distance = profileGestureStartRef.current - event.clientY
               if (distance > 24) {
                 profileGestureHandledRef.current = true
-                setShowCharList(true)
+                openCharList()
               } else if (distance < -24) {
                 profileGestureHandledRef.current = true
-                setShowCharList(false)
+                closeCharList()
               }
             }}
             onPointerUp={event => {
@@ -1732,7 +1775,8 @@ export default function Room() {
                 profileGestureHandledRef.current = false
                 return
               }
-              setShowCharList(value => !value)
+              if (showCharList) closeCharList()
+              else openCharList()
             }}
             aria-label="프로필 변경 메뉴"
             style={{ position: 'absolute', top: -18, left: 14, background: `color-mix(in srgb, ${t.panel} 78%, transparent)`, backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)', border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '3px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'auto', touchAction: 'none' }}>
@@ -1740,7 +1784,7 @@ export default function Room() {
           </button>
         )}
         {myChars.length > 0 && showCharList && (
-          <div className="profile-picker-reveal" style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, marginBottom: 7, padding: '7px 9px', borderRadius: 14, background: `color-mix(in srgb, ${t.panel} 76%, transparent)`, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: `1px solid ${t.border}`, boxShadow: '0 8px 24px rgba(0,0,0,0.16)', pointerEvents: 'auto' }}>
+          <div className={`profile-picker-reveal${closingCharList ? ' is-closing' : ''}`} style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, marginBottom: 7, padding: '7px 9px', borderRadius: 14, background: `color-mix(in srgb, ${t.panel} 76%, transparent)`, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: `1px solid ${t.border}`, boxShadow: '0 8px 24px rgba(0,0,0,0.16)', pointerEvents: closingCharList ? 'none' : 'auto' }}>
             <span style={{ fontSize: 10, color: t.subText, flexShrink: 0 }}>나</span>
             <div className="character-strip" style={{ display: 'flex', gap: 5, flex: 1, minWidth: 0, flexWrap: 'nowrap', overflowX: 'auto', overflowY: 'hidden', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', touchAction: 'pan-x', paddingBottom: 2 }}>
               {myChars.map(c => (
@@ -1775,12 +1819,12 @@ export default function Room() {
           </button>
         )}
         {showRoleplayMenu && (
-          <div style={{ display: 'grid', gap: 6, marginBottom: 7, padding: 8, borderRadius: 14, background: `color-mix(in srgb, ${t.panel} 92%, transparent)`, backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)', border: `1px solid ${t.border}`, pointerEvents: 'auto' }}>
+          <div className={`roleplay-tool-menu${closingRoleplayMenu ? ' is-closing' : ''}`} style={{ display: 'grid', gap: 6, marginBottom: 7, padding: 8, borderRadius: 14, background: `color-mix(in srgb, ${t.panel} 92%, transparent)`, backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)', border: `1px solid ${t.border}`, pointerEvents: closingRoleplayMenu ? 'none' : 'auto' }}>
             <button
               onMouseDown={event => event.preventDefault()}
               onClick={() => {
                 setMode(isNarrActive ? 'chat' : 'narration')
-                setShowRoleplayMenu(false)
+                closeRoleplayMenu()
                 inputRef.current?.focus()
               }}
               style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 11px', borderRadius: 10, border: `1px solid ${isNarrActive ? t.point : t.border}`, background: isNarrActive ? `${t.point}22` : 'none', color: isNarrActive ? t.point : t.theirText }}>
@@ -1809,7 +1853,7 @@ export default function Room() {
             <button
               onMouseDown={event => event.preventDefault()}
               onClick={() => {
-                setShowRoleplayMenu(false)
+                closeRoleplayMenu()
                 setShowCommunication(true)
               }}
               style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 11px', borderRadius: 10, border: `1px solid ${t.border}`, background: 'none', color: t.theirText }}>
@@ -1854,7 +1898,7 @@ export default function Room() {
               style={{ flex: 1, minWidth: 0, height: 32, minHeight: 32, maxHeight: 32, overflowY: 'auto', background: 'transparent', border: 'none', borderRadius: 0, padding: '5px 6px', color: isNarrActive ? t.narrColor : t.inputText, fontSize: 'calc(14px * var(--idea-font-scale, 1))', outline: 'none', resize: 'none', lineHeight: 1.55, fontStyle: isNarrActive ? 'italic' : 'normal' }}
             />
             {myChars.length > 0 && (
-              <button onMouseDown={e => e.preventDefault()} onClick={() => setShowRoleplayMenu(value => !value)} aria-label="역극 편의기능 메뉴" style={{ width: 32, height: 32, flexShrink: 0, padding: 0, borderRadius: '50%', cursor: 'pointer', border: `1px solid ${showRoleplayMenu || isNarrActive ? t.point : 'transparent'}`, background: showRoleplayMenu || isNarrActive ? `${t.point}2f` : `${t.border}66`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <button onMouseDown={e => e.preventDefault()} onClick={() => { if (showRoleplayMenu) closeRoleplayMenu(); else openRoleplayMenu() }} aria-label="역극 편의기능 메뉴" style={{ width: 32, height: 32, flexShrink: 0, padding: 0, borderRadius: '50%', cursor: 'pointer', border: `1px solid ${showRoleplayMenu || isNarrActive ? t.point : 'transparent'}`, background: showRoleplayMenu || isNarrActive ? `${t.point}2f` : `${t.border}66`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <Sparkles size={16} color={showRoleplayMenu || isNarrActive ? t.narrColor : t.subText} />
               </button>
             )}
