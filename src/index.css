@@ -354,3 +354,16 @@ button:disabled {
         animation: none;
     }
 }
+/* A continuous-corner superellipse used by character and room artwork. */
+.squircle-media {
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpath fill='black' d='M50 0C78 0 89 1 96 8C100 12 100 22 100 50C100 78 99 89 92 96C88 100 78 100 50 100C22 100 11 99 4 92C0 88 0 78 0 50C0 22 1 11 8 4C12 0 22 0 50 0Z'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpath fill='black' d='M50 0C78 0 89 1 96 8C100 12 100 22 100 50C100 78 99 89 92 96C88 100 78 100 50 100C22 100 11 99 4 92C0 88 0 78 0 50C0 22 1 11 8 4C12 0 22 0 50 0Z'/%3E%3C/svg%3E");
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+}
+
+div:has(> img.squircle-media) {
+  background-color: transparent !important;
+}

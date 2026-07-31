@@ -1493,7 +1493,7 @@ export default function Room() {
                 <div style={{ marginTop: 10 }}>
                   <div style={{ fontSize: 12, color: t.subText, marginBottom: 6 }}>대표 이미지</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <div style={{ width: 53, height: 53, borderRadius: 15, background: t.bg, border: `0.5px solid ${t.border}`, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, color: t.subText, flexShrink: 0 }}>{room?.cover_image ? <img src={room.cover_image} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '✦'}</div>
+                    <div className="squircle-media" style={{ width: 53, height: 53, background: t.bg, border: `0.5px solid ${t.border}`, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, color: t.subText, flexShrink: 0 }}>{room?.cover_image ? <img src={room.cover_image} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '✦'}</div>
                     <label style={{ flex: 1, background: t.bg, border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '5px 12px', color: t.subText, fontSize: 12, cursor: 'pointer', textAlign: 'center' }}>
                       이미지 선택
                       <input
@@ -1802,7 +1802,7 @@ export default function Room() {
                 style={{ position: 'relative', display: 'flex', flexDirection: isMine ? 'row-reverse' : 'row', alignItems: 'flex-start', gap: 6, paddingTop: timelineMarkerHeight, touchAction: 'pan-y', ...ownMessageLongPressStyle }}>
                 {timelineMarkers}
                 <div style={{ flexShrink: 0, width: 43, height: showMessageIdentity ? 43 : 0 }}>
-                  {showMessageIdentity && <div style={{ width: 43, height: 43, borderRadius: 13, overflow: 'hidden' }}><img src={talkingAvatarUrl(msg)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>}
+                  {showMessageIdentity && <div style={{ width: 43, height: 43, overflow: 'hidden' }}><img className="squircle-media" src={talkingAvatarUrl(msg)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>}
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMine ? 'flex-end' : 'flex-start', maxWidth: '76%' }}>
                   {showMessageIdentity && char?.name && <div style={{ marginBottom: 4, color: t.subText, fontSize: 11 }}>{char.name}</div>}
@@ -1852,7 +1852,7 @@ export default function Room() {
                 style={{ position: 'relative', display: 'flex', flexDirection: isMine ? 'row-reverse' : 'row', alignItems: 'flex-start', gap: 6, paddingTop: timelineMarkerHeight, touchAction: 'pan-y', ...ownMessageLongPressStyle }}>
                 {timelineMarkers}
                 <div style={{ flexShrink: 0, width: 43, height: showMessageIdentity ? 43 : 0 }}>
-                  {showMessageIdentity && <div role="button" tabIndex={0} aria-label={`${char?.name || '프로필'} 사진 크게 보기`} onPointerDown={event => event.stopPropagation()} onClick={() => setProfilePreview({ url: char?.image_url || DEFAULT_AVATAR, name: char?.name })} onKeyDown={event => (event.key === 'Enter' || event.key === ' ') && setProfilePreview({ url: char?.image_url || DEFAULT_AVATAR, name: char?.name })} style={{ width: 43, height: 43, borderRadius: 13, background: char?.color || t.border, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 500, color: char?.text_color || t.subText, cursor: 'zoom-in' }}><img src={talkingAvatarUrl(msg)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>}
+                  {showMessageIdentity && <div role="button" tabIndex={0} aria-label={`${char?.name || '프로필'} 사진 크게 보기`} onPointerDown={event => event.stopPropagation()} onClick={() => setProfilePreview({ url: char?.image_url || DEFAULT_AVATAR, name: char?.name })} onKeyDown={event => (event.key === 'Enter' || event.key === ' ') && setProfilePreview({ url: char?.image_url || DEFAULT_AVATAR, name: char?.name })} style={{ width: 43, height: 43, background: 'transparent', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 500, color: char?.text_color || t.subText, cursor: 'zoom-in' }}><img className="squircle-media" src={talkingAvatarUrl(msg)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>}
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMine ? 'flex-end' : 'flex-start', maxWidth: '72%' }}>
                   {showMessageIdentity && char?.name && <div style={{ maxWidth: '100%', marginBottom: 4, color: t.subText, fontSize: 11, lineHeight: 1.35, overflowWrap: 'anywhere', textAlign: isMine ? 'right' : 'left' }}>{char.name}</div>}
@@ -1884,7 +1884,7 @@ export default function Room() {
               style={{ position: 'relative', display: 'flex', flexDirection: isMine ? 'row-reverse' : 'row', alignItems: 'flex-start', gap: 6, paddingTop: timelineMarkerHeight, touchAction: 'pan-y', ...ownMessageLongPressStyle }}>
               {timelineMarkers}
               <div style={{ flexShrink: 0, width: 43, height: showMessageIdentity ? 43 : 0 }}>
-                {showMessageIdentity && <div role="button" tabIndex={0} aria-label={`${char?.name || '프로필'} 사진 크게 보기`} onPointerDown={event => event.stopPropagation()} onClick={() => setProfilePreview({ url: char?.image_url || DEFAULT_AVATAR, name: char?.name })} onKeyDown={event => (event.key === 'Enter' || event.key === ' ') && setProfilePreview({ url: char?.image_url || DEFAULT_AVATAR, name: char?.name })} style={{ width: 43, height: 43, borderRadius: 13, background: char?.color || t.border, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 500, color: char?.text_color || t.subText, cursor: 'zoom-in' }}><img src={talkingAvatarUrl(msg)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>}
+                {showMessageIdentity && <div role="button" tabIndex={0} aria-label={`${char?.name || '프로필'} 사진 크게 보기`} onPointerDown={event => event.stopPropagation()} onClick={() => setProfilePreview({ url: char?.image_url || DEFAULT_AVATAR, name: char?.name })} onKeyDown={event => (event.key === 'Enter' || event.key === ' ') && setProfilePreview({ url: char?.image_url || DEFAULT_AVATAR, name: char?.name })} style={{ width: 43, height: 43, background: 'transparent', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 500, color: char?.text_color || t.subText, cursor: 'zoom-in' }}><img className="squircle-media" src={talkingAvatarUrl(msg)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>}
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMine ? 'flex-end' : 'flex-start', maxWidth: '72%' }}>
                 {showMessageIdentity && char?.name && <div style={{ maxWidth: '100%', marginBottom: 4, color: t.subText, fontSize: 11, lineHeight: 1.35, overflowWrap: 'anywhere', textAlign: isMine ? 'right' : 'left' }}>{char.name}</div>}
@@ -2006,7 +2006,7 @@ export default function Room() {
                     await supabase.from('room_members').update({ last_char_id: c.id }).eq('room_id', roomId).eq('user_id', user.id)
                   }}
                   style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, padding: '3px 8px 3px 4px', borderRadius: 20, border: activeChar?.id === c.id && mode === 'chat' ? `1.5px solid ${c.color || t.point}` : `1px solid ${t.border}`, background: activeChar?.id === c.id && mode === 'chat' ? c.color + '22' : 'none', cursor: 'pointer' }}>
-                  <div style={{ width: 22, height: 22, borderRadius: 7, background: c.color || t.point, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, color: c.text_color || '#fff', overflow: 'hidden', flexShrink: 0 }}><img src={c.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>
+                  <div style={{ width: 22, height: 22, background: c.color || t.point, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, color: c.text_color || '#fff', overflow: 'hidden', flexShrink: 0 }}><img className="squircle-media" src={c.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>
                   <span style={{ fontSize: 11, color: activeChar?.id === c.id && mode === 'chat' ? t.theirText : t.subText }}>{c.name}</span>
                 </button>
               ))}

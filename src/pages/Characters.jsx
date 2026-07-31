@@ -482,7 +482,7 @@ export default function Characters() {
                     <Check size={15} color="#fff" />
                   </button>
                   <div role="button" tabIndex={0} aria-label={`${character.name} 프로필 사진 크게 보기`} onClick={() => setProfilePreview({ url: character.image_url || DEFAULT_AVATAR, name: character.name })} onKeyDown={event => (event.key === 'Enter' || event.key === ' ') && setProfilePreview({ url: character.image_url || DEFAULT_AVATAR, name: character.name })} style={{ width: 43, height: 43, borderRadius: 12, background: character.color, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', color: character.text_color, flexShrink: 0, cursor: 'zoom-in' }}>
-                    <img src={character.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <img className="squircle-media" src={character.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   </div>
                   <div style={{ flex: 1, color: t.theirText, fontSize: 13 }}>{character.name}</div>
                   </div>}
@@ -499,7 +499,7 @@ export default function Characters() {
               <button key={character.id} onClick={() => toggleRoomCharacter(character.id)} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', background: t.panel, border: `1px solid ${t.border}`, borderRadius: 11, padding: '10px 11px', cursor: 'pointer', textAlign: 'left' }}>
                 <div style={{ width: 24, height: 24, borderRadius: 7, border: `1px solid ${t.border}`, flexShrink: 0 }} />
                 <div role="button" tabIndex={0} aria-label={`${character.name} 프로필 사진 크게 보기`} onClick={event => { event.stopPropagation(); setProfilePreview({ url: character.image_url || DEFAULT_AVATAR, name: character.name }) }} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); setProfilePreview({ url: character.image_url || DEFAULT_AVATAR, name: character.name }) } }} style={{ width: 43, height: 43, borderRadius: 12, background: character.color, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', color: character.text_color, flexShrink: 0, cursor: 'zoom-in' }}>
-                  <img src={character.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <img className="squircle-media" src={character.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 </div>
                 <div style={{ color: t.theirText, fontSize: 13 }}>{character.name}</div>
               </button>
@@ -606,7 +606,7 @@ export default function Characters() {
               <div style={{ fontSize: 13, color: t.subText, marginBottom: 10 }}>새 캐릭터</div>
               <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
                 <label style={{ cursor: 'pointer' }}>
-                  <div style={{ width: 86, height: 86, borderRadius: 22, background: imagePreview ? 'transparent' : t.bg, border: `0.5px dashed ${t.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>{imagePreview ? <img src={imagePreview} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 24, color: t.border }}>+</span>}</div>
+                  <div className="squircle-media" style={{ width: 86, height: 86, background: imagePreview ? 'transparent' : t.bg, border: `0.5px dashed ${t.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>{imagePreview ? <img src={imagePreview} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 24, color: t.border }}>+</span>}</div>
                   <div style={{ fontSize: 10, color: t.subText, textAlign: 'center', marginTop: 4 }}>프로필 이미지</div>
                   <input type="file" accept="image/*" onChange={handleImageChange} style={{ display: 'none' }} />
                 </label>
@@ -665,7 +665,7 @@ export default function Characters() {
                   <div style={{ transformOrigin: 'top', animation: 'character-card-expand 240ms cubic-bezier(0.2, 0.8, 0.2, 1)' }}>
                     <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
                       <label style={{ cursor: 'pointer' }}>
-                        <div style={{ width: 86, height: 86, borderRadius: 22, background: editImagePreview ? 'transparent' : t.bg, border: `0.5px dashed ${t.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>{editImagePreview ? <img src={editImagePreview} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 24, color: t.border }}>+</span>}</div>
+                        <div className="squircle-media" style={{ width: 86, height: 86, background: editImagePreview ? 'transparent' : t.bg, border: `0.5px dashed ${t.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>{editImagePreview ? <img src={editImagePreview} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 24, color: t.border }}>+</span>}</div>
                         <div style={{ fontSize: 10, color: t.subText, textAlign: 'center', marginTop: 4 }}>프로필 이미지</div>
                         <input type="file" accept="image/*" onChange={handleEditImageChange} style={{ display: 'none' }} />
                       </label>
@@ -683,7 +683,7 @@ export default function Characters() {
                         </button>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 9 }}>
-                        <div style={{ width: 62, height: 62, flexShrink: 0, overflow: 'hidden', borderRadius: 18, background: t.panel, border: `0.5px solid ${t.border}` }}>
+                        <div className="squircle-media" style={{ width: 62, height: 62, flexShrink: 0, overflow: 'hidden', background: t.panel, border: `0.5px solid ${t.border}` }}>
                           <img src={talkingPreviewIndex === 0 ? editImagePreview || DEFAULT_AVATAR : talkingFrames[talkingPreviewIndex - 1]?.image_url || editImagePreview || DEFAULT_AVATAR} alt="말하기 애니메이션 미리보기" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         </div>
                         <div style={{ flex: 1, color: t.subText, fontSize: 10, lineHeight: 1.5 }}>기본 프로필과 등록된 프레임을 번갈아 재생합니다. 얼굴 위치와 이미지 크기를 동일하게 맞추면 자연스러워요.</div>
@@ -723,7 +723,7 @@ export default function Characters() {
                     <button {...listeners} disabled={alphabeticalView} aria-label={`${c.name} 순서 이동`} style={{ display: 'flex', background: 'none', border: 0, padding: 1, cursor: alphabeticalView ? 'default' : 'grab', touchAction: 'none', opacity: alphabeticalView ? 0.25 : 0.65 }}>
                       <GripVertical size={17} color={t.subText} />
                     </button>
-                    <div role="button" tabIndex={0} aria-label={`${c.name} 프로필 사진 크게 보기`} onClick={() => setProfilePreview({ url: c.image_url || DEFAULT_AVATAR, name: c.name })} onKeyDown={event => (event.key === 'Enter' || event.key === ' ') && setProfilePreview({ url: c.image_url || DEFAULT_AVATAR, name: c.name })} style={{ width: 53, height: 53, borderRadius: 15, background: c.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 500, color: c.text_color, flexShrink: 0, overflow: 'hidden', cursor: 'zoom-in' }}><img src={c.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>
+                    <div className="squircle-media" role="button" tabIndex={0} aria-label={`${c.name} 프로필 사진 크게 보기`} onClick={() => setProfilePreview({ url: c.image_url || DEFAULT_AVATAR, name: c.name })} onKeyDown={event => (event.key === 'Enter' || event.key === ' ') && setProfilePreview({ url: c.image_url || DEFAULT_AVATAR, name: c.name })} style={{ width: 53, height: 53, background: c.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 500, color: c.text_color, flexShrink: 0, overflow: 'hidden', cursor: 'zoom-in' }}><img src={c.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>
                     <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => startEdit(c)}>
                       <div style={{ fontSize: 14, fontWeight: 500, color: t.theirText }}>{c.name}</div>
                       {c.description && <div style={{ fontSize: 11, color: t.subText, marginTop: 2 }}>{c.description}</div>}
@@ -746,7 +746,7 @@ export default function Characters() {
               {archivedChars.length === 0 && <div style={{ textAlign: 'center', color: t.subText, fontSize: 12, opacity: 0.5 }}>보관된 캐릭터가 없어요</div>}
               {archivedChars.map(c => (
                 <div key={c.id} style={{ background: t.bg, borderRadius: 12, padding: '12px 15px', display: 'flex', alignItems: 'center', gap: 12, border: `0.5px solid ${t.border}`, marginBottom: 8, opacity: 0.6 }}>
-                  <div role="button" tabIndex={0} aria-label={`${c.name} 프로필 사진 크게 보기`} onClick={() => setProfilePreview({ url: c.image_url || DEFAULT_AVATAR, name: c.name })} onKeyDown={event => (event.key === 'Enter' || event.key === ' ') && setProfilePreview({ url: c.image_url || DEFAULT_AVATAR, name: c.name })} style={{ width: 48, height: 48, borderRadius: 14, background: c.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 500, color: c.text_color, flexShrink: 0, overflow: 'hidden', cursor: 'zoom-in' }}><img src={c.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>
+                  <div className="squircle-media" role="button" tabIndex={0} aria-label={`${c.name} 프로필 사진 크게 보기`} onClick={() => setProfilePreview({ url: c.image_url || DEFAULT_AVATAR, name: c.name })} onKeyDown={event => (event.key === 'Enter' || event.key === ' ') && setProfilePreview({ url: c.image_url || DEFAULT_AVATAR, name: c.name })} style={{ width: 48, height: 48, background: c.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 500, color: c.text_color, flexShrink: 0, overflow: 'hidden', cursor: 'zoom-in' }}><img src={c.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 13, fontWeight: 500, color: t.theirText }}>{c.name}</div>
                     {c.description && <div style={{ fontSize: 11, color: t.subText, marginTop: 2 }}>{c.description}</div>}

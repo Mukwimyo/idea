@@ -10,7 +10,7 @@ export default function EntryCharacterPicker({ open, roomName, characters, theme
         <div style={{ display: 'grid', gap: 7 }}>
           {characters.map(character => (
             <button key={character.id} disabled={loading} onClick={() => onSelect(character)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '9px 10px', borderRadius: 12, border: `1px solid ${theme.border}`, background: theme.bg, color: theme.theirText, textAlign: 'left', opacity: loading ? 0.55 : 1 }}>
-              <img src={character.image_url || DEFAULT_AVATAR} alt="" style={{ width: 46, height: 46, flexShrink: 0, borderRadius: 13, objectFit: 'cover' }} />
+              <img className="squircle-media" src={character.image_url || DEFAULT_AVATAR} alt="" style={{ width: 46, height: 46, flexShrink: 0, objectFit: 'cover' }} />
               <div style={{ minWidth: 0, flex: 1 }}>
                 <div style={{ fontSize: 13, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{character.name}</div>
                 {character.description && <div style={{ marginTop: 2, color: theme.subText, fontSize: 10, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{character.description}</div>}

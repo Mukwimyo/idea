@@ -506,7 +506,7 @@ export default function RoomList() {
                 animationDelay: playInitialRoomAnimation ? `${Math.min(roomIndex, 10) * 70}ms` : undefined,
               }}>
               {reordering && <button {...listeners} onClick={event => event.stopPropagation()} aria-label={`${room.name} 순서 이동`} style={{ border: 0, background: 'none', padding: 2, display: 'flex', cursor: 'grab', touchAction: 'none' }}><GripVertical size={18} color={t.subText} /></button>}
-              <div style={{ width: 48, height: 48, borderRadius: 14, background: t.point, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, color: t.bg, flexShrink: 0, overflow: 'hidden' }}>{room.cover_image ? <img src={room.cover_image} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '✦'}</div>
+              <div className="squircle-media" style={{ width: 48, height: 48, background: t.point, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, color: t.bg, flexShrink: 0, overflow: 'hidden' }}>{room.cover_image ? <img src={room.cover_image} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '✦'}</div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 14, fontWeight: 500, color: t.theirText }}>{room.name}</div>
                 <div
