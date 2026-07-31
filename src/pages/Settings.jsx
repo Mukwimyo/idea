@@ -135,6 +135,7 @@ export default function Settings() {
   const [myThemeId, setMyThemeId] = useState('dark-purple')
   const [saving, setSaving] = useState(false)
   const [myFontId, setMyFontId] = useState('sans')
+  const [fontScale, setFontScale] = useState(() => Number(localStorage.getItem('idea-font-scale') || 1))
   const [pushEnabled, setPushEnabled] = useState(false)
   const [showEntering, setShowEntering] = useState(true)
   const [showMessageTime, setShowMessageTime] = useState(true)
@@ -149,11 +150,17 @@ export default function Settings() {
       data: { user },
     } = await supabase.auth.getUser()
     const [{ data }, { data: messageTimeSetting }] = await Promise.all([
-      supabase.from('profiles').select('theme_id, font_id, show_entering').eq('id', user.id).single(),
+      supabase.from('profiles').select('theme_id, font_id, font_scale, show_entering').eq('id', user.id).single(),
       supabase.from('profiles').select('show_message_time').eq('id', user.id).maybeSingle(),
     ])
     if (data?.theme_id) setMyThemeId(data.theme_id)
     if (data?.font_id) setMyFontId(data.font_id)
+    if (data?.font_scale) {
+      const scale = Number(data.font_scale)
+      setFontScale(scale)
+      localStorage.setItem('idea-font-scale', String(scale))
+      document.documentElement.style.setProperty('--idea-font-scale', String(scale))
+    }
     if (data?.show_entering !== undefined) setShowEntering(data.show_entering)
     if (messageTimeSetting?.show_message_time !== undefined) setShowMessageTime(messageTimeSetting.show_message_time)
 
@@ -183,6 +190,17 @@ export default function Settings() {
     } = await supabase.auth.getUser()
     await supabase.from('profiles').update({ font_id: id }).eq('id', user.id)
     document.body.style.fontFamily = FONTS.find(f => f.id === id)?.family || 'sans-serif'
+  }
+
+  const saveFontScale = async value => {
+    const scale = Number(value)
+    setFontScale(scale)
+    localStorage.setItem('idea-font-scale', String(scale))
+    document.documentElement.style.setProperty('--idea-font-scale', String(scale))
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    await supabase.from('profiles').update({ font_scale: scale }).eq('id', user.id)
   }
 
   const togglePush = async () => {
@@ -220,8 +238,13 @@ export default function Settings() {
 
   return (
     <div
+      className="settings-page-drawer"
       style={{
-        minHeight: '100vh',
+        position: 'fixed',
+        inset: 0,
+        zIndex: 100,
+        minHeight: '100dvh',
+        overflowY: 'auto',
         background: t.bg,
         transition: 'background 0.3s',
       }}>
@@ -408,6 +431,29 @@ export default function Settings() {
                 </span>
               </div>
             ))}
+          </div>
+          <div style={{ marginTop: 12, padding: '12px 14px', borderRadius: 12, border: `0.5px solid ${t.border}`, background: t.panel }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 10 }}>
+              <div style={{ fontSize: 13, color: t.theirText }}>채팅 글자 크기</div>
+              <div style={{ fontSize: 12, color: t.subText }}>{Math.round(fontScale * 100)}%</div>
+            </div>
+            <input
+              type="range"
+              min="0.8"
+              max="1.3"
+              step="0.05"
+              value={fontScale}
+              onChange={event => {
+                const scale = Number(event.target.value)
+                setFontScale(scale)
+                localStorage.setItem('idea-font-scale', String(scale))
+                document.documentElement.style.setProperty('--idea-font-scale', String(scale))
+              }}
+              onPointerUp={event => saveFontScale(event.currentTarget.value)}
+              onKeyUp={event => saveFontScale(event.currentTarget.value)}
+              aria-label="채팅 글자 크기"
+              style={{ width: '100%', accentColor: t.point }}
+            />
           </div>
         </div>
 

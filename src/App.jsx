@@ -41,13 +41,16 @@ export default function App() {
       if (!user) return
       supabase
         .from('profiles')
-        .select('font_id')
+        .select('font_id, font_scale')
         .eq('id', user.id)
         .single()
         .then(({ data }) => {
           if (data?.font_id && FONT_MAP[data.font_id]) {
             document.body.style.fontFamily = FONT_MAP[data.font_id]
           }
+          const fontScale = Number(data?.font_scale || localStorage.getItem('idea-font-scale') || 1)
+          document.documentElement.style.setProperty('--idea-font-scale', String(fontScale))
+          localStorage.setItem('idea-font-scale', String(fontScale))
         })
     })
 

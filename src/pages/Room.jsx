@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase, uploadFile, validateImageFile } from '../lib/supabase'
 import { THEMES, getTheme } from '../lib/themes'
-import { ChevronLeft, Link2, Settings, Search, Calendar, Paperclip, ArrowUp, Eye, ArrowDown, ChevronDown, ChevronUp, Quote, Download, RotateCcw, AlertCircle, Sparkles, Minus, Phone, MessageSquare } from 'lucide-react'
+import { ChevronLeft, Settings, Search, Paperclip, ArrowUp, Eye, ArrowDown, ChevronDown, ChevronUp, Quote, RotateCcw, AlertCircle, Sparkles, Minus, Phone, MessageSquare } from 'lucide-react'
 import ProfileImageModal from '../components/ProfileImageModal'
 import CommunicationSessions from '../components/CommunicationSessions'
 import CommunicationRecord from '../components/CommunicationRecord'
@@ -528,7 +528,6 @@ export default function Room() {
     if (!input.trim()) return
     const content = input.trim().replace(/\(([^)]*$)/g, '($1)')
     setInput('')
-    if (inputRef.current) inputRef.current.style.height = 'auto'
 
     // 전송 시 타이핑 상태 즉시 해제
     clearTimeout(typingTimerRef.current)
@@ -863,27 +862,19 @@ export default function Room() {
       )}
 
       {/* 헤더 */}
-      <div style={{ background: t.panel, borderBottom: `0.5px solid ${t.border}`, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 8, position: 'sticky', top: 0, zIndex: 10 }}>
+      <div style={{ background: `color-mix(in srgb, ${t.panel} 78%, transparent)`, backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)', borderBottom: `0.5px solid ${t.border}`, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 8, position: 'sticky', top: 0, zIndex: 10 }}>
+        <div aria-hidden="true" style={{ position: 'absolute', top: '100%', left: 0, right: 0, height: 28, pointerEvents: 'none', background: `linear-gradient(to bottom, color-mix(in srgb, ${t.panel} 42%, transparent), transparent)` }} />
         <button onClick={() => navigate('/')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 2px', display: 'flex', alignItems: 'center' }}>
           <ChevronLeft size={22} color={t.subText} />
         </button>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 15, fontWeight: 600, color: t.theirText, lineHeight: 1.3 }}>{room?.name}</div>
         </div>
-        <button {...iconBtn(() => openPanel(showInvite ? null : 'invite'), null, showInvite)}>
-          <Link2 size={15} color={showInvite ? t.point : t.subText} />
-        </button>
-        <button {...iconBtn(() => openPanel(showTheme ? null : 'theme'), null, showTheme)}>
-          <Settings size={15} color={showTheme ? t.point : t.subText} />
-        </button>
         <button {...iconBtn(() => openPanel(showSearch ? null : 'search'), null, showSearch)}>
           <Search size={15} color={showSearch ? t.point : t.subText} />
         </button>
-        <button {...iconBtn(() => openPanel(showCalendar ? null : 'calendar'), null, showCalendar)}>
-          <Calendar size={15} color={showCalendar ? t.point : t.subText} />
-        </button>
-        <button {...iconBtn(exportChat, null, false)} aria-label="채팅 내보내기" title="채팅 내보내기">
-          <Download size={15} color={t.subText} />
+        <button {...iconBtn(() => openPanel(showTheme ? null : 'theme'), null, showTheme)}>
+          <Settings size={15} color={showTheme ? t.point : t.subText} />
         </button>
       </div>
 
@@ -900,8 +891,29 @@ export default function Room() {
 
       {/* 테마 패널 */}
       {showTheme && (
-        <div className="top-panel-backdrop" style={{ position: 'fixed', top: 49, left: 0, right: 0, bottom: 0, zIndex: 50, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }} onClick={() => setShowTheme(false)}>
-          <div className="top-panel-sheet" style={{ background: t.panel, padding: '12px 14px', borderBottom: `0.5px solid ${t.border}`, maxWidth: 480, margin: '0 auto', width: '100%', overflowY: 'auto', maxHeight: '80vh' }} onClick={e => e.stopPropagation()}>
+        <div className="top-panel-backdrop" style={{ position: 'fixed', inset: 0, zIndex: 80, display: 'flex', justifyContent: 'flex-end', background: 'rgba(0,0,0,0.24)' }} onClick={() => setShowTheme(false)}>
+          <div className="top-panel-sheet settings-page-drawer" style={{ background: t.panel, padding: '14px', borderLeft: `0.5px solid ${t.border}`, maxWidth: 480, marginLeft: 'auto', width: '100%', height: '100%', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 14 }}>
+              <div style={{ flex: 1, fontSize: 15, color: t.theirText }}>대화방 설정</div>
+              <button onClick={() => setShowTheme(false)} style={{ border: `1px solid ${t.border}`, borderRadius: 9, background: 'none', color: t.subText, padding: '6px 10px' }}>닫기</button>
+            </div>
+            <div style={{ marginBottom: 14, padding: 10, borderRadius: 10, background: t.bg, border: `1px solid ${t.border}` }}>
+              <div style={{ fontSize: 10, color: t.subText }}>초대 코드</div>
+              <div style={{ marginTop: 3, color: t.point, letterSpacing: 2 }}>{room?.invite_code}</div>
+            </div>
+            <div style={{ display: 'flex', gap: 7, marginBottom: 14 }}>
+              <button
+                onClick={() => {
+                  setShowTheme(false)
+                  setShowCalendar(true)
+                }}
+                style={{ flex: 1, padding: '8px 10px', borderRadius: 9, border: `1px solid ${t.border}`, background: 'none', color: t.theirText }}>
+                날짜로 이동
+              </button>
+              <button onClick={exportChat} style={{ flex: 1, padding: '8px 10px', borderRadius: 9, border: `1px solid ${t.border}`, background: 'none', color: t.theirText }}>
+                채팅 내보내기
+              </button>
+            </div>
             <div style={{ fontSize: 11, color: t.subText, marginBottom: 10 }}>채팅방 테마 설정</div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, padding: '8px 10px', background: t.bg, borderRadius: 8, border: `0.5px solid ${t.border}` }}>
               <div>
@@ -1265,7 +1277,7 @@ export default function Room() {
                 ) : (
                   <div
                     data-message-bubble
-                    style={{ background: bubbleBg, color: bubbleColor, padding: '8px 12px', borderRadius: 13, fontSize: 14, lineHeight: 1.55, border: 'none', cursor: isMine ? 'pointer' : 'default' }}>
+                    style={{ background: bubbleBg, color: bubbleColor, padding: '8px 12px', borderRadius: 13, fontSize: 'calc(14px * var(--idea-font-scale, 1))', lineHeight: 1.55, border: 'none', cursor: isMine ? 'pointer' : 'default' }}>
                     {parseContent(msg.content, actColor, actionStyle)}
                     {msg.edited && <span style={{ fontSize: 9, opacity: 0.5, marginLeft: 4 }}>수정됨</span>}
                   </div>
@@ -1399,8 +1411,8 @@ export default function Room() {
             </button>
           </div>
         )}
-        <div style={{ display: 'flex', gap: 5, alignItems: 'flex-end', width: '100%', minHeight: 52, padding: 6, borderRadius: 26, background: `color-mix(in srgb, ${t.panel} 78%, transparent)`, backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)', border: `1px solid ${t.border}`, boxShadow: '0 10px 30px rgba(0,0,0,0.24)', pointerEvents: 'auto' }}>
-          <button onMouseDown={e => e.preventDefault()} onClick={() => fileInputRef.current?.click()} aria-label="이미지 업로드" style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: `${t.border}88`, cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center', width: '100%', height: 42, padding: 5, borderRadius: 22, background: `color-mix(in srgb, ${t.panel} 78%, transparent)`, backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)', border: `1px solid ${t.border}`, boxShadow: '0 10px 30px rgba(0,0,0,0.24)', pointerEvents: 'auto' }}>
+          <button onMouseDown={e => e.preventDefault()} onClick={() => fileInputRef.current?.click()} aria-label="이미지 업로드" style={{ width: 32, height: 32, borderRadius: '50%', border: 'none', background: `${t.border}88`, cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Paperclip size={16} color={t.subText} />
           </button>
           <input type="file" multiple accept="image/jpeg,image/png,image/webp,image/gif" ref={fileInputRef} onChange={e => sendImages(e.target.files)} style={{ display: 'none' }} />
@@ -1409,8 +1421,6 @@ export default function Room() {
               value={input}
               onChange={e => {
                 setInput(e.target.value)
-                e.target.style.height = 'auto'
-                e.target.style.height = Math.min(e.target.scrollHeight, 80) + 'px'
                 handleTyping(e)
               }}
               onKeyDown={e => {
@@ -1433,14 +1443,14 @@ export default function Room() {
               placeholder={isNarrActive ? '나레이션 입력...' : activeChar ? `${activeChar.name}${instrumentalParticle(activeChar.name)} 입력...` : '캐릭터를 먼저 추가해주세요'}
               enterKeyHint="enter"
               rows={1}
-              style={{ flex: 1, minWidth: 0, minHeight: 40, maxHeight: 80, background: 'transparent', border: 'none', borderRadius: 0, padding: '9px 7px', color: isNarrActive ? t.narrColor : t.inputText, fontSize: 14, outline: 'none', resize: 'none', lineHeight: 1.5, fontStyle: isNarrActive ? 'italic' : 'normal' }}
+              style={{ flex: 1, minWidth: 0, height: 32, minHeight: 32, maxHeight: 32, overflowY: 'auto', background: 'transparent', border: 'none', borderRadius: 0, padding: '5px 6px', color: isNarrActive ? t.narrColor : t.inputText, fontSize: 'calc(14px * var(--idea-font-scale, 1))', outline: 'none', resize: 'none', lineHeight: 1.55, fontStyle: isNarrActive ? 'italic' : 'normal' }}
             />
             {myChars.length > 0 && (
-              <button onMouseDown={e => e.preventDefault()} onClick={() => setShowRoleplayMenu(value => !value)} aria-label="역극 편의기능 메뉴" style={{ width: 40, height: 40, flexShrink: 0, padding: 0, borderRadius: '50%', cursor: 'pointer', border: `1px solid ${showRoleplayMenu || isNarrActive ? t.point : 'transparent'}`, background: showRoleplayMenu || isNarrActive ? `${t.point}2f` : `${t.border}66`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <button onMouseDown={e => e.preventDefault()} onClick={() => setShowRoleplayMenu(value => !value)} aria-label="역극 편의기능 메뉴" style={{ width: 32, height: 32, flexShrink: 0, padding: 0, borderRadius: '50%', cursor: 'pointer', border: `1px solid ${showRoleplayMenu || isNarrActive ? t.point : 'transparent'}`, background: showRoleplayMenu || isNarrActive ? `${t.point}2f` : `${t.border}66`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <Sparkles size={16} color={showRoleplayMenu || isNarrActive ? t.narrColor : t.subText} />
               </button>
             )}
-          <button onMouseDown={e => e.preventDefault()} onClick={sendMessage} aria-label="전송" style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: t.point, cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <button onMouseDown={e => e.preventDefault()} onClick={sendMessage} aria-label="전송" style={{ width: 32, height: 32, borderRadius: '50%', border: 'none', background: t.point, cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <ArrowUp size={18} color="#fff" strokeWidth={2.5} />
           </button>
         </div>
