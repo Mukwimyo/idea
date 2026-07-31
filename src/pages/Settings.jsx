@@ -139,6 +139,7 @@ export default function Settings() {
   const [pushEnabled, setPushEnabled] = useState(false)
   const [showEntering, setShowEntering] = useState(true)
   const [showMessageTime, setShowMessageTime] = useState(true)
+  const [showEditedLabel, setShowEditedLabel] = useState(true)
   const [pushLoading, setPushLoading] = useState(false)
   const [closing, setClosing] = useState(false)
 
@@ -150,9 +151,9 @@ export default function Settings() {
     const {
       data: { user },
     } = await supabase.auth.getUser()
-    const [{ data }, { data: messageTimeSetting }] = await Promise.all([
+    const [{ data }, { data: messageDisplaySetting }] = await Promise.all([
       supabase.from('profiles').select('theme_id, font_id, font_scale, show_entering').eq('id', user.id).single(),
-      supabase.from('profiles').select('show_message_time').eq('id', user.id).maybeSingle(),
+      supabase.from('profiles').select('show_message_time, show_edited_label').eq('id', user.id).maybeSingle(),
     ])
     if (data?.theme_id) setMyThemeId(data.theme_id)
     if (data?.font_id) setMyFontId(data.font_id)
@@ -163,7 +164,8 @@ export default function Settings() {
       document.documentElement.style.setProperty('--idea-font-scale', String(scale))
     }
     if (data?.show_entering !== undefined) setShowEntering(data.show_entering)
-    if (messageTimeSetting?.show_message_time !== undefined) setShowMessageTime(messageTimeSetting.show_message_time)
+    if (messageDisplaySetting?.show_message_time !== undefined) setShowMessageTime(messageDisplaySetting.show_message_time)
+    if (messageDisplaySetting?.show_edited_label !== undefined) setShowEditedLabel(messageDisplaySetting.show_edited_label)
 
     if ('serviceWorker' in navigator) {
       const registration = await navigator.serviceWorker.getRegistration('/idea/sw.js')
@@ -550,6 +552,30 @@ export default function Settings() {
               }}
               style={{ width: 40, height: 22, borderRadius: 11, cursor: 'pointer', transition: 'background 0.2s', background: showMessageTime ? t.point : t.border, position: 'relative', flexShrink: 0 }}>
               <div style={{ position: 'absolute', top: 3, left: showMessageTime ? 20 : 3, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
+            </div>
+          </div>
+          <div style={{ background: t.panel, border: `0.5px solid ${t.border}`, borderRadius: 12, padding: '12px 14px', marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div>
+              <div style={{ fontSize: 13, color: t.theirText }}>수정됨 표시</div>
+              <div style={{ fontSize: 10, color: t.subText, marginTop: 2 }}>편집한 메시지 옆의 수정 이력을 표시해요.</div>
+            </div>
+            <div
+              onClick={async () => {
+                const next = !showEditedLabel
+                setShowEditedLabel(next)
+                const {
+                  data: { user },
+                } = await supabase.auth.getUser()
+                await supabase.from('profiles').update({ show_edited_label: next }).eq('id', user.id)
+              }}
+              role="switch"
+              aria-checked={showEditedLabel}
+              tabIndex={0}
+              onKeyDown={event => {
+                if (event.key === 'Enter' || event.key === ' ') event.currentTarget.click()
+              }}
+              style={{ width: 40, height: 22, borderRadius: 11, cursor: 'pointer', transition: 'background 0.2s', background: showEditedLabel ? t.point : t.border, position: 'relative', flexShrink: 0 }}>
+              <div style={{ position: 'absolute', top: 3, left: showEditedLabel ? 20 : 3, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
             </div>
           </div>
         </div>

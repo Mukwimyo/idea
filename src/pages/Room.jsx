@@ -167,6 +167,7 @@ export default function Room() {
   const [showTypingIndicator, setShowTypingIndicator] = useState(true)
   const [showEntering, setShowEntering] = useState(true)
   const [showMessageTime, setShowMessageTime] = useState(true)
+  const [showEditedLabel, setShowEditedLabel] = useState(true)
   const [messageMenuId, setMessageMenuId] = useState(null)
   const [deletingMessageId, setDeletingMessageId] = useState(null)
   const [profilePreview, setProfilePreview] = useState(null)
@@ -277,13 +278,14 @@ export default function Room() {
       setShowTypingIndicator(roomData?.show_typing_indicator ?? true)
       setIsOwner(roomData?.created_by === user.id)
 
-      const [{ data: profile }, { data: messageTimeSetting }] = await Promise.all([
+      const [{ data: profile }, { data: messageDisplaySetting }] = await Promise.all([
         supabase.from('profiles').select('theme_id, last_char_id, show_entering').eq('id', user.id).single(),
-        supabase.from('profiles').select('show_message_time').eq('id', user.id).maybeSingle(),
+        supabase.from('profiles').select('show_message_time, show_edited_label').eq('id', user.id).maybeSingle(),
       ])
       const enteringEnabled = profile?.show_entering ?? true
       setShowEntering(enteringEnabled)
-      setShowMessageTime(messageTimeSetting?.show_message_time ?? true)
+      setShowMessageTime(messageDisplaySetting?.show_message_time ?? true)
+      setShowEditedLabel(messageDisplaySetting?.show_edited_label ?? true)
       if (!enteringEnabled) setShowSlot(false)
       const myId = profile?.theme_id || 'dark-purple'
       setMyThemeId(myId)
@@ -1459,14 +1461,13 @@ export default function Room() {
                   ))}
                 </div>
                 {editingId === msg.id ? (
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    <input value={editText} onChange={event => setEditText(event.target.value)} onKeyDown={event => event.key === 'Enter' && editMessage(msg.id)} style={{ background: t.bg, border: `0.5px solid ${t.point}`, borderRadius: 8, padding: '6px 10px', color: t.inputText, fontSize: 12, outline: 'none' }} />
-                    <button onClick={() => editMessage(msg.id)} style={{ background: t.point, border: 'none', borderRadius: 8, padding: '6px 10px', color: '#fff', fontSize: 11, cursor: 'pointer' }}>
-                      저장
-                    </button>
-                    <button onClick={() => setEditingId(null)} style={{ background: 'none', border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '6px 10px', color: t.subText, fontSize: 11, cursor: 'pointer' }}>
-                      취소
-                    </button>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
+                    <input value={editText} onChange={event => setEditText(event.target.value)} onKeyDown={event => event.key === 'Enter' && editMessage(msg.id)} style={{ minWidth: 210, background: t.bg, border: `0.5px solid ${t.point}`, borderRadius: 8, padding: '7px 10px', color: t.inputText, fontSize: 12, outline: 'none' }} />
+                    <div style={{ display: 'flex', alignItems: 'center', border: `1px solid ${t.border}`, borderRadius: 9, overflow: 'hidden', background: t.panel, boxShadow: '0 3px 10px rgba(0,0,0,0.2)' }}>
+                      <button onClick={() => editMessage(msg.id)} style={{ border: 0, background: 'none', color: t.theirText, padding: '7px 13px', fontSize: 11, cursor: 'pointer' }}>저장</button>
+                      <div style={{ width: 1, alignSelf: 'stretch', background: t.border }} />
+                      <button onClick={() => setEditingId(null)} style={{ border: 0, background: 'none', color: '#f87171', padding: '7px 13px', fontSize: 11, cursor: 'pointer' }}>취소</button>
+                    </div>
                   </div>
                 ) : (
                   msg.content.split('\n').map((line, i) => (
@@ -1585,21 +1586,20 @@ export default function Room() {
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMine ? 'flex-end' : 'flex-start', maxWidth: '72%' }}>
                 {showMessageIdentity && char?.name && <div style={{ maxWidth: '100%', marginBottom: 4, color: t.subText, fontSize: 11, lineHeight: 1.35, overflowWrap: 'anywhere', textAlign: isMine ? 'right' : 'left' }}>{char.name}</div>}
                 {editingId === msg.id ? (
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    <input value={editText} onChange={e => setEditText(e.target.value)} onKeyDown={e => e.key === 'Enter' && editMessage(msg.id)} style={{ background: t.bg, border: `0.5px solid ${t.point}`, borderRadius: 8, padding: '6px 10px', color: t.inputText, fontSize: 12, outline: 'none' }} />
-                    <button onClick={() => editMessage(msg.id)} style={{ background: t.point, border: 'none', borderRadius: 8, padding: '6px 10px', color: '#fff', fontSize: 11, cursor: 'pointer' }}>
-                      저장
-                    </button>
-                    <button onClick={() => setEditingId(null)} style={{ background: 'none', border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '6px 10px', color: t.subText, fontSize: 11, cursor: 'pointer' }}>
-                      취소
-                    </button>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMine ? 'flex-end' : 'flex-start', gap: 5 }}>
+                    <input value={editText} onChange={e => setEditText(e.target.value)} onKeyDown={e => e.key === 'Enter' && editMessage(msg.id)} style={{ width: 'min(62vw, 280px)', background: t.bg, border: `0.5px solid ${t.point}`, borderRadius: 8, padding: '7px 10px', color: t.inputText, fontSize: 12, outline: 'none', boxSizing: 'border-box' }} />
+                    <div style={{ display: 'flex', alignItems: 'center', border: `1px solid ${t.border}`, borderRadius: 9, overflow: 'hidden', background: t.panel, boxShadow: '0 3px 10px rgba(0,0,0,0.2)' }}>
+                      <button onClick={() => editMessage(msg.id)} style={{ border: 0, background: 'none', color: t.theirText, padding: '7px 13px', fontSize: 11, cursor: 'pointer' }}>저장</button>
+                      <div style={{ width: 1, alignSelf: 'stretch', background: t.border }} />
+                      <button onClick={() => setEditingId(null)} style={{ border: 0, background: 'none', color: '#f87171', padding: '7px 13px', fontSize: 11, cursor: 'pointer' }}>취소</button>
+                    </div>
                   </div>
                 ) : (
                   <div
                     data-message-bubble
                     style={{ background: bubbleBg, color: bubbleColor, padding: '8px 12px', borderRadius: 13, fontSize: 'calc(14px * var(--idea-font-scale, 1))', lineHeight: 1.55, border: 'none', cursor: isMine ? 'pointer' : 'default' }}>
                     {parseContent(msg.content, actColor, actionStyle)}
-                    {msg.edited && <span style={{ fontSize: 9, opacity: 0.5, marginLeft: 4 }}>수정됨</span>}
+                    {msg.edited && showEditedLabel && <span style={{ fontSize: 9, opacity: 0.5, marginLeft: 4 }}>수정됨</span>}
                   </div>
                 )}
                 {renderMessageActions(msg)}
