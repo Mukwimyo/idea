@@ -8,6 +8,7 @@ import CommunicationSessions from '../components/CommunicationSessions'
 import CommunicationRecord from '../components/CommunicationRecord'
 import Toast, { useToast } from '../components/Toast'
 import LoadingScreen from '../components/LoadingScreen'
+import EntryCharacterPicker from '../components/EntryCharacterPicker'
 
 const DEFAULT_AVATAR = `${import.meta.env.BASE_URL}default-avatar.png`
 
@@ -182,6 +183,9 @@ export default function Room() {
   const [showRoomInvitePicker, setShowRoomInvitePicker] = useState(false)
   const [invitableRooms, setInvitableRooms] = useState([])
   const [joinedRoomIds, setJoinedRoomIds] = useState([])
+  const [pendingInviteEntry, setPendingInviteEntry] = useState(null)
+  const [entryCharacters, setEntryCharacters] = useState([])
+  const [entryJoining, setEntryJoining] = useState(false)
   const [dividerText, setDividerText] = useState('')
   const [initialUnreadId, setInitialUnreadId] = useState(null)
   const [viewportHeight, setViewportHeight] = useState(() => window.visualViewport?.height || window.innerHeight)
@@ -817,6 +821,32 @@ export default function Room() {
     showToast(error ? '테마 설정을 저장하지 못했어요.' : '테마 설정이 저장됐어요.', error ? 'error' : 'success')
   }
 
+  const leaveRoom = async () => {
+    if (isOwner) {
+      showToast('방장은 대화방을 나갈 수 없어요.', 'error')
+      return
+    }
+    if (!confirm('이 대화방에서 나갈까요?')) return
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    const leavingCharacter = activeChar || myChars[0]
+    const leavingName = leavingCharacter?.name || '사용자'
+    await supabase.from('messages').insert({
+      room_id: roomId,
+      user_id: user.id,
+      character_id: leavingCharacter?.id || null,
+      type: 'member_left',
+      content: `${leavingName}님이 대화방에서 나갔어요.`,
+    })
+    const { error } = await supabase.from('room_members').delete().eq('room_id', roomId).eq('user_id', user.id)
+    if (error) {
+      showToast('대화방에서 나가지 못했어요.', 'error')
+      return
+    }
+    navigate('/')
+  }
+
   const sendImage = async file => {
     if (!file) return
     const validationError = validateImageFile(file)
@@ -967,24 +997,51 @@ export default function Room() {
       data: { user },
     } = await supabase.auth.getUser()
     const { data: existingMember } = await supabase.from('room_members').select('room_id').eq('room_id', invite.roomId).eq('user_id', user.id).maybeSingle()
-    if (!existingMember) {
-      const { count } = await supabase.from('room_members').select('*', { count: 'exact', head: true }).eq('user_id', user.id)
-      const { error } = await supabase.from('room_members').insert({ room_id: invite.roomId, user_id: user.id, sort_order: count || 0 })
-      if (error) {
-        showToast('방 초대를 수락하지 못했어요.', 'error')
-        return
-      }
-      const memberName = user.email?.split('@')[0] || '새 사용자'
-      await supabase.from('messages').insert({
-        room_id: invite.roomId,
-        user_id: user.id,
-        character_id: null,
-        type: 'member_joined',
-        content: `${memberName}님이 대화방에 들어왔어요.`,
-      })
-      setJoinedRoomIds(current => [...new Set([...current, invite.roomId])])
+    if (existingMember) {
+      navigate(`/room/${invite.roomId}`)
+      return
     }
-    navigate(`/room/${invite.roomId}`)
+    const { data: characters } = await supabase.from('characters').select('*').eq('user_id', user.id).eq('is_archived', false).order('sort_order').order('created_at')
+    setEntryCharacters(characters || [])
+    setPendingInviteEntry(invite)
+  }
+
+  const completeInvitedRoomEntry = async character => {
+    if (!pendingInviteEntry || !character) return
+    setEntryJoining(true)
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    const { count } = await supabase.from('room_members').select('*', { count: 'exact', head: true }).eq('user_id', user.id)
+    const { error } = await supabase.from('room_members').insert({
+      room_id: pendingInviteEntry.roomId,
+      user_id: user.id,
+      sort_order: count || 0,
+      last_char_id: character.id,
+    })
+    if (error) {
+      setEntryJoining(false)
+      showToast('방 초대를 수락하지 못했어요.', 'error')
+      return
+    }
+    await supabase.from('room_characters').upsert({
+      room_id: pendingInviteEntry.roomId,
+      user_id: user.id,
+      character_id: character.id,
+      sort_order: 0,
+    })
+    await supabase.from('messages').insert({
+      room_id: pendingInviteEntry.roomId,
+      user_id: user.id,
+      character_id: character.id,
+      type: 'member_joined',
+      content: `${character.name}님이 대화방에 들어왔어요.`,
+    })
+    const targetRoomId = pendingInviteEntry.roomId
+    setJoinedRoomIds(current => [...new Set([...current, targetRoomId])])
+    setEntryJoining(false)
+    setPendingInviteEntry(null)
+    navigate(`/room/${targetRoomId}`)
   }
 
   const sendImages = async fileList => {
@@ -1220,6 +1277,15 @@ export default function Room() {
         animation: !showEntering ? 'slide-in-right 0.3s ease' : 'none',
       }}>
       <Toast toast={toast} />
+      <EntryCharacterPicker
+        open={Boolean(pendingInviteEntry)}
+        roomName={pendingInviteEntry?.roomName}
+        characters={entryCharacters}
+        theme={t}
+        loading={entryJoining}
+        onSelect={completeInvitedRoomEntry}
+        onClose={() => !entryJoining && setPendingInviteEntry(null)}
+      />
       <ProfileImageModal profile={profilePreview} onClose={() => setProfilePreview(null)} />
       <CommunicationSessions roomId={roomId} userId={userId} myChars={myChars} theme={t} open={showCommunication} onClose={() => setShowCommunication(false)} />
       {showSlot && room && showEntering && (
@@ -1427,7 +1493,7 @@ export default function Room() {
                 <div style={{ marginTop: 10 }}>
                   <div style={{ fontSize: 12, color: t.subText, marginBottom: 6 }}>대표 이미지</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <div style={{ width: 44, height: 44, borderRadius: '50%', background: t.bg, border: `0.5px solid ${t.border}`, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, color: t.subText, flexShrink: 0 }}>{room?.cover_image ? <img src={room.cover_image} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '✦'}</div>
+                    <div style={{ width: 53, height: 53, borderRadius: 15, background: t.bg, border: `0.5px solid ${t.border}`, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, color: t.subText, flexShrink: 0 }}>{room?.cover_image ? <img src={room.cover_image} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '✦'}</div>
                     <label style={{ flex: 1, background: t.bg, border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '5px 12px', color: t.subText, fontSize: 12, cursor: 'pointer', textAlign: 'center' }}>
                       이미지 선택
                       <input
@@ -1506,6 +1572,12 @@ export default function Room() {
                 ))}
               </div>
             )}
+            <button
+              onClick={leaveRoom}
+              disabled={isOwner}
+              style={{ width: '100%', marginTop: 18, padding: '9px 12px', borderRadius: 10, border: `1px solid ${isOwner ? t.border : '#f87171'}`, background: 'none', color: isOwner ? t.subText : '#f87171', fontSize: 12, cursor: isOwner ? 'default' : 'pointer', opacity: isOwner ? 0.48 : 1 }}>
+              {isOwner ? '방장은 대화방을 나갈 수 없어요' : '대화방 나가기'}
+            </button>
           </div>
         </div>
       )}
@@ -1612,7 +1684,7 @@ export default function Room() {
               </div>
             )
 
-          if (msg.type === 'member_joined')
+          if (msg.type === 'member_joined' || msg.type === 'member_left')
             return (
               <div key={msg.id} id={'msg-' + msg.id} style={{ position: 'relative', paddingTop: timelineMarkerHeight }}>
                 {timelineMarkers}
@@ -1640,7 +1712,7 @@ export default function Room() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     <div style={{ width: 36, height: 36, display: 'grid', placeItems: 'center', flexShrink: 0, borderRadius: 11, background: `${t.point}22`, color: t.point }}><DoorOpen size={18} /></div>
                     <div style={{ minWidth: 0, flex: 1 }}>
-                      <div style={{ color: t.subText, fontSize: 10 }}>{alreadyJoined ? '연결된 대화방' : `${msg.characters?.name || '사용자'}의 대화방 초대`}</div>
+                      <div style={{ color: t.subText, fontSize: 10 }}>{alreadyJoined ? '연결된 장소' : `${msg.characters?.name || '사용자'}의 대화방 초대`}</div>
                       <div style={{ marginTop: 2, color: t.theirText, fontSize: 13, fontWeight: 600, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{invite.roomName}</div>
                     </div>
                     <button onClick={() => enterInvitedRoom(invite)} style={{ flexShrink: 0, padding: '7px 11px', border: 0, borderRadius: 9, background: t.point, color: '#fff', fontSize: 11, cursor: 'pointer' }}>
@@ -1729,8 +1801,8 @@ export default function Room() {
                 onSelectStart={event => isMine && event.preventDefault()}
                 style={{ position: 'relative', display: 'flex', flexDirection: isMine ? 'row-reverse' : 'row', alignItems: 'flex-start', gap: 6, paddingTop: timelineMarkerHeight, touchAction: 'pan-y', ...ownMessageLongPressStyle }}>
                 {timelineMarkers}
-                <div style={{ flexShrink: 0, width: 36, height: showMessageIdentity ? 36 : 0 }}>
-                  {showMessageIdentity && <div style={{ width: 36, height: 36, borderRadius: '50%', overflow: 'hidden' }}><img src={talkingAvatarUrl(msg)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>}
+                <div style={{ flexShrink: 0, width: 43, height: showMessageIdentity ? 43 : 0 }}>
+                  {showMessageIdentity && <div style={{ width: 43, height: 43, borderRadius: 13, overflow: 'hidden' }}><img src={talkingAvatarUrl(msg)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>}
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMine ? 'flex-end' : 'flex-start', maxWidth: '76%' }}>
                   {showMessageIdentity && char?.name && <div style={{ marginBottom: 4, color: t.subText, fontSize: 11 }}>{char.name}</div>}
@@ -1779,8 +1851,8 @@ export default function Room() {
                 onSelectStart={event => isMine && event.preventDefault()}
                 style={{ position: 'relative', display: 'flex', flexDirection: isMine ? 'row-reverse' : 'row', alignItems: 'flex-start', gap: 6, paddingTop: timelineMarkerHeight, touchAction: 'pan-y', ...ownMessageLongPressStyle }}>
                 {timelineMarkers}
-                <div style={{ flexShrink: 0, width: 36, height: showMessageIdentity ? 36 : 0 }}>
-                  {showMessageIdentity && <div role="button" tabIndex={0} aria-label={`${char?.name || '프로필'} 사진 크게 보기`} onPointerDown={event => event.stopPropagation()} onClick={() => setProfilePreview({ url: char?.image_url || DEFAULT_AVATAR, name: char?.name })} onKeyDown={event => (event.key === 'Enter' || event.key === ' ') && setProfilePreview({ url: char?.image_url || DEFAULT_AVATAR, name: char?.name })} style={{ width: 36, height: 36, borderRadius: '50%', background: char?.color || t.border, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 500, color: char?.text_color || t.subText, cursor: 'zoom-in' }}><img src={talkingAvatarUrl(msg)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>}
+                <div style={{ flexShrink: 0, width: 43, height: showMessageIdentity ? 43 : 0 }}>
+                  {showMessageIdentity && <div role="button" tabIndex={0} aria-label={`${char?.name || '프로필'} 사진 크게 보기`} onPointerDown={event => event.stopPropagation()} onClick={() => setProfilePreview({ url: char?.image_url || DEFAULT_AVATAR, name: char?.name })} onKeyDown={event => (event.key === 'Enter' || event.key === ' ') && setProfilePreview({ url: char?.image_url || DEFAULT_AVATAR, name: char?.name })} style={{ width: 43, height: 43, borderRadius: 13, background: char?.color || t.border, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 500, color: char?.text_color || t.subText, cursor: 'zoom-in' }}><img src={talkingAvatarUrl(msg)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>}
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMine ? 'flex-end' : 'flex-start', maxWidth: '72%' }}>
                   {showMessageIdentity && char?.name && <div style={{ maxWidth: '100%', marginBottom: 4, color: t.subText, fontSize: 11, lineHeight: 1.35, overflowWrap: 'anywhere', textAlign: isMine ? 'right' : 'left' }}>{char.name}</div>}
@@ -1811,8 +1883,8 @@ export default function Room() {
               onSelectStart={event => isMine && event.preventDefault()}
               style={{ position: 'relative', display: 'flex', flexDirection: isMine ? 'row-reverse' : 'row', alignItems: 'flex-start', gap: 6, paddingTop: timelineMarkerHeight, touchAction: 'pan-y', ...ownMessageLongPressStyle }}>
               {timelineMarkers}
-              <div style={{ flexShrink: 0, width: 36, height: showMessageIdentity ? 36 : 0 }}>
-                {showMessageIdentity && <div role="button" tabIndex={0} aria-label={`${char?.name || '프로필'} 사진 크게 보기`} onPointerDown={event => event.stopPropagation()} onClick={() => setProfilePreview({ url: char?.image_url || DEFAULT_AVATAR, name: char?.name })} onKeyDown={event => (event.key === 'Enter' || event.key === ' ') && setProfilePreview({ url: char?.image_url || DEFAULT_AVATAR, name: char?.name })} style={{ width: 36, height: 36, borderRadius: '50%', background: char?.color || t.border, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 500, color: char?.text_color || t.subText, cursor: 'zoom-in' }}><img src={talkingAvatarUrl(msg)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>}
+              <div style={{ flexShrink: 0, width: 43, height: showMessageIdentity ? 43 : 0 }}>
+                {showMessageIdentity && <div role="button" tabIndex={0} aria-label={`${char?.name || '프로필'} 사진 크게 보기`} onPointerDown={event => event.stopPropagation()} onClick={() => setProfilePreview({ url: char?.image_url || DEFAULT_AVATAR, name: char?.name })} onKeyDown={event => (event.key === 'Enter' || event.key === ' ') && setProfilePreview({ url: char?.image_url || DEFAULT_AVATAR, name: char?.name })} style={{ width: 43, height: 43, borderRadius: 13, background: char?.color || t.border, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 500, color: char?.text_color || t.subText, cursor: 'zoom-in' }}><img src={talkingAvatarUrl(msg)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>}
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMine ? 'flex-end' : 'flex-start', maxWidth: '72%' }}>
                 {showMessageIdentity && char?.name && <div style={{ maxWidth: '100%', marginBottom: 4, color: t.subText, fontSize: 11, lineHeight: 1.35, overflowWrap: 'anywhere', textAlign: isMine ? 'right' : 'left' }}>{char.name}</div>}
@@ -1934,7 +2006,7 @@ export default function Room() {
                     await supabase.from('room_members').update({ last_char_id: c.id }).eq('room_id', roomId).eq('user_id', user.id)
                   }}
                   style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, padding: '3px 8px 3px 4px', borderRadius: 20, border: activeChar?.id === c.id && mode === 'chat' ? `1.5px solid ${c.color || t.point}` : `1px solid ${t.border}`, background: activeChar?.id === c.id && mode === 'chat' ? c.color + '22' : 'none', cursor: 'pointer' }}>
-                  <div style={{ width: 18, height: 18, borderRadius: '50%', background: c.color || t.point, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, color: c.text_color || '#fff', overflow: 'hidden', flexShrink: 0 }}><img src={c.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>
+                  <div style={{ width: 22, height: 22, borderRadius: 7, background: c.color || t.point, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, color: c.text_color || '#fff', overflow: 'hidden', flexShrink: 0 }}><img src={c.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>
                   <span style={{ fontSize: 11, color: activeChar?.id === c.id && mode === 'chat' ? t.theirText : t.subText }}>{c.name}</span>
                 </button>
               ))}

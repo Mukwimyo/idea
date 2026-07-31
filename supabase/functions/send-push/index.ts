@@ -102,7 +102,7 @@ Deno.serve(async req => {
         bodyText = '다른 대화방으로 초대했어요'
       }
     }
-    if (record.type === 'member_joined') bodyText = record.content
+    if (record.type === 'member_joined' || record.type === 'member_left') bodyText = record.content
 
     const notifPayload = JSON.stringify({
       title: senderName,

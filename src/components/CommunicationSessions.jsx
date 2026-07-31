@@ -249,7 +249,7 @@ export default function CommunicationSessions({ roomId, userId, myChars, theme, 
             </div>
             <label style={{ display: 'block', color: t.subText, fontSize: 12, marginBottom: 10 }}>발신인
               <span style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 5, padding: '5px 8px', borderRadius: 10, background: t.bg, border: `1px solid ${t.border}` }}>
-                <img src={selectedSender?.image_url || DEFAULT_AVATAR} alt="" style={{ width: 30, height: 30, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                <img src={selectedSender?.image_url || DEFAULT_AVATAR} alt="" style={{ width: 36, height: 36, borderRadius: 11, objectFit: 'cover', flexShrink: 0 }} />
                 <select value={effectiveSenderId} onChange={event => setSenderId(event.target.value)} style={{ flex: 1, minWidth: 0, padding: 4, border: 0, outline: 'none', background: t.bg, color: t.inputText }}>
                   {myChars.map(character => <option key={character.id} value={character.id}>{character.name}</option>)}
                 </select>
@@ -257,7 +257,7 @@ export default function CommunicationSessions({ roomId, userId, myChars, theme, 
             </label>
             <label style={{ display: 'block', color: t.subText, fontSize: 12 }}>수신인
               <span style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 5, padding: '5px 8px', borderRadius: 10, background: t.bg, border: `1px solid ${t.border}` }}>
-                <img src={selectedReceiver?.image_url || DEFAULT_AVATAR} alt="" style={{ width: 30, height: 30, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                <img src={selectedReceiver?.image_url || DEFAULT_AVATAR} alt="" style={{ width: 36, height: 36, borderRadius: 11, objectFit: 'cover', flexShrink: 0 }} />
                 <select value={receiverId} onChange={event => setReceiverId(event.target.value)} style={{ flex: 1, minWidth: 0, padding: 4, border: 0, outline: 'none', background: t.bg, color: t.inputText }}>
                   {receiverOptions.length === 0 && <option value="">선택 가능한 상대 캐릭터 없음</option>}
                   {receiverOptions.map(character => <option key={character.id} value={character.id}>{character.name}</option>)}
@@ -271,7 +271,7 @@ export default function CommunicationSessions({ roomId, userId, myChars, theme, 
 
         {activeSession?.status === 'ringing' && (
           <section style={{ flex: 1, minHeight: 0, paddingTop: 32, textAlign: 'center', display: 'flex', flexDirection: 'column' }}>
-            <img src={counterpartCharacter(activeSession)?.image_url || DEFAULT_AVATAR} alt="" style={{ width: 76, height: 76, objectFit: 'cover', borderRadius: '50%' }} />
+            <img src={counterpartCharacter(activeSession)?.image_url || DEFAULT_AVATAR} alt="" style={{ width: 91, height: 91, objectFit: 'cover', borderRadius: 24 }} />
             <div style={{ marginTop: 10, fontSize: 12, color: t.subText }}>{activeSession.kind === 'call' ? '수신 전화' : '새 문자'}</div>
             <h2 style={{ color: t.theirText }}>{isReceiver(activeSession) ? `${counterpartCharacter(activeSession)?.name || '상대방'}에게 ${activeSession.kind === 'call' ? '전화가' : '문자가'} 왔습니다` : `${counterpartCharacter(activeSession)?.name || '상대방'}의 응답을 기다리는 중…`}</h2>
             {isReceiver(activeSession) ? activeSession.kind === 'call' ? (

@@ -8,6 +8,7 @@ import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } 
 import { CSS } from '@dnd-kit/utilities'
 import { IconButton } from '../components/ui'
 import LoadingScreen from '../components/LoadingScreen'
+import EntryCharacterPicker from '../components/EntryCharacterPicker'
 
 function SortableRoomCard({ roomId, disabled, children }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: roomId, disabled })
@@ -24,6 +25,9 @@ export default function RoomList() {
   const [showJoin, setShowJoin] = useState(false)
   const [roomName, setRoomName] = useState('')
   const [inviteCode, setInviteCode] = useState('')
+  const [pendingJoinRoom, setPendingJoinRoom] = useState(null)
+  const [entryCharacters, setEntryCharacters] = useState([])
+  const [entryJoining, setEntryJoining] = useState(false)
   const [loading, setLoading] = useState(false)
   const [theme, setTheme] = useState(null)
   const [userId, setUserId] = useState(null)
@@ -165,24 +169,56 @@ export default function RoomList() {
     if (room) {
       await supabase.from('profiles').upsert({ id: user.id, email: user.email })
       const { data: existingMember } = await supabase.from('room_members').select('room_id').eq('room_id', room.id).eq('user_id', user.id).maybeSingle()
-      const { error: joinError } = await supabase.from('room_members').upsert({ room_id: room.id, user_id: user.id, sort_order: rooms.length })
-      if (!joinError && !existingMember) {
-        const memberName = user.email?.split('@')[0] || '새 사용자'
-        await supabase.from('messages').insert({
-          room_id: room.id,
-          user_id: user.id,
-          character_id: null,
-          type: 'member_joined',
-          content: `${memberName}님이 대화방에 들어왔어요.`,
-        })
+      if (existingMember) {
+        setInviteCode('')
+        setShowJoin(false)
+        fetchRooms()
+      } else {
+        const { data: characters } = await supabase.from('characters').select('*').eq('user_id', user.id).eq('is_archived', false).order('sort_order').order('created_at')
+        setEntryCharacters(characters || [])
+        setPendingJoinRoom(room)
       }
-      setInviteCode('')
-      setShowJoin(false)
-      fetchRooms()
     } else {
       alert('초대 코드를 찾을 수 없어요.')
     }
     setLoading(false)
+  }
+
+  const completeJoinRoom = async character => {
+    if (!pendingJoinRoom || !character) return
+    setEntryJoining(true)
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    const { error } = await supabase.from('room_members').insert({
+      room_id: pendingJoinRoom.id,
+      user_id: user.id,
+      sort_order: rooms.length,
+      last_char_id: character.id,
+    })
+    if (error) {
+      setEntryJoining(false)
+      alert('대화방에 입장하지 못했어요.')
+      return
+    }
+    await supabase.from('room_characters').upsert({
+      room_id: pendingJoinRoom.id,
+      user_id: user.id,
+      character_id: character.id,
+      sort_order: 0,
+    })
+    await supabase.from('messages').insert({
+      room_id: pendingJoinRoom.id,
+      user_id: user.id,
+      character_id: character.id,
+      type: 'member_joined',
+      content: `${character.name}님이 대화방에 들어왔어요.`,
+    })
+    setEntryJoining(false)
+    setPendingJoinRoom(null)
+    setInviteCode('')
+    setShowJoin(false)
+    fetchRooms()
   }
 
   const deleteRoom = async (e, roomId, createdBy) => {
@@ -236,6 +272,15 @@ export default function RoomList() {
         padding: 16,
         transition: 'background-color 0.3s',
       }}>
+      <EntryCharacterPicker
+        open={Boolean(pendingJoinRoom)}
+        roomName={pendingJoinRoom?.name}
+        characters={entryCharacters}
+        theme={t}
+        loading={entryJoining}
+        onSelect={completeJoinRoom}
+        onClose={() => !entryJoining && setPendingJoinRoom(null)}
+      />
       <div style={{ maxWidth: 400, margin: '0 auto', position: 'relative' }}>
         {/* 헤더 */}
         <div
@@ -461,7 +506,7 @@ export default function RoomList() {
                 animationDelay: playInitialRoomAnimation ? `${Math.min(roomIndex, 10) * 70}ms` : undefined,
               }}>
               {reordering && <button {...listeners} onClick={event => event.stopPropagation()} aria-label={`${room.name} 순서 이동`} style={{ border: 0, background: 'none', padding: 2, display: 'flex', cursor: 'grab', touchAction: 'none' }}><GripVertical size={18} color={t.subText} /></button>}
-              <div style={{ width: 40, height: 40, borderRadius: '50%', background: t.point, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, color: t.bg, flexShrink: 0, overflow: 'hidden' }}>{room.cover_image ? <img src={room.cover_image} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '✦'}</div>
+              <div style={{ width: 48, height: 48, borderRadius: 14, background: t.point, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, color: t.bg, flexShrink: 0, overflow: 'hidden' }}>{room.cover_image ? <img src={room.cover_image} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '✦'}</div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 14, fontWeight: 500, color: t.theirText }}>{room.name}</div>
                 <div
@@ -478,7 +523,7 @@ export default function RoomList() {
                       ? `${room.lastMsg.characters?.name || ''}: ${room.lastMsg.content}`
                       : room.lastMsg.type === 'room_invite'
                         ? '[대화방 초대]'
-                        : room.lastMsg.type === 'member_joined'
+                        : room.lastMsg.type === 'member_joined' || room.lastMsg.type === 'member_left'
                           ? room.lastMsg.content
                           : room.lastMsg.type === 'image' || room.lastMsg.type === 'image_group'
                             ? '[이미지]'
