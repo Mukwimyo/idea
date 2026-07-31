@@ -322,3 +322,24 @@ button:disabled {
     transform: translate(-50%, 0) scale(1);
   }
 }
+
+.idea-loading-logo {
+    animation: idea-loading-breathe 1.35s ease-in-out infinite;
+}
+
+@keyframes idea-loading-breathe {
+    0%, 100% {
+        opacity: 0.78;
+        transform: translateY(2px) scale(0.985);
+    }
+    50% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .idea-loading-logo {
+        animation: none;
+    }
+}

@@ -7,6 +7,7 @@ import ProfileImageModal from '../components/ProfileImageModal'
 import CommunicationSessions from '../components/CommunicationSessions'
 import CommunicationRecord from '../components/CommunicationRecord'
 import Toast, { useToast } from '../components/Toast'
+import LoadingScreen from '../components/LoadingScreen'
 
 const DEFAULT_AVATAR = `${import.meta.env.BASE_URL}default-avatar.png`
 
@@ -328,6 +329,7 @@ export default function Room() {
       setSharedThemeId(sharedId)
       setFollowShared(follow)
       const resolvedTheme = getTheme(follow ? sharedId : myId)
+      localStorage.setItem('idea-theme-id', myId)
       setTheme(resolvedTheme)
       document.querySelector('meta[name="theme-color"]')?.setAttribute('content', resolvedTheme.panel)
 
@@ -1107,11 +1109,7 @@ export default function Room() {
   })
 
   if (!theme)
-    return (
-      <div style={{ height: '100dvh', background: '#1a1a2e', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ color: '#7F77DD', fontSize: 28 }}>✦</div>
-      </div>
-    )
+    return <LoadingScreen />
 
   return (
     <div

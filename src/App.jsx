@@ -8,6 +8,7 @@ import Characters from './pages/Characters'
 import Settings from './pages/Settings'
 import Help from './pages/Help'
 import PwaPrompts from './components/PwaPrompts'
+import LoadingScreen from './components/LoadingScreen'
 
 const FONT_MAP = {
   'godo-b': 'GodoB',
@@ -20,8 +21,6 @@ const FONT_MAP = {
   'jeju-myeongjo': 'Jeju Myeongjo',
   aggro: 'SBAggroB',
 }
-
-const LAUNCH_LOGO = `${import.meta.env.BASE_URL}branding/idea-logo-launch-dark.png`
 
 export default function App() {
   const [session, setSession] = useState(undefined)
@@ -42,13 +41,14 @@ export default function App() {
       if (!user) return
       supabase
         .from('profiles')
-        .select('font_id, font_scale')
+        .select('font_id, font_scale, theme_id')
         .eq('id', user.id)
         .single()
         .then(({ data }) => {
           if (data?.font_id && FONT_MAP[data.font_id]) {
             document.body.style.fontFamily = FONT_MAP[data.font_id]
           }
+          if (data?.theme_id) localStorage.setItem('idea-theme-id', data.theme_id)
           const fontScale = Number(data?.font_scale || localStorage.getItem('idea-font-scale') || 1)
           document.documentElement.style.setProperty('--idea-font-scale', String(fontScale))
           localStorage.setItem('idea-font-scale', String(fontScale))
@@ -59,36 +59,7 @@ export default function App() {
   }, [])
 
   if (session === undefined || !splashReady)
-    return (
-      <div
-        style={{
-          minHeight: '100vh',
-          background: '#1a1a2e',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}>
-        <img
-          className="app-launch-logo"
-          src={LAUNCH_LOGO}
-          alt="IDEA"
-          style={{
-            width: 'min(64vw, 300px)',
-            height: 'auto',
-            animation: 'app-logo-enter 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both',
-          }}
-        />
-        <style>{`
-          @keyframes app-logo-enter {
-            from { opacity: 0; transform: translateY(8px) scale(0.96); }
-            to { opacity: 1; transform: translateY(0) scale(1); }
-          }
-          @media (prefers-reduced-motion: reduce) {
-            .app-launch-logo { animation: none !important; }
-          }
-        `}</style>
-      </div>
-    )
+    return <LoadingScreen />
 
   return (
     <>

@@ -180,6 +180,7 @@ export default function Settings() {
 
   const saveTheme = async id => {
     setMyThemeId(id)
+    localStorage.setItem('idea-theme-id', id)
     setSaving(true)
     const {
       data: { user },

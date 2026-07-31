@@ -8,6 +8,7 @@ import { DndContext, PointerSensor, TouchSensor, closestCenter, useSensor, useSe
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy, rectSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import ProfileImageModal from '../components/ProfileImageModal'
+import LoadingScreen from '../components/LoadingScreen'
 
 const DEFAULT_CHARACTER_COLOR = '#AFA9EC'
 const DEFAULT_CHARACTER_TEXT_COLOR = '#26215C'
@@ -109,6 +110,7 @@ export default function Characters() {
     setUserId(user.id)
     const { data } = await supabase.from('profiles').select('theme_id').eq('id', user.id).single()
     const resolvedTheme = getTheme(data?.theme_id || 'dark-purple')
+    localStorage.setItem('idea-theme-id', data?.theme_id || 'dark-purple')
     setTheme(resolvedTheme)
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', resolvedTheme.panel)
     if (roomId) {
@@ -422,11 +424,7 @@ export default function Characters() {
   }
 
   if (!theme)
-    return (
-      <div style={{ minHeight: '100vh', background: '#1a1a2e', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ color: '#7F77DD', fontSize: 28 }}>✦</div>
-      </div>
-    )
+    return <LoadingScreen />
 
   const t = theme
   const normalizedSearch = searchQuery.trim().toLocaleLowerCase('ko-KR')
