@@ -50,6 +50,10 @@ export default function ProfileImageModal({ profile, onClose }) {
   }, [profile, onClose])
 
   if (!profile) return null
+  const currentItem = profile.items?.[currentIndex]
+  const uploadedAt = currentItem?.createdAt
+    ? new Date(currentItem.createdAt).toLocaleString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+    : ''
 
   return (
     <div
@@ -64,6 +68,12 @@ export default function ProfileImageModal({ profile, onClose }) {
         style={{ position: 'absolute', top: 'max(18px, env(safe-area-inset-top))', left: 18, width: 38, height: 38, borderRadius: '50%', border: 'none', background: 'transparent', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
         <X size={22} />
       </button>
+      {currentItem && (
+        <div onClick={event => event.stopPropagation()} style={{ position: 'absolute', top: 'max(22px, env(safe-area-inset-top))', left: 68, right: 24, color: '#fff', pointerEvents: 'none' }}>
+          <div style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.3 }}>{currentItem.uploader}</div>
+          <div style={{ marginTop: 2, fontSize: 10, opacity: 0.68 }}>{uploadedAt}</div>
+        </div>
+      )}
       <div
         onClick={event => event.stopPropagation()}
         onPointerDown={event => {
@@ -87,10 +97,10 @@ export default function ProfileImageModal({ profile, onClose }) {
           setIsDragging(false)
           setDragOffset(0)
         }}
-        style={{ width: '100%', minHeight: 0, overflow: 'hidden', touchAction: 'pan-y', cursor: isDragging ? 'grabbing' : 'grab' }}>
-        <div style={{ width: '100%', display: 'flex', alignItems: 'center', transform: `translate3d(calc(${-currentIndex * 100}% + ${dragOffset}px), 0, 0)`, transition: isDragging ? 'none' : 'transform 280ms cubic-bezier(0.22, 0.72, 0, 1)', willChange: 'transform' }}>
+        style={{ width: '100vw', maxWidth: '100vw', minHeight: 0, overflow: 'hidden', clipPath: 'inset(0)', overscrollBehavior: 'none', touchAction: 'pan-y', cursor: isDragging ? 'grabbing' : 'grab' }}>
+        <div style={{ width: '100%', display: 'flex', alignItems: 'center', transform: `translate3d(calc(${-currentIndex * 100}% + ${dragOffset}px), 0, 0)`, transition: isDragging ? 'none' : 'transform 280ms cubic-bezier(0.22, 0.72, 0, 1)', willChange: 'transform', backfaceVisibility: 'hidden' }}>
           {urls.map((url, index) => (
-            <div key={`${url}-${index}`} style={{ flex: '0 0 100%', minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 6vw', boxSizing: 'border-box' }}>
+            <div key={`${url}-${index}`} style={{ flex: '0 0 100%', minWidth: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 6vw', boxSizing: 'border-box', opacity: isDragging || index === currentIndex ? 1 : 0 }}>
               <img
                 src={url}
                 alt={`${profile.name || '이미지'} ${index + 1}`}

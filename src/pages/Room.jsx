@@ -169,6 +169,7 @@ export default function Room() {
   const [showMessageTime, setShowMessageTime] = useState(true)
   const [showEditedLabel, setShowEditedLabel] = useState(true)
   const [messageMenuId, setMessageMenuId] = useState(null)
+  const [imageMenuTarget, setImageMenuTarget] = useState(null)
   const [deletingMessageId, setDeletingMessageId] = useState(null)
   const [profilePreview, setProfilePreview] = useState(null)
   const [showCommunication, setShowCommunication] = useState(false)
@@ -448,14 +449,15 @@ export default function Room() {
   }, [])
 
   useEffect(() => {
-    if (!messageMenuId) return undefined
+    if (!messageMenuId && !imageMenuTarget) return undefined
     const closeMenuOutside = event => {
       if (event.target.closest?.('[data-message-menu="true"]')) return
       setMessageMenuId(null)
+      setImageMenuTarget(null)
     }
     document.addEventListener('pointerdown', closeMenuOutside)
     return () => document.removeEventListener('pointerdown', closeMenuOutside)
-  }, [messageMenuId])
+  }, [messageMenuId, imageMenuTarget])
 
   useEffect(() => {
     if (isAtBottomRef.current) {
@@ -680,6 +682,7 @@ export default function Room() {
 
   const deleteGalleryImage = async item => {
     if (!item?.message || item.message.user_id !== userId) return
+    setImageMenuTarget(null)
 
     const message = item.message
     if (message.type === 'image') {
@@ -812,6 +815,20 @@ export default function Room() {
       type: 'image',
       content: url,
     })
+  }
+
+  const startImageLongPress = (event, message, imageIndex) => {
+    if (message.user_id !== userId || message.id.toString().startsWith('temp-')) return
+    event.stopPropagation()
+    cancelLongPress()
+    longPressTriggeredRef.current = false
+    longPressStartRef.current = { x: event.clientX, y: event.clientY }
+    longPressTimerRef.current = window.setTimeout(() => {
+      longPressTriggeredRef.current = true
+      setMessageMenuId(null)
+      setImageMenuTarget({ message, imageIndex })
+      longPressTimerRef.current = null
+    }, 550)
   }
 
   const sendDivider = async () => {
@@ -1011,6 +1028,18 @@ export default function Room() {
     }
   })
   const galleryUrls = galleryItems.map(item => item.url)
+  const galleryPreviewItems = galleryItems.map(item => ({
+    url: item.url,
+    uploader: item.message.characters?.name || '알 수 없음',
+    createdAt: item.message.created_at,
+  }))
+  const galleryGroups = galleryItems.reduce((groups, item) => {
+    const dateKey = new Date(item.message.created_at).toLocaleDateString('ko-KR')
+    const existing = groups.find(group => group.date === dateKey)
+    if (existing) existing.items.push(item)
+    else groups.push({ date: dateKey, items: [item] })
+    return groups
+  }, [])
   const lastTypingProfileMessageId = typingInfo?.characterId
     ? filteredMessages.reduce((lastId, message, index) => {
         if (message.character_id !== typingInfo.characterId || message.user_id === userId) return lastId
@@ -1304,24 +1333,26 @@ export default function Room() {
             {galleryItems.length === 0 ? (
               <div style={{ padding: '48px 12px', color: t.subText, fontSize: 12, textAlign: 'center' }}>아직 전송된 이미지가 없어요.</div>
             ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 4 }}>
-                {galleryItems.map((item, index) => (
-                  <div key={`${item.message.id}-${item.imageIndex}`} style={{ position: 'relative', aspectRatio: '1 / 1', overflow: 'hidden', borderRadius: 8, background: t.bg }}>
-                    <button
-                      onClick={() => setProfilePreview({ url: item.url, urls: galleryUrls, index, name: '' })}
-                      aria-label={`이미지 ${index + 1} 크게 보기`}
-                      style={{ width: '100%', height: '100%', padding: 0, border: 0, background: 'none', cursor: 'pointer' }}>
-                      <img src={item.url} alt="" loading="lazy" style={{ width: '100%', height: '100%', display: 'block', objectFit: 'cover' }} />
-                    </button>
-                    {item.message.user_id === userId && (
-                      <button
-                        onClick={() => deleteGalleryImage(item)}
-                        aria-label="이미지 삭제"
-                        style={{ position: 'absolute', top: 4, right: 4, width: 24, height: 24, display: 'grid', placeItems: 'center', padding: 0, border: 0, borderRadius: '50%', background: 'rgba(0,0,0,0.62)', color: '#fff', cursor: 'pointer' }}>
-                        ×
-                      </button>
-                    )}
-                  </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+                {galleryGroups.map(group => (
+                  <section key={group.date}>
+                    <div style={{ marginBottom: 7, color: t.subText, fontSize: 11 }}>{group.date}</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 4 }}>
+                      {group.items.map(item => {
+                        const index = galleryItems.findIndex(candidate => candidate.message.id === item.message.id && candidate.imageIndex === item.imageIndex)
+                        return (
+                          <div key={`${item.message.id}-${item.imageIndex}`} style={{ position: 'relative', aspectRatio: '1 / 1', overflow: 'hidden', borderRadius: 8, background: t.bg }}>
+                            <button
+                              onClick={() => setProfilePreview({ url: item.url, urls: galleryUrls, items: galleryPreviewItems, index, name: '' })}
+                              aria-label={`${group.date} 이미지 크게 보기`}
+                              style={{ width: '100%', height: '100%', padding: 0, border: 0, background: 'none', cursor: 'pointer' }}>
+                              <img src={item.url} alt="" loading="lazy" style={{ width: '100%', height: '100%', display: 'block', objectFit: 'cover' }} />
+                            </button>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </section>
                 ))}
               </div>
             )}
@@ -1519,13 +1550,23 @@ export default function Room() {
                         key={`${url}-${imageIndex}`}
                         src={url}
                         alt=""
-                        onPointerDown={event => event.stopPropagation()}
+                        onPointerDown={event => startImageLongPress(event, msg, imageIndex)}
+                        onPointerMove={moveLongPress}
+                        onPointerUp={cancelLongPress}
+                        onPointerCancel={cancelLongPress}
+                        onPointerLeave={cancelLongPress}
+                        onContextMenu={event => isMine && event.preventDefault()}
+                        onSelectStart={event => isMine && event.preventDefault()}
                         onClick={() => openImageMessage(url, imageUrls, imageIndex)}
-                        style={{ display: 'block', width: '100%', height: 92, objectFit: 'cover', cursor: 'pointer', gridColumn: imageUrls.length % 2 === 1 && imageIndex === imageUrls.length - 1 ? '1 / -1' : undefined }}
+                        style={{ display: 'block', width: '100%', height: 92, objectFit: 'cover', cursor: 'pointer', userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none', gridColumn: imageUrls.length % 2 === 1 && imageIndex === imageUrls.length - 1 ? '1 / -1' : undefined }}
                       />
                     ))}
                   </div>
-                  {renderMessageActions(msg, false)}
+                  {imageMenuTarget?.message.id === msg.id ? (
+                    <div className="message-action-menu" data-message-menu="true" onPointerDown={event => event.stopPropagation()} style={{ display: 'flex', alignItems: 'center', marginTop: 5, border: `1px solid ${t.border}`, borderRadius: 9, overflow: 'hidden', background: t.panel, boxShadow: '0 3px 10px rgba(0,0,0,0.2)' }}>
+                      <button onClick={() => deleteGalleryImage({ message: msg, imageIndex: imageMenuTarget.imageIndex })} style={{ border: 0, background: 'none', color: '#f87171', padding: '7px 13px', fontSize: 11, cursor: 'pointer' }}>삭제</button>
+                    </div>
+                  ) : renderMessageActions(msg, false)}
                   {renderDeliveryStatus(msg)}
                 </div>
               </div>
