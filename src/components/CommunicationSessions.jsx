@@ -137,6 +137,12 @@ export default function CommunicationSessions({ roomId, userId, myChars, theme, 
   const counterpartCharacter = session => characterById[session.sender_user_id === userId ? session.receiver_character_id : session.sender_character_id]
   const visible = open || (activeSession?.status === 'ringing' && isReceiver(activeSession))
 
+  useEffect(() => {
+    if (!visible) return
+    const focusedElement = document.activeElement
+    if (focusedElement instanceof HTMLElement) focusedElement.blur()
+  }, [visible])
+
   if (!visible) return null
 
   return (
