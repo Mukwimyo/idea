@@ -206,10 +206,19 @@ export default function Room() {
     }
     const frames = talkingFramesByCharacter[typingInfo.characterId] || []
     if (frames.length === 0) return undefined
-    const timer = window.setInterval(() => {
-      setTalkingFrameIndex(index => (index + 1) % (frames.length + 1))
-    }, 180)
-    return () => window.clearInterval(timer)
+    let timer
+    let current = 0
+    const scheduleNextFrame = () => {
+      const total = frames.length + 1
+      let next = current
+      while (next === current) next = Math.floor(Math.random() * total)
+      current = next
+      setTalkingFrameIndex(next)
+      const delay = next === 0 ? 260 + Math.random() * 180 : 130 + Math.random() * 120
+      timer = window.setTimeout(scheduleNextFrame, delay)
+    }
+    timer = window.setTimeout(scheduleNextFrame, 140 + Math.random() * 100)
+    return () => window.clearTimeout(timer)
   }, [typingInfo?.characterId, talkingFramesByCharacter])
 
   const loadTalkingFrames = async characterId => {

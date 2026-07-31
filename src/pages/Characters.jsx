@@ -87,10 +87,19 @@ export default function Characters() {
 
   useEffect(() => {
     if (!talkingPreviewPlaying || talkingFrames.length === 0) return undefined
-    const timer = window.setInterval(() => {
-      setTalkingPreviewIndex(index => (index + 1) % (talkingFrames.length + 1))
-    }, 180)
-    return () => window.clearInterval(timer)
+    let timer
+    let current = 0
+    const scheduleNextFrame = () => {
+      const total = talkingFrames.length + 1
+      let next = current
+      while (next === current) next = Math.floor(Math.random() * total)
+      current = next
+      setTalkingPreviewIndex(next)
+      const delay = next === 0 ? 260 + Math.random() * 180 : 130 + Math.random() * 120
+      timer = window.setTimeout(scheduleNextFrame, delay)
+    }
+    timer = window.setTimeout(scheduleNextFrame, 160)
+    return () => window.clearTimeout(timer)
   }, [talkingPreviewPlaying, talkingFrames.length])
 
   const init = async () => {
