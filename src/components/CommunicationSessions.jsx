@@ -135,7 +135,7 @@ export default function CommunicationSessions({ roomId, userId, myChars, theme, 
   const sessionTitle = session => `${characterById[session.sender_character_id]?.name || '캐릭터'} × ${characterById[session.receiver_character_id]?.name || '캐릭터'}`
   const isReceiver = session => session.receiver_user_id === userId
   const counterpartCharacter = session => characterById[session.sender_user_id === userId ? session.receiver_character_id : session.sender_character_id]
-  const visible = open || (activeSession?.status === 'ringing' && isReceiver(activeSession))
+  const visible = open || activeSession?.status === 'active' || (activeSession?.status === 'ringing' && isReceiver(activeSession))
 
   useEffect(() => {
     if (!visible) return
