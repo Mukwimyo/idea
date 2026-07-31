@@ -3,13 +3,42 @@ import { ChevronLeft, ChevronRight, X } from 'lucide-react'
 
 export default function ProfileImageModal({ profile, onClose }) {
   const [currentIndex, setCurrentIndex] = useState(0)
+  const [dragOffset, setDragOffset] = useState(0)
+  const [isDragging, setIsDragging] = useState(false)
   const swipeStartXRef = useRef(null)
+  const swipeStartTimeRef = useRef(0)
   const urls = profile?.urls?.length ? profile.urls : profile?.url ? [profile.url] : []
 
   useEffect(() => {
     if (!profile) return
     setCurrentIndex(Math.max(0, Math.min(profile.index || 0, urls.length - 1)))
+    setDragOffset(0)
+    setIsDragging(false)
   }, [profile])
+
+  const moveTo = nextIndex => {
+    setIsDragging(false)
+    setDragOffset(0)
+    setCurrentIndex(Math.max(0, Math.min(urls.length - 1, nextIndex)))
+  }
+
+  const finishSwipe = clientX => {
+    if (swipeStartXRef.current === null) return
+    const distance = clientX - swipeStartXRef.current
+    const elapsed = Math.max(1, Date.now() - swipeStartTimeRef.current)
+    const velocity = Math.abs(distance) / elapsed
+    swipeStartXRef.current = null
+    setIsDragging(false)
+
+    const shouldMove = Math.abs(distance) > 55 || (Math.abs(distance) > 20 && velocity > 0.45)
+    if (shouldMove && distance < 0 && currentIndex < urls.length - 1) {
+      moveTo(currentIndex + 1)
+    } else if (shouldMove && distance > 0 && currentIndex > 0) {
+      moveTo(currentIndex - 1)
+    } else {
+      setDragOffset(0)
+    }
+  }
 
   useEffect(() => {
     if (!profile) return undefined
@@ -39,26 +68,38 @@ export default function ProfileImageModal({ profile, onClose }) {
         onClick={event => event.stopPropagation()}
         onPointerDown={event => {
           swipeStartXRef.current = event.clientX
+          swipeStartTimeRef.current = Date.now()
+          setIsDragging(true)
           event.currentTarget.setPointerCapture?.(event.pointerId)
         }}
-        onPointerUp={event => {
+        onPointerMove={event => {
           if (swipeStartXRef.current === null) return
-          const distance = event.clientX - swipeStartXRef.current
-          swipeStartXRef.current = null
-          if (distance < -45) setCurrentIndex(index => Math.min(urls.length - 1, index + 1))
-          if (distance > 45) setCurrentIndex(index => Math.max(0, index - 1))
+          let nextOffset = event.clientX - swipeStartXRef.current
+          if ((currentIndex === 0 && nextOffset > 0) || (currentIndex === urls.length - 1 && nextOffset < 0)) nextOffset *= 0.28
+          setDragOffset(nextOffset)
+        }}
+        onPointerUp={event => {
+          finishSwipe(event.clientX)
           event.currentTarget.releasePointerCapture?.(event.pointerId)
         }}
         onPointerCancel={() => {
           swipeStartXRef.current = null
+          setIsDragging(false)
+          setDragOffset(0)
         }}
-        style={{ width: '100%', minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'pan-y' }}>
-        <img
-          src={urls[currentIndex]}
-          alt={`${profile.name || '이미지'} ${currentIndex + 1}`}
-          draggable={false}
-          style={{ display: 'block', maxWidth: 'min(88vw, 640px)', maxHeight: '78dvh', width: 'auto', height: 'auto', objectFit: 'contain', borderRadius: 16, boxShadow: '0 16px 48px rgba(0,0,0,0.45)', userSelect: 'none' }}
-        />
+        style={{ width: '100%', minHeight: 0, overflow: 'hidden', touchAction: 'pan-y', cursor: isDragging ? 'grabbing' : 'grab' }}>
+        <div style={{ width: '100%', display: 'flex', alignItems: 'center', transform: `translate3d(calc(${-currentIndex * 100}% + ${dragOffset}px), 0, 0)`, transition: isDragging ? 'none' : 'transform 280ms cubic-bezier(0.22, 0.72, 0, 1)', willChange: 'transform' }}>
+          {urls.map((url, index) => (
+            <div key={`${url}-${index}`} style={{ flex: '0 0 100%', minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 6vw', boxSizing: 'border-box' }}>
+              <img
+                src={url}
+                alt={`${profile.name || '이미지'} ${index + 1}`}
+                draggable={false}
+                style={{ display: 'block', maxWidth: 'min(88vw, 640px)', maxHeight: '78dvh', width: 'auto', height: 'auto', objectFit: 'contain', borderRadius: 16, boxShadow: '0 16px 48px rgba(0,0,0,0.45)', userSelect: 'none' }}
+              />
+            </div>
+          ))}
+        </div>
       </div>
       {urls.length > 1 && (
         <>
