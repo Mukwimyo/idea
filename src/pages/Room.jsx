@@ -162,6 +162,8 @@ export default function Room() {
   const [roomNameText, setRoomNameText] = useState('')
   const [showCharList, setShowCharList] = useState(false)
   const [typingInfo, setTypingInfo] = useState(null)
+  const [talkingFramesByCharacter, setTalkingFramesByCharacter] = useState({})
+  const [talkingFrameIndex, setTalkingFrameIndex] = useState(0)
   const [showTypingIndicator, setShowTypingIndicator] = useState(true)
   const [showEntering, setShowEntering] = useState(true)
   const [showMessageTime, setShowMessageTime] = useState(true)
@@ -196,6 +198,31 @@ export default function Room() {
   useEffect(() => {
     messagesRef.current = messages
   }, [messages])
+
+  useEffect(() => {
+    if (!typingInfo?.characterId) {
+      setTalkingFrameIndex(0)
+      return undefined
+    }
+    const frames = talkingFramesByCharacter[typingInfo.characterId] || []
+    if (frames.length === 0) return undefined
+    const timer = window.setInterval(() => {
+      setTalkingFrameIndex(index => (index + 1) % (frames.length + 1))
+    }, 180)
+    return () => window.clearInterval(timer)
+  }, [typingInfo?.characterId, talkingFramesByCharacter])
+
+  const loadTalkingFrames = async characterId => {
+    if (!characterId || Object.prototype.hasOwnProperty.call(talkingFramesByCharacter, characterId)) return
+    const { data, error } = await supabase
+      .from('character_talking_frames')
+      .select('image_url, sort_order')
+      .eq('character_id', characterId)
+      .order('sort_order')
+    if (!error) {
+      setTalkingFramesByCharacter(current => ({ ...current, [characterId]: (data || []).map(frame => frame.image_url) }))
+    }
+  }
 
   const openPanel = panel => {
     setShowInvite(panel === 'invite')
@@ -289,7 +316,9 @@ export default function Room() {
             const remaining = expiresAt - Date.now()
             window.clearTimeout(remoteTypingTimerRef.current)
             if ((payload.new.is_typing ?? true) && payload.new.typing_char_name && remaining > 0) {
-              setTypingInfo({ charName: payload.new.typing_char_name, expiresAt })
+              const characterId = payload.new.typing_character_id || null
+              setTypingInfo({ charName: payload.new.typing_char_name, characterId, expiresAt })
+              if (characterId) loadTalkingFrames(characterId)
               remoteTypingTimerRef.current = window.setTimeout(() => setTypingInfo(null), remaining)
             } else {
               setTypingInfo(null)
@@ -331,7 +360,7 @@ export default function Room() {
       if (userIdRef.current) {
         supabase
           .from('room_members')
-          .update({ is_typing: false, typing_char_name: null, typing_expires_at: null })
+          .update({ is_typing: false, typing_char_name: null, typing_character_id: null, typing_expires_at: null })
           .eq('room_id', roomId)
           .eq('user_id', userIdRef.current)
           .then(() => {})
@@ -492,6 +521,7 @@ export default function Room() {
         .update({
           is_typing: true,
           typing_char_name: activeChar.name,
+          typing_character_id: activeChar.id,
           typing_expires_at: new Date(currentTime + 5000).toISOString(),
         })
         .eq('room_id', roomId)
@@ -503,7 +533,7 @@ export default function Room() {
       lastTypingSentAtRef.current = 0
       await supabase
         .from('room_members')
-        .update({ is_typing: false, typing_char_name: null, typing_expires_at: null })
+        .update({ is_typing: false, typing_char_name: null, typing_character_id: null, typing_expires_at: null })
         .eq('room_id', roomId)
         .eq('user_id', userIdRef.current)
     }, hasContent ? 5000 : 0)
@@ -560,7 +590,7 @@ export default function Room() {
     if (userIdRef.current) {
       supabase
         .from('room_members')
-        .update({ is_typing: false, typing_char_name: null, typing_expires_at: null })
+        .update({ is_typing: false, typing_char_name: null, typing_character_id: null, typing_expires_at: null })
         .eq('room_id', roomId)
         .eq('user_id', userIdRef.current)
         .then(() => {})
@@ -970,6 +1000,26 @@ export default function Room() {
     }
   })
   const galleryUrls = galleryItems.map(item => item.url)
+  const lastTypingProfileMessageId = typingInfo?.characterId
+    ? filteredMessages.reduce((lastId, message, index) => {
+        if (message.character_id !== typingInfo.characterId || message.user_id === userId) return lastId
+        if (!['chat', 'image', 'image_group'].includes(message.type)) return lastId
+        const previousMessage = filteredMessages[index - 1]
+        const showsIdentity =
+          !previousMessage ||
+          previousMessage.type === 'chapter' ||
+          previousMessage.type === 'narration' ||
+          previousMessage.character_id !== message.character_id ||
+          previousMessage.user_id !== message.user_id
+        return showsIdentity ? message.id : lastId
+      }, null)
+    : null
+  const talkingAvatarUrl = message => {
+    if (message.id !== lastTypingProfileMessageId || !typingInfo?.characterId) return message.characters?.image_url || DEFAULT_AVATAR
+    const frames = talkingFramesByCharacter[typingInfo.characterId] || []
+    if (talkingFrameIndex === 0 || frames.length === 0) return message.characters?.image_url || DEFAULT_AVATAR
+    return frames[(talkingFrameIndex - 1) % frames.length]
+  }
   const lastReadMessageId = [...filteredMessages].reverse().find(msg => msg.user_id === userId && (msg.read_by || []).some(id => id !== msg.user_id))?.id
 
   const iconBtn = (onClick, icon, active) => ({
@@ -1449,7 +1499,7 @@ export default function Room() {
                 style={{ position: 'relative', display: 'flex', flexDirection: isMine ? 'row-reverse' : 'row', alignItems: 'flex-start', gap: 6, paddingTop: timelineMarkerHeight, touchAction: 'pan-y', ...ownMessageLongPressStyle }}>
                 {timelineMarkers}
                 <div style={{ flexShrink: 0, width: 36, height: showMessageIdentity ? 36 : 0 }}>
-                  {showMessageIdentity && <div style={{ width: 36, height: 36, borderRadius: '50%', overflow: 'hidden' }}><img src={char?.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>}
+                  {showMessageIdentity && <div style={{ width: 36, height: 36, borderRadius: '50%', overflow: 'hidden' }}><img src={talkingAvatarUrl(msg)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>}
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMine ? 'flex-end' : 'flex-start', maxWidth: '76%' }}>
                   {showMessageIdentity && char?.name && <div style={{ marginBottom: 4, color: t.subText, fontSize: 11 }}>{char.name}</div>}
@@ -1489,7 +1539,7 @@ export default function Room() {
                 style={{ position: 'relative', display: 'flex', flexDirection: isMine ? 'row-reverse' : 'row', alignItems: 'flex-start', gap: 6, paddingTop: timelineMarkerHeight, touchAction: 'pan-y', ...ownMessageLongPressStyle }}>
                 {timelineMarkers}
                 <div style={{ flexShrink: 0, width: 36, height: showMessageIdentity ? 36 : 0 }}>
-                  {showMessageIdentity && <div role="button" tabIndex={0} aria-label={`${char?.name || '프로필'} 사진 크게 보기`} onPointerDown={event => event.stopPropagation()} onClick={() => setProfilePreview({ url: char?.image_url || DEFAULT_AVATAR, name: char?.name })} onKeyDown={event => (event.key === 'Enter' || event.key === ' ') && setProfilePreview({ url: char?.image_url || DEFAULT_AVATAR, name: char?.name })} style={{ width: 36, height: 36, borderRadius: '50%', background: char?.color || t.border, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 500, color: char?.text_color || t.subText, cursor: 'zoom-in' }}><img src={char?.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>}
+                  {showMessageIdentity && <div role="button" tabIndex={0} aria-label={`${char?.name || '프로필'} 사진 크게 보기`} onPointerDown={event => event.stopPropagation()} onClick={() => setProfilePreview({ url: char?.image_url || DEFAULT_AVATAR, name: char?.name })} onKeyDown={event => (event.key === 'Enter' || event.key === ' ') && setProfilePreview({ url: char?.image_url || DEFAULT_AVATAR, name: char?.name })} style={{ width: 36, height: 36, borderRadius: '50%', background: char?.color || t.border, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 500, color: char?.text_color || t.subText, cursor: 'zoom-in' }}><img src={talkingAvatarUrl(msg)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>}
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMine ? 'flex-end' : 'flex-start', maxWidth: '72%' }}>
                   {showMessageIdentity && char?.name && <div style={{ maxWidth: '100%', marginBottom: 4, color: t.subText, fontSize: 11, lineHeight: 1.35, overflowWrap: 'anywhere', textAlign: isMine ? 'right' : 'left' }}>{char.name}</div>}
@@ -1521,7 +1571,7 @@ export default function Room() {
               style={{ position: 'relative', display: 'flex', flexDirection: isMine ? 'row-reverse' : 'row', alignItems: 'flex-start', gap: 6, paddingTop: timelineMarkerHeight, touchAction: 'pan-y', ...ownMessageLongPressStyle }}>
               {timelineMarkers}
               <div style={{ flexShrink: 0, width: 36, height: showMessageIdentity ? 36 : 0 }}>
-                {showMessageIdentity && <div role="button" tabIndex={0} aria-label={`${char?.name || '프로필'} 사진 크게 보기`} onPointerDown={event => event.stopPropagation()} onClick={() => setProfilePreview({ url: char?.image_url || DEFAULT_AVATAR, name: char?.name })} onKeyDown={event => (event.key === 'Enter' || event.key === ' ') && setProfilePreview({ url: char?.image_url || DEFAULT_AVATAR, name: char?.name })} style={{ width: 36, height: 36, borderRadius: '50%', background: char?.color || t.border, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 500, color: char?.text_color || t.subText, cursor: 'zoom-in' }}><img src={char?.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>}
+                {showMessageIdentity && <div role="button" tabIndex={0} aria-label={`${char?.name || '프로필'} 사진 크게 보기`} onPointerDown={event => event.stopPropagation()} onClick={() => setProfilePreview({ url: char?.image_url || DEFAULT_AVATAR, name: char?.name })} onKeyDown={event => (event.key === 'Enter' || event.key === ' ') && setProfilePreview({ url: char?.image_url || DEFAULT_AVATAR, name: char?.name })} style={{ width: 36, height: 36, borderRadius: '50%', background: char?.color || t.border, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 500, color: char?.text_color || t.subText, cursor: 'zoom-in' }}><img src={talkingAvatarUrl(msg)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>}
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMine ? 'flex-end' : 'flex-start', maxWidth: '72%' }}>
                 {showMessageIdentity && char?.name && <div style={{ maxWidth: '100%', marginBottom: 4, color: t.subText, fontSize: 11, lineHeight: 1.35, overflowWrap: 'anywhere', textAlign: isMine ? 'right' : 'left' }}>{char.name}</div>}

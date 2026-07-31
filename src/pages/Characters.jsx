@@ -2,10 +2,10 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase, uploadFile, validateImageFile } from '../lib/supabase'
 import { getTheme } from '../lib/themes'
-import { ChevronLeft, X, RotateCcw, Search, Check, ArrowDownAZ, GripVertical } from 'lucide-react'
+import { ChevronLeft, X, RotateCcw, Search, Check, ArrowDownAZ, GripVertical, Play, Pause, Trash2 } from 'lucide-react'
 import Cropper from 'react-easy-crop'
 import { DndContext, PointerSensor, TouchSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core'
-import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy, rectSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import ProfileImageModal from '../components/ProfileImageModal'
 
@@ -22,6 +22,15 @@ function SortableCard({ id, disabled, children }) {
       style={{ transform: CSS.Transform.toString(transform), transition, position: 'relative', zIndex: isDragging ? 2 : 1, opacity: isDragging ? 0.72 : 1 }}
       {...attributes}>
       {children({ listeners })}
+    </div>
+  )
+}
+
+function SortableFrame({ frame, children }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: frame.id })
+  return (
+    <div ref={setNodeRef} {...attributes} {...listeners} style={{ position: 'relative', aspectRatio: '1 / 1', transform: CSS.Transform.toString(transform), transition, zIndex: isDragging ? 3 : 1, opacity: isDragging ? 0.7 : 1, touchAction: 'none' }}>
+      {children}
     </div>
   )
 }
@@ -52,6 +61,10 @@ export default function Characters() {
   const [editDescription, setEditDescription] = useState('')
   const [editImageFile, setEditImageFile] = useState(null)
   const [editImagePreview, setEditImagePreview] = useState(null)
+  const [talkingFrames, setTalkingFrames] = useState([])
+  const [talkingFramesLoading, setTalkingFramesLoading] = useState(false)
+  const [talkingPreviewPlaying, setTalkingPreviewPlaying] = useState(false)
+  const [talkingPreviewIndex, setTalkingPreviewIndex] = useState(0)
 
   const [showCropper, setShowCropper] = useState(false)
   const [cropSrc, setCropSrc] = useState(null)
@@ -71,6 +84,14 @@ export default function Characters() {
   useEffect(() => {
     init()
   }, [])
+
+  useEffect(() => {
+    if (!talkingPreviewPlaying || talkingFrames.length === 0) return undefined
+    const timer = window.setInterval(() => {
+      setTalkingPreviewIndex(index => (index + 1) % (talkingFrames.length + 1))
+    }, 180)
+    return () => window.clearInterval(timer)
+  }, [talkingPreviewPlaying, talkingFrames.length])
 
   const init = async () => {
     const {
@@ -265,12 +286,85 @@ export default function Characters() {
     fetchChars()
   }
 
+  const fetchTalkingFrames = async characterId => {
+    const { data, error } = await supabase
+      .from('character_talking_frames')
+      .select('*')
+      .eq('character_id', characterId)
+      .order('sort_order')
+      .order('created_at')
+    if (!error) setTalkingFrames(data || [])
+  }
+
   const startEdit = c => {
     setEditingChar(c.id)
     setEditName(c.name)
     setEditDescription(c.description || '')
     setEditImagePreview(c.image_url || null)
     setEditImageFile(null)
+    setTalkingFrames([])
+    setTalkingPreviewPlaying(false)
+    setTalkingPreviewIndex(0)
+    fetchTalkingFrames(c.id)
+  }
+
+  const uploadTalkingFrames = async (character, files) => {
+    const selected = Array.from(files || []).slice(0, Math.max(0, 4 - talkingFrames.length))
+    if (selected.length === 0) return
+    for (const file of selected) {
+      const validationError = validateImageFile(file)
+      if (validationError) {
+        alert(validationError)
+        return
+      }
+    }
+    setTalkingFramesLoading(true)
+    const rows = []
+    for (let index = 0; index < selected.length; index += 1) {
+      const file = selected[index]
+      const ext = file.name.split('.').pop()
+      const path = `talking-frames/${userId}/${character.id}/${Date.now()}-${index}.${ext}`
+      const imageUrl = await uploadFile(file, path)
+      rows.push({
+        character_id: character.id,
+        user_id: userId,
+        image_url: imageUrl,
+        sort_order: talkingFrames.length + index,
+      })
+    }
+    const { error } = await supabase.from('character_talking_frames').insert(rows)
+    setTalkingFramesLoading(false)
+    if (error) {
+      alert('말하기 프레임을 저장하지 못했어요. Supabase 마이그레이션 적용 여부를 확인해 주세요.')
+      return
+    }
+    fetchTalkingFrames(character.id)
+  }
+
+  const deleteTalkingFrame = async frame => {
+    const { error } = await supabase.from('character_talking_frames').delete().eq('id', frame.id).eq('user_id', userId)
+    if (error) {
+      alert('말하기 프레임을 삭제하지 못했어요.')
+      return
+    }
+    setTalkingFrames(current => current.filter(item => item.id !== frame.id))
+    setTalkingPreviewIndex(0)
+  }
+
+  const reorderTalkingFrames = async ({ active, over }) => {
+    if (!over || active.id === over.id) return
+    const oldIndex = talkingFrames.findIndex(frame => frame.id === active.id)
+    const newIndex = talkingFrames.findIndex(frame => frame.id === over.id)
+    if (oldIndex < 0 || newIndex < 0) return
+    const reordered = arrayMove(talkingFrames, oldIndex, newIndex)
+    setTalkingFrames(reordered)
+    const results = await Promise.all(
+      reordered.map((frame, index) => supabase.from('character_talking_frames').update({ sort_order: index }).eq('id', frame.id).eq('user_id', userId))
+    )
+    if (results.some(result => result.error)) {
+      alert('말하기 프레임 순서를 저장하지 못했어요.')
+      fetchTalkingFrames(editingChar)
+    }
   }
 
   const saveEdit = async c => {
@@ -571,6 +665,43 @@ export default function Characters() {
                     </div>
                     <input value={editName} onChange={e => setEditName(e.target.value)} placeholder="캐릭터 이름 *" style={{ width: '100%', background: t.bg, border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '9px 12px', color: t.inputText, fontSize: 13, outline: 'none', boxSizing: 'border-box', marginBottom: 8 }} />
                     <textarea value={editDescription} onChange={e => setEditDescription(e.target.value)} placeholder="캐릭터 설명 (선택)" style={{ width: '100%', background: t.bg, border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '9px 12px', color: t.inputText, fontSize: 13, outline: 'none', boxSizing: 'border-box', resize: 'none', height: 70, marginBottom: 10 }} />
+                    <div style={{ marginBottom: 12, padding: 11, borderRadius: 10, background: t.bg, border: `0.5px solid ${t.border}` }}>
+                      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 9 }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ color: t.theirText, fontSize: 12 }}>입력 중 말하기 애니메이션</div>
+                          <div style={{ marginTop: 2, color: t.subText, fontSize: 10 }}>입 모양이 다른 이미지를 2~4장 등록해 주세요.</div>
+                        </div>
+                        <button type="button" onClick={() => { setTalkingPreviewPlaying(current => !current); setTalkingPreviewIndex(0) }} disabled={talkingFrames.length === 0} aria-label={talkingPreviewPlaying ? '미리보기 정지' : '미리보기 재생'} style={{ width: 32, height: 32, display: 'grid', placeItems: 'center', border: `0.5px solid ${t.border}`, borderRadius: 9, background: 'none', color: t.subText, opacity: talkingFrames.length === 0 ? 0.35 : 1 }}>
+                          {talkingPreviewPlaying ? <Pause size={14} /> : <Play size={14} />}
+                        </button>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 9 }}>
+                        <div style={{ width: 52, height: 52, flexShrink: 0, overflow: 'hidden', borderRadius: '50%', background: t.panel, border: `0.5px solid ${t.border}` }}>
+                          <img src={talkingPreviewIndex === 0 ? editImagePreview || DEFAULT_AVATAR : talkingFrames[talkingPreviewIndex - 1]?.image_url || editImagePreview || DEFAULT_AVATAR} alt="말하기 애니메이션 미리보기" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        </div>
+                        <div style={{ flex: 1, color: t.subText, fontSize: 10, lineHeight: 1.5 }}>기본 프로필과 등록된 프레임을 번갈아 재생합니다. 얼굴 위치와 이미지 크기를 동일하게 맞추면 자연스러워요.</div>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 6 }}>
+                        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={reorderTalkingFrames}>
+                          <SortableContext items={talkingFrames.map(frame => frame.id)} strategy={rectSortingStrategy}>
+                            {talkingFrames.map((frame, index) => (
+                              <SortableFrame key={frame.id} frame={frame}>
+                                <div style={{ width: '100%', height: '100%', overflow: 'hidden', borderRadius: 8, background: t.panel, cursor: 'grab' }}>
+                                  <img src={frame.image_url} alt={`말하기 프레임 ${index + 1}`} draggable={false} style={{ width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' }} />
+                                  <button type="button" onPointerDown={event => event.stopPropagation()} onClick={() => deleteTalkingFrame(frame)} aria-label={`말하기 프레임 ${index + 1} 삭제`} style={{ position: 'absolute', top: 3, right: 3, width: 22, height: 22, display: 'grid', placeItems: 'center', padding: 0, border: 0, borderRadius: '50%', background: 'rgba(0,0,0,0.62)', color: '#fff' }}><Trash2 size={11} /></button>
+                                </div>
+                              </SortableFrame>
+                            ))}
+                          </SortableContext>
+                        </DndContext>
+                        {talkingFrames.length < 4 && (
+                          <label style={{ aspectRatio: '1 / 1', display: 'grid', placeItems: 'center', borderRadius: 8, border: `0.5px dashed ${t.border}`, color: t.subText, cursor: talkingFramesLoading ? 'wait' : 'pointer', opacity: talkingFramesLoading ? 0.5 : 1 }}>
+                            <span style={{ fontSize: 20 }}>+</span>
+                            <input type="file" accept="image/*" multiple disabled={talkingFramesLoading} onChange={event => { uploadTalkingFrames(c, event.target.files); event.target.value = '' }} style={{ display: 'none' }} />
+                          </label>
+                        )}
+                      </div>
+                    </div>
                     <div style={{ display: 'flex', gap: 8 }}>
                       <button onClick={() => saveEdit(c)} disabled={loading} style={{ flex: 1, background: t.point, border: 'none', borderRadius: 8, padding: 9, color: '#fff', fontSize: 12, cursor: 'pointer' }}>
                         {loading ? '...' : '저장'}
