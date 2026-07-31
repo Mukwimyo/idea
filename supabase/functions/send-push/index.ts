@@ -85,7 +85,15 @@ Deno.serve(async req => {
       if (char) senderName = char.name
     }
 
-    const bodyText = record.type === 'image' ? '사진을 보냈어요' : record.type === 'narration' ? record.content : record.content
+    let bodyText = record.type === 'image' ? '사진을 보냈어요' : record.type === 'narration' ? record.content : record.content
+    if (record.type === 'communication') {
+      try {
+        const communication = JSON.parse(record.content)
+        bodyText = `${communication.title} · ${communication.statusLabel}`
+      } catch {
+        bodyText = '전화·문자 기록이 도착했습니다.'
+      }
+    }
 
     const notifPayload = JSON.stringify({
       title: senderName,

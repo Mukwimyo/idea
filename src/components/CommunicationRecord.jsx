@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { ChevronDown, ChevronRight, MessageSquare, Phone } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 
-export default function CommunicationRecord({ message, theme }) {
+export default function CommunicationRecord({ message, theme, onOpenSession }) {
   const [open, setOpen] = useState(false)
   const [items, setItems] = useState([])
   const t = theme
@@ -25,15 +25,21 @@ export default function CommunicationRecord({ message, theme }) {
 
   return (
     <div style={{ width: 'calc(100% - 20px)', margin: '4px auto', padding: 11, borderRadius: 13, border: `1px solid ${t.border}`, background: t.panel }}>
-      <button onClick={() => setOpen(value => !value)} aria-expanded={open} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: 0, border: 0, background: 'none', color: t.theirText, textAlign: 'left' }}>
+      <button
+        onClick={() => {
+          if (record.status === 'ringing' || record.status === 'active') {
+            onOpenSession?.()
+            return
+          }
+          setOpen(value => !value)
+        }}
+        aria-expanded={open}
+        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: 0, border: 0, background: 'none', color: t.theirText, textAlign: 'left' }}>
         {open ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
         {record.kind === 'call' ? <Phone size={15} /> : <MessageSquare size={15} />}
         <span style={{ flex: 1 }}>
           <span style={{ display: 'block', fontSize: 12 }}>{record.title}</span>
-          <span style={{ display: 'block', marginTop: 2, fontSize: 10, color: t.subText }}>
-            {record.statusLabel}
-            {record.duration ? ` · ${record.duration}` : ''}
-          </span>
+          <span style={{ display: 'block', marginTop: 2, fontSize: 10, color: t.subText }}>{record.statusLabel}{record.duration ? ` · ${record.duration}` : ''}{record.status === 'ringing' || record.status === 'active' ? ' · 눌러서 열기' : ''}</span>
         </span>
       </button>
       {open && (
