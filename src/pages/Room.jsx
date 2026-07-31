@@ -142,6 +142,7 @@ export default function Room() {
   const [editingId, setEditingId] = useState(null)
   const [editText, setEditText] = useState('')
   const [showTheme, setShowTheme] = useState(false)
+  const [closingTheme, setClosingTheme] = useState(false)
   const [showSearch, setShowSearch] = useState(false)
   const [showCalendar, setShowCalendar] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -197,6 +198,16 @@ export default function Room() {
     setShowTheme(panel === 'theme')
     setShowSearch(panel === 'search')
     setShowCalendar(panel === 'calendar')
+    if (panel === 'theme') setClosingTheme(false)
+  }
+
+  const closeThemePanel = () => {
+    if (closingTheme) return
+    setClosingTheme(true)
+    window.setTimeout(() => {
+      setShowTheme(false)
+      setClosingTheme(false)
+    }, 220)
   }
 
   useEffect(() => {
@@ -862,24 +873,19 @@ export default function Room() {
       )}
 
       {/* 헤더 */}
-      <div style={{ background: `color-mix(in srgb, ${t.panel} 78%, transparent)`, backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)', borderBottom: `0.5px solid ${t.border}`, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 8, position: 'sticky', top: 0, zIndex: 10 }}>
-        <div
-          aria-hidden="true"
-          style={{
-            position: 'absolute',
-            top: '100%',
-            left: 0,
-            right: 0,
-            height: 38,
-            zIndex: 11,
-            pointerEvents: 'none',
-            background: `linear-gradient(to bottom, ${t.panel}d9 0%, ${t.panel}80 42%, ${t.panel}24 76%, transparent 100%)`,
-            backdropFilter: 'blur(5px)',
-            WebkitBackdropFilter: 'blur(5px)',
-            maskImage: 'linear-gradient(to bottom, #000 0%, rgba(0,0,0,0.72) 48%, transparent 100%)',
-            WebkitMaskImage: 'linear-gradient(to bottom, #000 0%, rgba(0,0,0,0.72) 48%, transparent 100%)',
-          }}
-        />
+      <div
+        style={{
+          background: `linear-gradient(to bottom, color-mix(in srgb, ${t.panel} 86%, transparent) 0%, color-mix(in srgb, ${t.panel} 68%, transparent) 58%, transparent 100%)`,
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          padding: '10px 14px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          position: 'sticky',
+          top: 0,
+          zIndex: 10,
+        }}>
         <button onClick={() => navigate('/')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 2px', display: 'flex', alignItems: 'center' }}>
           <ChevronLeft size={22} color={t.subText} />
         </button>
@@ -889,7 +895,7 @@ export default function Room() {
         <button {...iconBtn(() => openPanel(showSearch ? null : 'search'), null, showSearch)}>
           <Search size={15} color={showSearch ? t.point : t.subText} />
         </button>
-        <button {...iconBtn(() => openPanel(showTheme ? null : 'theme'), null, showTheme)}>
+        <button {...iconBtn(() => (showTheme ? closeThemePanel() : openPanel('theme')), null, showTheme)}>
           <Settings size={15} color={showTheme ? t.point : t.subText} />
         </button>
       </div>
@@ -907,11 +913,11 @@ export default function Room() {
 
       {/* 테마 패널 */}
       {showTheme && (
-        <div className="top-panel-backdrop" style={{ position: 'fixed', inset: 0, zIndex: 80, display: 'flex', justifyContent: 'flex-end', background: 'rgba(0,0,0,0.24)' }} onClick={() => setShowTheme(false)}>
-          <div className="top-panel-sheet settings-page-drawer" style={{ background: t.panel, padding: '14px', borderLeft: `0.5px solid ${t.border}`, maxWidth: 480, marginLeft: 'auto', width: '100%', height: '100%', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+        <div className={`top-panel-backdrop${closingTheme ? ' settings-backdrop-closing' : ''}`} style={{ position: 'fixed', inset: 0, zIndex: 80, display: 'flex', justifyContent: 'flex-end', background: 'rgba(0,0,0,0.24)' }} onClick={closeThemePanel}>
+          <div className={`top-panel-sheet settings-page-drawer${closingTheme ? ' is-closing' : ''}`} style={{ background: t.panel, padding: '14px', borderLeft: `0.5px solid ${t.border}`, maxWidth: 480, marginLeft: 'auto', width: '100%', height: '100%', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', alignItems: 'center', marginBottom: 14 }}>
               <div style={{ flex: 1, fontSize: 15, color: t.theirText }}>대화방 설정</div>
-              <button onClick={() => setShowTheme(false)} style={{ border: `1px solid ${t.border}`, borderRadius: 9, background: 'none', color: t.subText, padding: '6px 10px' }}>닫기</button>
+              <button onClick={closeThemePanel} style={{ border: `1px solid ${t.border}`, borderRadius: 9, background: 'none', color: t.subText, padding: '6px 10px' }}>닫기</button>
             </div>
             <div style={{ marginBottom: 14, padding: 10, borderRadius: 10, background: t.bg, border: `1px solid ${t.border}` }}>
               <div style={{ fontSize: 10, color: t.subText }}>초대 코드</div>
@@ -920,7 +926,7 @@ export default function Room() {
             <div style={{ display: 'flex', gap: 7, marginBottom: 14 }}>
               <button
                 onClick={() => {
-                  setShowTheme(false)
+                  closeThemePanel()
                   setShowCalendar(true)
                 }}
                 style={{ flex: 1, padding: '8px 10px', borderRadius: 9, border: `1px solid ${t.border}`, background: 'none', color: t.theirText }}>
@@ -1343,7 +1349,7 @@ export default function Room() {
           }}
         />
         {myChars.length > 0 && (
-          <button onMouseDown={e => e.preventDefault()} onClick={() => setShowCharList(v => !v)} aria-label="프로필 변경 메뉴" style={{ position: 'absolute', top: -18, left: '50%', transform: 'translateX(-50%)', background: `color-mix(in srgb, ${t.panel} 78%, transparent)`, backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)', border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '3px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'auto' }}>
+          <button onMouseDown={e => e.preventDefault()} onClick={() => setShowCharList(v => !v)} aria-label="프로필 변경 메뉴" style={{ position: 'absolute', top: -18, left: 14, background: `color-mix(in srgb, ${t.panel} 78%, transparent)`, backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)', border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '3px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'auto' }}>
             {showCharList ? <ChevronDown size={13} color={t.subText} /> : <ChevronUp size={13} color={t.subText} />}
           </button>
         )}

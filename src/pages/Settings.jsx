@@ -140,6 +140,7 @@ export default function Settings() {
   const [showEntering, setShowEntering] = useState(true)
   const [showMessageTime, setShowMessageTime] = useState(true)
   const [pushLoading, setPushLoading] = useState(false)
+  const [closing, setClosing] = useState(false)
 
   useEffect(() => {
     loadSettings()
@@ -232,13 +233,19 @@ export default function Settings() {
     await supabase.auth.signOut()
   }
 
+  const closeSettings = () => {
+    if (closing) return
+    setClosing(true)
+    window.setTimeout(() => navigate(-1), 220)
+  }
+
   const t = getTheme(myThemeId)
   const darkThemes = THEMES.filter(th => th.dark)
   const lightThemes = THEMES.filter(th => !th.dark)
 
   return (
     <div
-      className="settings-page-drawer"
+      className={`settings-page-drawer${closing ? ' is-closing' : ''}`}
       style={{
         position: 'fixed',
         inset: 0,
@@ -258,7 +265,7 @@ export default function Settings() {
             paddingTop: 8,
           }}>
           <button
-            onClick={() => navigate(-1)}
+            onClick={closeSettings}
             style={{
               background: 'none',
               border: 'none',

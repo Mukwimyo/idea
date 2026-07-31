@@ -28,9 +28,28 @@ body {
     animation: settings-drawer-in 240ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
+.settings-page-drawer.is-closing,
+.top-panel-sheet.settings-page-drawer.is-closing {
+    animation: settings-drawer-out 220ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+.settings-backdrop-closing {
+    animation: settings-backdrop-out 220ms ease both !important;
+}
+
 @keyframes settings-drawer-in {
     from { transform: translateX(100%); }
     to { transform: translateX(0); }
+}
+
+@keyframes settings-drawer-out {
+    from { transform: translateX(0); }
+    to { transform: translateX(100%); }
+}
+
+@keyframes settings-backdrop-out {
+    from { opacity: 1; }
+    to { opacity: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {
