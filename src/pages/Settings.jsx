@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { THEMES, getTheme } from '../lib/themes'
-import { ChevronLeft, ChevronRight, LogOut, Users, Bell, BellOff } from 'lucide-react'
+import { ChevronLeft, ChevronRight, LogOut, Users, Bell, BellOff, CircleHelp } from 'lucide-react'
 import { supabase, subscribePush, unsubscribePush } from '../lib/supabase'
 
 const FONTS = [
@@ -599,6 +599,22 @@ export default function Settings() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <LogOut size={15} color="#f87171" />
                 <div style={{ fontSize: 13, color: '#f87171' }}>로그아웃</div>
+              </div>
+              <ChevronRight size={16} color={t.subText} />
+            </div>
+            <div
+              style={{
+                padding: '12px 14px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                borderTop: `0.5px solid ${t.border}`,
+                cursor: 'pointer',
+              }}
+              onClick={() => navigate('/help')}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <CircleHelp size={15} color={t.subText} />
+                <div style={{ fontSize: 13, color: t.theirText }}>앱 사용법</div>
               </div>
               <ChevronRight size={16} color={t.subText} />
             </div>
