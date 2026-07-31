@@ -23,7 +23,7 @@ export default function ProfileImageModal({ profile, onClose }) {
       <button
         onClick={onClose}
         aria-label="닫기"
-        style={{ position: 'absolute', top: 18, right: 18, width: 38, height: 38, borderRadius: '50%', border: '1px solid rgba(255,255,255,0.24)', background: 'rgba(0,0,0,0.35)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+        style={{ position: 'absolute', top: 'max(18px, env(safe-area-inset-top))', left: 18, width: 38, height: 38, borderRadius: '50%', border: 'none', background: 'transparent', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
         <X size={22} />
       </button>
       <img

@@ -655,7 +655,7 @@ export default function Room() {
       longPressTriggeredRef.current = false
       return
     }
-    window.open(url, '_blank')
+    setProfilePreview({ url, name: '' })
   }
 
   const saveRoomName = async () => {
@@ -688,23 +688,33 @@ export default function Room() {
       data: { user },
     } = await supabase.auth.getUser()
     const ext = file.name.split('.').pop()
-    const path = `chat/${roomId}/${Date.now()}.${ext}`
-    const url = await uploadFile(file, path)
-    if (!url) return alert('업로드 실패')
+    const uniqueId = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`
+    const path = `chat/${roomId}/${uniqueId}.${ext}`
+    const localUrl = URL.createObjectURL(file)
     const tempMsg = {
-      id: 'temp-' + Date.now(),
+      id: `temp-image-${uniqueId}`,
       room_id: roomId,
       user_id: user.id,
       character_id: activeChar?.id,
       characters: activeChar ? { name: activeChar.name, color: activeChar.color, text_color: activeChar.text_color, avatar_letter: activeChar.avatar_letter, image_url: activeChar.image_url } : null,
       type: 'image',
-      content: url,
+      content: localUrl,
       edited: false,
       created_at: new Date().toISOString(),
-      delivery_state: 'sending',
+      delivery_state: 'uploading',
+      upload_progress: 0,
       entrance_side: 'right',
     }
     setMessages(prev => [...prev, tempMsg])
+    const url = await uploadFile(file, path, progress => {
+      setMessages(current => current.map(message => (message.id === tempMsg.id ? { ...message, upload_progress: progress } : message)))
+    })
+    if (!url) {
+      setMessages(current => current.map(message => (message.id === tempMsg.id ? { ...message, delivery_state: 'upload_failed' } : message)))
+      return
+    }
+    setMessages(current => current.map(message => (message.id === tempMsg.id ? { ...message, content: url, upload_progress: 100, delivery_state: 'sending' } : message)))
+    window.requestAnimationFrame(() => URL.revokeObjectURL(localUrl))
     await persistMessage(tempMsg.id, {
       room_id: roomId,
       user_id: user.id,
@@ -752,7 +762,57 @@ export default function Room() {
       alert(invalid)
       return
     }
-    for (const file of files) await sendImage(file)
+    if (files.length === 1) {
+      await sendImage(files[0])
+    } else {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      const groupId = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`
+      const localUrls = files.map(file => URL.createObjectURL(file))
+      const progressByFile = files.map(() => 0)
+      const tempMsg = {
+        id: `temp-image-group-${groupId}`,
+        room_id: roomId,
+        user_id: user.id,
+        character_id: activeChar?.id,
+        characters: activeChar ? { name: activeChar.name, color: activeChar.color, text_color: activeChar.text_color, avatar_letter: activeChar.avatar_letter, image_url: activeChar.image_url } : null,
+        type: 'image_group',
+        content: JSON.stringify(localUrls),
+        edited: false,
+        created_at: new Date().toISOString(),
+        delivery_state: 'uploading',
+        upload_progress: 0,
+        entrance_side: 'right',
+      }
+      setMessages(current => [...current, tempMsg])
+      const uploadedUrls = await Promise.all(
+        files.map(async (file, index) => {
+          const ext = file.name.split('.').pop()
+          const path = `chat/${roomId}/${groupId}-${index}.${ext}`
+          return uploadFile(file, path, progress => {
+            progressByFile[index] = progress
+            const totalProgress = Math.round(progressByFile.reduce((sum, value) => sum + value, 0) / progressByFile.length)
+            setMessages(current => current.map(message => (message.id === tempMsg.id ? { ...message, upload_progress: totalProgress } : message)))
+          })
+        })
+      )
+      const successfulUrls = uploadedUrls.filter(Boolean)
+      window.requestAnimationFrame(() => localUrls.forEach(url => URL.revokeObjectURL(url)))
+      if (successfulUrls.length === 0) {
+        setMessages(current => current.map(message => (message.id === tempMsg.id ? { ...message, delivery_state: 'upload_failed' } : message)))
+      } else {
+        const content = JSON.stringify(successfulUrls)
+        setMessages(current => current.map(message => (message.id === tempMsg.id ? { ...message, content, upload_progress: 100, delivery_state: 'sending' } : message)))
+        await persistMessage(tempMsg.id, {
+          room_id: roomId,
+          user_id: user.id,
+          character_id: activeChar?.id,
+          type: 'image_group',
+          content,
+        })
+      }
+    }
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
@@ -762,7 +822,14 @@ export default function Room() {
       .map(message => {
         const time = new Date(message.created_at).toLocaleString('ko-KR')
         const speaker = message.type === 'narration' ? '나레이션' : message.characters?.name || '알 수 없음'
-        const content = message.type === 'image' ? `[이미지] ${message.content}` : message.content
+        let content = message.type === 'image' ? `[이미지] ${message.content}` : message.content
+        if (message.type === 'image_group') {
+          try {
+            content = `[이미지 ${JSON.parse(message.content).length}장]`
+          } catch {
+            content = '[이미지 묶음]'
+          }
+        }
         return `[${time}] ${speaker}\n${content}`
       })
     const blob = new Blob([`${room?.name || 'IDEA 채팅'}\n\n${lines.join('\n\n')}`], { type: 'text/plain;charset=utf-8' })
@@ -808,6 +875,18 @@ export default function Room() {
     )
   }
   const renderDeliveryStatus = msg => {
+    if (msg.delivery_state === 'uploading') {
+      const progress = Math.max(0, Math.min(100, msg.upload_progress || 0))
+      return (
+        <div style={{ width: 150, marginTop: 5 }}>
+          <div style={{ marginBottom: 3, color: t.subText, fontSize: 10 }}>업로드 중 {progress}%</div>
+          <div style={{ height: 3, overflow: 'hidden', borderRadius: 2, background: t.border }}>
+            <div style={{ width: `${progress}%`, height: '100%', borderRadius: 2, background: t.point, transition: 'width 120ms linear' }} />
+          </div>
+        </div>
+      )
+    }
+    if (msg.delivery_state === 'upload_failed') return <span style={{ marginTop: 4, color: '#f87171', fontSize: 10 }}>파일 업로드 실패</span>
     if (msg.delivery_state === 'sending') return <span style={{ marginTop: 3, color: t.subText, fontSize: 10, opacity: 0.7 }}>전송 중…</span>
     if (msg.delivery_state !== 'failed') return null
     return (
@@ -1237,6 +1316,52 @@ export default function Room() {
                 {renderDeliveryStatus(msg)}
               </div>
             )
+
+          if (msg.type === 'image_group') {
+            let imageUrls = []
+            try {
+              imageUrls = JSON.parse(msg.content)
+            } catch {
+              imageUrls = []
+            }
+            return (
+              <div
+                className={messageEntranceClass}
+                onAnimationEnd={() => messageEntranceClass && finishMessageEntrance(msg.id)}
+                key={msg.id}
+                id={'msg-' + msg.id}
+                onPointerDown={event => startLongPress(event, msg)}
+                onPointerMove={moveLongPress}
+                onPointerUp={cancelLongPress}
+                onPointerCancel={cancelLongPress}
+                onPointerLeave={cancelLongPress}
+                onContextMenu={event => isMine && event.preventDefault()}
+                onSelectStart={event => isMine && event.preventDefault()}
+                style={{ position: 'relative', display: 'flex', flexDirection: isMine ? 'row-reverse' : 'row', alignItems: 'flex-start', gap: 6, paddingTop: timelineMarkerHeight, touchAction: 'pan-y', ...ownMessageLongPressStyle }}>
+                {timelineMarkers}
+                <div style={{ flexShrink: 0, width: 36, height: showMessageIdentity ? 36 : 0 }}>
+                  {showMessageIdentity && <div style={{ width: 36, height: 36, borderRadius: '50%', overflow: 'hidden' }}><img src={char?.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>}
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMine ? 'flex-end' : 'flex-start', maxWidth: '76%' }}>
+                  {showMessageIdentity && char?.name && <div style={{ marginBottom: 4, color: t.subText, fontSize: 11 }}>{char.name}</div>}
+                  <div style={{ width: 190, display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 3, overflow: 'hidden', borderRadius: 11 }}>
+                    {imageUrls.map((url, imageIndex) => (
+                      <img
+                        key={`${url}-${imageIndex}`}
+                        src={url}
+                        alt=""
+                        onPointerDown={event => event.stopPropagation()}
+                        onClick={() => openImageMessage(url)}
+                        style={{ display: 'block', width: '100%', height: 92, objectFit: 'cover', cursor: 'pointer', gridColumn: imageUrls.length % 2 === 1 && imageIndex === imageUrls.length - 1 ? '1 / -1' : undefined }}
+                      />
+                    ))}
+                  </div>
+                  {renderMessageActions(msg, false)}
+                  {renderDeliveryStatus(msg)}
+                </div>
+              </div>
+            )
+          }
 
           if (msg.type === 'image')
             return (

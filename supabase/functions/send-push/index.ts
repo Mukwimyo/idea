@@ -85,7 +85,7 @@ Deno.serve(async req => {
       if (char) senderName = char.name
     }
 
-    let bodyText = record.type === 'image' ? '사진을 보냈어요' : record.type === 'narration' ? record.content : record.content
+    let bodyText = record.type === 'image' || record.type === 'image_group' ? '사진을 보냈어요' : record.type === 'narration' ? record.content : record.content
     if (record.type === 'communication') {
       try {
         const communication = JSON.parse(record.content)
