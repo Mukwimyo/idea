@@ -1126,7 +1126,7 @@ export default function Room() {
           style={{
             position: 'absolute',
             zIndex: -1,
-            inset: '0 0 -34px',
+            inset: '0 0 -17px',
             pointerEvents: 'none',
             background: `linear-gradient(to bottom, color-mix(in srgb, ${t.panel} 68%, transparent) 0%, color-mix(in srgb, ${t.panel} 48%, transparent) 42%, color-mix(in srgb, ${t.panel} 18%, transparent) 72%, transparent 100%)`,
             backdropFilter: 'blur(9px)',
