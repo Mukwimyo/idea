@@ -863,7 +863,23 @@ export default function Room() {
 
       {/* 헤더 */}
       <div style={{ background: `color-mix(in srgb, ${t.panel} 78%, transparent)`, backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)', borderBottom: `0.5px solid ${t.border}`, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 8, position: 'sticky', top: 0, zIndex: 10 }}>
-        <div aria-hidden="true" style={{ position: 'absolute', top: '100%', left: 0, right: 0, height: 28, pointerEvents: 'none', background: `linear-gradient(to bottom, color-mix(in srgb, ${t.panel} 42%, transparent), transparent)` }} />
+        <div
+          aria-hidden="true"
+          style={{
+            position: 'absolute',
+            top: '100%',
+            left: 0,
+            right: 0,
+            height: 38,
+            zIndex: 11,
+            pointerEvents: 'none',
+            background: `linear-gradient(to bottom, ${t.panel}d9 0%, ${t.panel}80 42%, ${t.panel}24 76%, transparent 100%)`,
+            backdropFilter: 'blur(5px)',
+            WebkitBackdropFilter: 'blur(5px)',
+            maskImage: 'linear-gradient(to bottom, #000 0%, rgba(0,0,0,0.72) 48%, transparent 100%)',
+            WebkitMaskImage: 'linear-gradient(to bottom, #000 0%, rgba(0,0,0,0.72) 48%, transparent 100%)',
+          }}
+        />
         <button onClick={() => navigate('/')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 2px', display: 'flex', alignItems: 'center' }}>
           <ChevronLeft size={22} color={t.subText} />
         </button>
