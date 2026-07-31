@@ -831,7 +831,7 @@ export default function Room() {
 
   const iconBtn = (onClick, icon, active) => ({
     onClick,
-    style: { width: 40, height: 40, background: active ? t.point + '22' : 'none', border: `1px solid ${active ? t.point : t.border}`, borderRadius: 10, padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+    style: { width: 40, height: 40, background: active ? t.point + '22' : 'none', border: 'none', borderRadius: 10, padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   })
 
   if (!theme)
@@ -882,8 +882,11 @@ export default function Room() {
           display: 'flex',
           alignItems: 'center',
           gap: 8,
-          position: 'sticky',
+          position: 'absolute',
           top: 0,
+          left: 0,
+          right: 0,
+          width: '100%',
           zIndex: 10,
         }}>
         <button onClick={() => navigate('/')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 2px', display: 'flex', alignItems: 'center' }}>
@@ -1117,7 +1120,7 @@ export default function Room() {
       )}
 
       {/* 메시지 목록 */}
-      <div ref={messageListRef} onScroll={handleScroll} className={`chat-scroll${hideScroll ? ' hide-scroll' : ''}`} style={{ position: 'relative', flex: 1, minHeight: 0, padding: `12px 10px ${showCharList && myChars.length > 0 ? 126 : 82}px`, display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto', background: t.bg, transition: 'padding-bottom 210ms cubic-bezier(0.2, 0.8, 0.2, 1)' }}>
+      <div ref={messageListRef} onScroll={handleScroll} className={`chat-scroll${hideScroll ? ' hide-scroll' : ''}`} style={{ position: 'relative', flex: 1, minHeight: 0, padding: `62px 10px ${showCharList && myChars.length > 0 ? 126 : 82}px`, display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto', background: t.bg, transition: 'padding-bottom 210ms cubic-bezier(0.2, 0.8, 0.2, 1)' }}>
         {filteredMessages.map((msg, messageIndex) => {
           const isMine = msg.user_id === userId
           const messageEntranceClass = msg.entrance_side === 'right' ? 'message-enter-right' : msg.entrance_side === 'left' ? 'message-enter-left' : ''
