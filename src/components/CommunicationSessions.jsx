@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { MessageSquare, Phone, PhoneOff, Send, X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 
@@ -22,6 +22,9 @@ export default function CommunicationSessions({ roomId, userId, myChars, theme, 
   const [now, setNow] = useState(Date.now())
   const [characterLoadError, setCharacterLoadError] = useState('')
   const [hiddenSessionId, setHiddenSessionId] = useState(null)
+  const [viewportHeight, setViewportHeight] = useState(() => window.visualViewport?.height || window.innerHeight)
+  const [viewportOffsetTop, setViewportOffsetTop] = useState(() => window.visualViewport?.offsetTop || 0)
+  const messageInputRef = useRef(null)
   const t = theme
 
   const activeSession = sessions.find(session => ['ringing', 'active'].includes(session.status))
@@ -32,7 +35,7 @@ export default function CommunicationSessions({ roomId, userId, myChars, theme, 
   const selectedReceiver = receiverOptions.find(character => character.id === receiverId)
 
   const fetchSessions = async () => {
-    const { data } = await supabase.from('communication_sessions').select('*').eq('room_id', roomId).order('created_at', { ascending: false })
+    const { data } = await supabase.from('communication_sessions').select('*').eq('room_id', roomId).in('status', ['ringing', 'active']).order('created_at', { ascending: false })
     setSessions(data || [])
   }
 
@@ -105,6 +108,22 @@ export default function CommunicationSessions({ roomId, userId, myChars, theme, 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1000)
     return () => window.clearInterval(timer)
+  }, [])
+
+  useEffect(() => {
+    const viewport = window.visualViewport
+    if (!viewport) return undefined
+    const syncViewport = () => {
+      setViewportHeight(viewport.height)
+      setViewportOffsetTop(viewport.offsetTop)
+    }
+    syncViewport()
+    viewport.addEventListener('resize', syncViewport)
+    viewport.addEventListener('scroll', syncViewport)
+    return () => {
+      viewport.removeEventListener('resize', syncViewport)
+      viewport.removeEventListener('scroll', syncViewport)
+    }
   }, [])
 
   const createSession = async () => {
@@ -185,6 +204,7 @@ export default function CommunicationSessions({ roomId, userId, myChars, theme, 
     const characterId = session.sender_user_id === userId ? session.sender_character_id : session.receiver_character_id
     await supabase.from('communication_session_messages').insert({ session_id: session.id, user_id: userId, character_id: characterId, content: draft.trim() })
     setDraft('')
+    window.requestAnimationFrame(() => messageInputRef.current?.focus({ preventScroll: true }))
   }
 
   const sessionTitle = session => `${characterById[session.sender_character_id]?.name || '캐릭터'} × ${characterById[session.receiver_character_id]?.name || '캐릭터'}`
@@ -205,7 +225,7 @@ export default function CommunicationSessions({ roomId, userId, myChars, theme, 
   if (!visible) return null
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 120, background: `${t.bg}f2`, display: 'flex', flexDirection: 'column', maxWidth: 480, margin: '0 auto' }}>
+    <div style={{ position: 'fixed', top: viewportOffsetTop, left: 0, right: 0, width: '100%', height: viewportHeight, zIndex: 120, overflow: 'hidden', background: `${t.bg}f2`, display: 'flex', flexDirection: 'column', maxWidth: 480, margin: '0 auto' }}>
       <header style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: t.panel, borderBottom: `1px solid ${t.border}` }}>
         <strong style={{ flex: 1, color: t.theirText }}>전화 · 문자</strong>
         <button
@@ -220,7 +240,7 @@ export default function CommunicationSessions({ roomId, userId, myChars, theme, 
         </button>
       </header>
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: 14 }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 14, display: 'flex', flexDirection: 'column' }}>
         {!activeSession && (
           <section style={{ padding: 14, borderRadius: 18, background: t.panel, border: `1px solid ${t.border}` }}>
             <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
@@ -250,17 +270,17 @@ export default function CommunicationSessions({ roomId, userId, myChars, theme, 
         )}
 
         {activeSession?.status === 'ringing' && (
-          <section style={{ marginTop: 32, textAlign: 'center' }}>
+          <section style={{ flex: 1, minHeight: 0, paddingTop: 32, textAlign: 'center', display: 'flex', flexDirection: 'column' }}>
             <img src={counterpartCharacter(activeSession)?.image_url || DEFAULT_AVATAR} alt="" style={{ width: 76, height: 76, objectFit: 'cover', borderRadius: '50%' }} />
             <div style={{ marginTop: 10, fontSize: 12, color: t.subText }}>{activeSession.kind === 'call' ? '수신 전화' : '새 문자'}</div>
             <h2 style={{ color: t.theirText }}>{isReceiver(activeSession) ? `${counterpartCharacter(activeSession)?.name || '상대방'}에게 ${activeSession.kind === 'call' ? '전화가' : '문자가'} 왔습니다` : `${counterpartCharacter(activeSession)?.name || '상대방'}의 응답을 기다리는 중…`}</h2>
             {isReceiver(activeSession) ? activeSession.kind === 'call' ? (
-              <div style={{ display: 'flex', justifyContent: 'center', gap: 72, marginTop: 28 }}>
+              <div style={{ display: 'flex', justifyContent: 'center', gap: 72, marginTop: 'auto', paddingTop: 28, paddingBottom: 'calc(18px + env(safe-area-inset-bottom))' }}>
                 <label style={{ display: 'grid', gap: 8, color: t.theirText }}><button onClick={() => updateSession(activeSession, 'active')} aria-label="받기" style={{ width: 66, height: 66, border: 0, borderRadius: '50%', background: '#26a65b', color: '#fff' }}><Phone size={27} /></button>받기</label>
                 <label style={{ display: 'grid', gap: 8, color: t.theirText }}><button onClick={() => updateSession(activeSession, 'declined')} aria-label="거절" style={{ width: 66, height: 66, border: 0, borderRadius: '50%', background: '#e5484d', color: '#fff' }}><PhoneOff size={27} /></button>거절</label>
               </div>
             ) : (
-              <div style={{ display: 'flex', justifyContent: 'center', gap: 10, marginTop: 24 }}>
+              <div style={{ display: 'flex', justifyContent: 'center', gap: 10, marginTop: 'auto', paddingTop: 24, paddingBottom: 'calc(18px + env(safe-area-inset-bottom))' }}>
                 <button onClick={() => updateSession(activeSession, 'active')} style={{ padding: '10px 22px', border: 0, borderRadius: 12, background: t.point, color: '#fff' }}>입장</button>
                 <button onClick={() => updateSession(activeSession, 'left')} style={{ padding: '10px 22px', borderRadius: 12, border: `1px solid ${t.border}`, background: 'none', color: t.subText }}>나가기</button>
               </div>
@@ -269,18 +289,18 @@ export default function CommunicationSessions({ roomId, userId, myChars, theme, 
         )}
 
         {activeSession?.status === 'active' && (
-          <section style={{ borderRadius: 22, overflow: 'hidden', background: t.panel, border: `1px solid ${t.border}` }}>
+          <section style={{ flex: 1, minHeight: 0, borderRadius: 22, overflow: 'hidden', background: t.panel, border: `1px solid ${t.border}`, display: 'flex', flexDirection: 'column' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '9px 14px', borderBottom: `1px solid ${t.border}`, color: t.subText, fontSize: 11 }}><span>IDEA</span><span>●●● 87%</span></div>
             <div style={{ padding: 14, textAlign: 'center', borderBottom: `1px solid ${t.border}` }}>
               <div style={{ fontSize: 11, color: t.subText }}>{activeSession.kind === 'call' ? `통화 중 · ${durationLabel(activeSession.started_at, null, now)}` : '문자 대화'}</div>
               <strong style={{ color: t.theirText }}>{sessionTitle(activeSession)}</strong>
             </div>
-            <div style={{ minHeight: 230, padding: 14 }}>
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 14 }}>
               {(messages[activeSession.id] || []).map(message => <div key={message.id} style={{ width: 'fit-content', maxWidth: '75%', margin: message.user_id === userId ? '0 0 9px auto' : '0 auto 9px 0', padding: '8px 11px', borderRadius: 12, background: message.user_id === userId ? t.myBubble : t.theirBubble, color: message.user_id === userId ? t.myText : t.theirText }}>{message.content}</div>)}
             </div>
-            <div style={{ display: 'flex', gap: 7, padding: 10, borderTop: `1px solid ${t.border}` }}>
-              <input value={draft} onChange={event => setDraft(event.target.value)} onKeyDown={event => event.key === 'Enter' && sendMessage(activeSession)} placeholder="대화를 입력…" style={{ flex: 1, minWidth: 0, padding: 9, borderRadius: 10, background: t.bg, color: t.inputText, border: `1px solid ${t.border}` }} />
-              <button onClick={() => sendMessage(activeSession)} aria-label="전송" style={{ width: 40, border: 0, borderRadius: 10, background: t.point, color: '#fff' }}><Send size={16} /></button>
+            <div style={{ flexShrink: 0, display: 'flex', gap: 7, padding: '10px 10px calc(10px + env(safe-area-inset-bottom))', borderTop: `1px solid ${t.border}` }}>
+              <input ref={messageInputRef} value={draft} onChange={event => setDraft(event.target.value)} onKeyDown={event => event.key === 'Enter' && sendMessage(activeSession)} placeholder="대화를 입력…" style={{ flex: 1, minWidth: 0, padding: 9, borderRadius: 10, background: t.bg, color: t.inputText, border: `1px solid ${t.border}` }} />
+              <button onPointerDown={event => event.preventDefault()} onClick={() => sendMessage(activeSession)} aria-label="전송" style={{ width: 40, border: 0, borderRadius: 10, background: t.point, color: '#fff' }}><Send size={16} /></button>
               <button onClick={() => updateSession(activeSession, 'ended')} aria-label="종료" style={{ width: 40, borderRadius: 10, border: `1px solid ${t.border}`, background: 'none', color: t.subText }}><PhoneOff size={16} /></button>
             </div>
           </section>
