@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase, uploadFile, validateImageFile } from '../lib/supabase'
 import { THEMES, getTheme } from '../lib/themes'
-import { ChevronLeft, Settings, Search, Paperclip, ArrowUp, Eye, ArrowDown, ChevronDown, ChevronUp, Quote, RotateCcw, AlertCircle, Sparkles, Minus, Phone, MessageSquare } from 'lucide-react'
+import { ChevronLeft, Settings, Search, Images, Paperclip, ArrowUp, Eye, ArrowDown, ChevronDown, ChevronUp, Quote, RotateCcw, AlertCircle, Sparkles, Minus, Phone, MessageSquare } from 'lucide-react'
 import ProfileImageModal from '../components/ProfileImageModal'
 import CommunicationSessions from '../components/CommunicationSessions'
 import CommunicationRecord from '../components/CommunicationRecord'
@@ -143,6 +143,8 @@ export default function Room() {
   const [editText, setEditText] = useState('')
   const [showTheme, setShowTheme] = useState(false)
   const [closingTheme, setClosingTheme] = useState(false)
+  const [showGallery, setShowGallery] = useState(false)
+  const [closingGallery, setClosingGallery] = useState(false)
   const [showSearch, setShowSearch] = useState(false)
   const [showCalendar, setShowCalendar] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -200,7 +202,9 @@ export default function Room() {
     setShowTheme(panel === 'theme')
     setShowSearch(panel === 'search')
     setShowCalendar(panel === 'calendar')
+    setShowGallery(panel === 'gallery')
     if (panel === 'theme') setClosingTheme(false)
+    if (panel === 'gallery') setClosingGallery(false)
   }
 
   const closeThemePanel = () => {
@@ -209,6 +213,15 @@ export default function Room() {
     window.setTimeout(() => {
       setShowTheme(false)
       setClosingTheme(false)
+    }, 220)
+  }
+
+  const closeGalleryPanel = () => {
+    if (closingGallery) return
+    setClosingGallery(true)
+    window.setTimeout(() => {
+      setShowGallery(false)
+      setClosingGallery(false)
     }, 220)
   }
 
@@ -624,6 +637,42 @@ export default function Room() {
     setMessages(prev => prev.filter(m => m.id !== msg.id))
   }
 
+  const deleteGalleryImage = async item => {
+    if (!item?.message || item.message.user_id !== userId) return
+
+    const message = item.message
+    if (message.type === 'image') {
+      await deleteMessage(message)
+      return
+    }
+
+    let urls = []
+    try {
+      urls = JSON.parse(message.content)
+    } catch {
+      return
+    }
+    if (!confirm('이 이미지를 삭제할까요?')) return
+    const nextUrls = urls.filter((_, index) => index !== item.imageIndex)
+    if (nextUrls.length === 0) {
+      await deleteMessage(message)
+      return
+    }
+
+    const nextContent = JSON.stringify(nextUrls)
+    const { error } = await supabase
+      .from('messages')
+      .update({ content: nextContent, edited: true })
+      .eq('id', message.id)
+      .eq('user_id', userId)
+    if (error) {
+      alert('이미지를 삭제하지 못했어요.')
+      return
+    }
+    setMessages(prev => prev.map(entry => (entry.id === message.id ? { ...entry, content: nextContent, edited: true } : entry)))
+    setProfilePreview(null)
+  }
+
   const cancelLongPress = () => {
     clearTimeout(longPressTimerRef.current)
     longPressTimerRef.current = null
@@ -650,12 +699,12 @@ export default function Room() {
     }
   }
 
-  const openImageMessage = url => {
+  const openImageMessage = (url, urls = [url], index = 0) => {
     if (longPressTriggeredRef.current) {
       longPressTriggeredRef.current = false
       return
     }
-    setProfilePreview({ url, name: '' })
+    setProfilePreview({ url, urls, index, name: '' })
   }
 
   const saveRoomName = async () => {
@@ -908,6 +957,19 @@ export default function Room() {
     if (!searchQuery) return true
     return msg.content?.toLowerCase().includes(searchQuery.toLowerCase())
   })
+  const galleryItems = messages.flatMap(message => {
+    if (message.type === 'image') {
+      return message.content ? [{ url: message.content, message, imageIndex: 0 }] : []
+    }
+    if (message.type !== 'image_group') return []
+    try {
+      const urls = JSON.parse(message.content)
+      return Array.isArray(urls) ? urls.filter(Boolean).map((url, imageIndex) => ({ url, message, imageIndex })) : []
+    } catch {
+      return []
+    }
+  })
+  const galleryUrls = galleryItems.map(item => item.url)
   const lastReadMessageId = [...filteredMessages].reverse().find(msg => msg.user_id === userId && (msg.read_by || []).some(id => id !== msg.user_id))?.id
 
   const iconBtn = (onClick, icon, active) => ({
@@ -978,6 +1040,11 @@ export default function Room() {
         </div>
         <button {...iconBtn(() => openPanel(showSearch ? null : 'search'), null, showSearch)}>
           <Search size={15} color={showSearch ? t.point : t.subText} />
+        </button>
+        <button
+          {...iconBtn(() => (showGallery ? closeGalleryPanel() : openPanel('gallery')), null, showGallery)}
+          aria-label="대화방 갤러리">
+          <Images size={15} color={showGallery ? t.point : t.subText} />
         </button>
         <button {...iconBtn(() => (showTheme ? closeThemePanel() : openPanel('theme')), null, showTheme)}>
           <Settings size={15} color={showTheme ? t.point : t.subText} />
@@ -1159,6 +1226,48 @@ export default function Room() {
       )}
 
       {/* 검색 패널 */}
+      {showGallery && (
+        <div
+          className={`top-panel-backdrop${closingGallery ? ' settings-backdrop-closing' : ''}`}
+          style={{ position: 'fixed', inset: 0, zIndex: 80, display: 'flex', justifyContent: 'flex-end', background: 'rgba(0,0,0,0.24)' }}
+          onClick={closeGalleryPanel}>
+          <div
+            className={`top-panel-sheet settings-page-drawer${closingGallery ? ' is-closing' : ''}`}
+            style={{ background: t.panel, padding: 14, borderLeft: `0.5px solid ${t.border}`, maxWidth: 480, marginLeft: 'auto', width: '100%', height: '100%', overflowY: 'auto' }}
+            onClick={event => event.stopPropagation()}>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 14 }}>
+              <div style={{ flex: 1, fontSize: 15, color: t.theirText }}>대화방 갤러리</div>
+              <div style={{ marginRight: 10, color: t.subText, fontSize: 11 }}>{galleryItems.length}장</div>
+              <button onClick={closeGalleryPanel} style={{ border: 0, borderRadius: 9, background: 'none', color: t.subText, padding: '6px 8px' }}>닫기</button>
+            </div>
+            {galleryItems.length === 0 ? (
+              <div style={{ padding: '48px 12px', color: t.subText, fontSize: 12, textAlign: 'center' }}>아직 전송된 이미지가 없어요.</div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 4 }}>
+                {galleryItems.map((item, index) => (
+                  <div key={`${item.message.id}-${item.imageIndex}`} style={{ position: 'relative', aspectRatio: '1 / 1', overflow: 'hidden', borderRadius: 8, background: t.bg }}>
+                    <button
+                      onClick={() => setProfilePreview({ url: item.url, urls: galleryUrls, index, name: '' })}
+                      aria-label={`이미지 ${index + 1} 크게 보기`}
+                      style={{ width: '100%', height: '100%', padding: 0, border: 0, background: 'none', cursor: 'pointer' }}>
+                      <img src={item.url} alt="" loading="lazy" style={{ width: '100%', height: '100%', display: 'block', objectFit: 'cover' }} />
+                    </button>
+                    {item.message.user_id === userId && (
+                      <button
+                        onClick={() => deleteGalleryImage(item)}
+                        aria-label="이미지 삭제"
+                        style={{ position: 'absolute', top: 4, right: 4, width: 24, height: 24, display: 'grid', placeItems: 'center', padding: 0, border: 0, borderRadius: '50%', background: 'rgba(0,0,0,0.62)', color: '#fff', cursor: 'pointer' }}>
+                        ×
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {showSearch && (
         <div className="top-panel-backdrop" style={{ position: 'fixed', top: 49, left: 0, right: 0, bottom: 0, zIndex: 50, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }} onClick={() => setShowSearch(false)}>
           <div className="top-panel-sheet" style={{ background: t.panel, padding: '10px 14px', borderBottom: `0.5px solid ${t.border}`, maxWidth: 480, margin: '0 auto', width: '100%' }} onClick={e => e.stopPropagation()}>
@@ -1351,7 +1460,7 @@ export default function Room() {
                         src={url}
                         alt=""
                         onPointerDown={event => event.stopPropagation()}
-                        onClick={() => openImageMessage(url)}
+                        onClick={() => openImageMessage(url, imageUrls, imageIndex)}
                         style={{ display: 'block', width: '100%', height: 92, objectFit: 'cover', cursor: 'pointer', gridColumn: imageUrls.length % 2 === 1 && imageIndex === imageUrls.length - 1 ? '1 / -1' : undefined }}
                       />
                     ))}
