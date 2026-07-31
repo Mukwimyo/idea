@@ -833,7 +833,7 @@ export default function Room() {
 
   const iconBtn = (onClick, icon, active) => ({
     onClick,
-    style: { width: 40, height: 40, background: active ? t.point + '22' : 'none', border: 'none', borderRadius: 10, padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+    style: { width: 36, height: 36, background: active ? t.point + '1f' : 'none', border: 'none', borderRadius: 10, padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   })
 
   if (!theme)
@@ -877,10 +877,10 @@ export default function Room() {
       {/* 헤더 */}
       <div
         style={{
-          background: `linear-gradient(to bottom, color-mix(in srgb, ${t.panel} 86%, transparent) 0%, color-mix(in srgb, ${t.panel} 68%, transparent) 58%, transparent 100%)`,
-          backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)',
-          padding: '10px 14px',
+          background: `linear-gradient(to bottom, color-mix(in srgb, ${t.panel} 58%, transparent) 0%, color-mix(in srgb, ${t.panel} 34%, transparent) 58%, color-mix(in srgb, ${t.panel} 8%, transparent) 100%)`,
+          backdropFilter: 'blur(6px)',
+          WebkitBackdropFilter: 'blur(6px)',
+          padding: '8px 12px',
           display: 'flex',
           alignItems: 'center',
           gap: 8,
@@ -891,11 +891,11 @@ export default function Room() {
           width: '100%',
           zIndex: 10,
         }}>
-        <button onClick={() => navigate('/')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 2px', display: 'flex', alignItems: 'center' }}>
+        <button onClick={() => navigate('/')} style={{ width: 32, height: 36, flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <ChevronLeft size={22} color={t.subText} />
         </button>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 15, fontWeight: 600, color: t.theirText, lineHeight: 1.3 }}>{room?.name}</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 15, fontWeight: 600, color: t.theirText, lineHeight: 1.3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{room?.name}</div>
         </div>
         <button {...iconBtn(() => openPanel(showSearch ? null : 'search'), null, showSearch)}>
           <Search size={15} color={showSearch ? t.point : t.subText} />
@@ -1122,7 +1122,7 @@ export default function Room() {
       )}
 
       {/* 메시지 목록 */}
-      <div ref={messageListRef} onScroll={handleScroll} className={`chat-scroll${hideScroll ? ' hide-scroll' : ''}`} style={{ position: 'relative', flex: 1, minHeight: 0, padding: `62px 10px ${showCharList && myChars.length > 0 ? 126 : 82}px`, display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto', background: t.bg, transition: 'padding-bottom 210ms cubic-bezier(0.2, 0.8, 0.2, 1)' }}>
+      <div ref={messageListRef} onScroll={handleScroll} className={`chat-scroll${hideScroll ? ' hide-scroll' : ''}`} style={{ position: 'relative', flex: 1, minHeight: 0, padding: `58px 10px ${showCharList && myChars.length > 0 ? 126 : 82}px`, scrollPaddingTop: 58, display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto', background: t.bg, transition: 'padding-bottom 210ms cubic-bezier(0.2, 0.8, 0.2, 1)' }}>
         {filteredMessages.map((msg, messageIndex) => {
           const isMine = msg.user_id === userId
           const messageEntranceClass = msg.entrance_side === 'right' ? 'message-enter-right' : msg.entrance_side === 'left' ? 'message-enter-left' : ''
