@@ -159,6 +159,7 @@ export default function Room() {
   const [roomNameText, setRoomNameText] = useState('')
   const [showCharList, setShowCharList] = useState(false)
   const [typingInfo, setTypingInfo] = useState(null)
+  const [showTypingIndicator, setShowTypingIndicator] = useState(true)
   const [showEntering, setShowEntering] = useState(true)
   const [showMessageTime, setShowMessageTime] = useState(true)
   const [messageMenuId, setMessageMenuId] = useState(null)
@@ -172,6 +173,8 @@ export default function Room() {
   const [viewportOffsetTop, setViewportOffsetTop] = useState(() => window.visualViewport?.offsetTop || 0)
   const scrollTimerRef = useRef(null)
   const typingTimerRef = useRef(null)
+  const remoteTypingTimerRef = useRef(null)
+  const lastTypingSentAtRef = useRef(0)
   const longPressTimerRef = useRef(null)
   const longPressStartRef = useRef(null)
   const longPressTriggeredRef = useRef(false)
@@ -209,6 +212,7 @@ export default function Room() {
       setRoom(roomData)
       setReadReceipt(roomData?.read_receipt_style || 'text')
       setActionStyle(roomData?.action_style || 'dim')
+      setShowTypingIndicator(roomData?.show_typing_indicator ?? true)
       setIsOwner(roomData?.created_by === user.id)
 
       const [{ data: profile }, { data: messageTimeSetting }] = await Promise.all([supabase.from('profiles').select('theme_id, last_char_id, show_entering').eq('id', user.id).single(), supabase.from('profiles').select('show_message_time').eq('id', user.id).maybeSingle()])
@@ -243,12 +247,18 @@ export default function Room() {
         .channel('room-' + roomId)
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rooms', filter: `id=eq.${roomId}` }, payload => {
           setRoom(prev => ({ ...prev, ...payload.new }))
+          setShowTypingIndicator(payload.new.show_typing_indicator ?? true)
+          if (payload.new.show_typing_indicator === false) setTypingInfo(null)
         })
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'room_members', filter: `room_id=eq.${roomId}` }, payload => {
           // 상대방 타이핑 감지
           if (payload.new.user_id !== userIdRef.current) {
-            if (payload.new.is_typing && payload.new.typing_char_name) {
-              setTypingInfo({ charName: payload.new.typing_char_name })
+            const expiresAt = payload.new.typing_expires_at ? new Date(payload.new.typing_expires_at).getTime() : 0
+            const remaining = expiresAt - Date.now()
+            window.clearTimeout(remoteTypingTimerRef.current)
+            if ((payload.new.is_typing ?? true) && payload.new.typing_char_name && remaining > 0) {
+              setTypingInfo({ charName: payload.new.typing_char_name, expiresAt })
+              remoteTypingTimerRef.current = window.setTimeout(() => setTypingInfo(null), remaining)
             } else {
               setTypingInfo(null)
             }
@@ -289,7 +299,7 @@ export default function Room() {
       if (userIdRef.current) {
         supabase
           .from('room_members')
-          .update({ is_typing: false, typing_char_name: null })
+          .update({ is_typing: false, typing_char_name: null, typing_expires_at: null })
           .eq('room_id', roomId)
           .eq('user_id', userIdRef.current)
           .then(() => {})
@@ -412,6 +422,7 @@ export default function Room() {
         const firstUnread = data.find(message => message.user_id !== userIdRef.current && !(message.read_by || []).includes(userIdRef.current))
         setInitialUnreadId(firstUnread?.id || null)
       }
+      window.clearTimeout(remoteTypingTimerRef.current)
       setMessages(data)
       markAsRead(data)
       const dates = [...new Set(data.map(m => new Date(m.created_at).toLocaleDateString('ko-KR')))]
@@ -437,16 +448,32 @@ export default function Room() {
   }
 
   const handleTyping = async e => {
-    // 뒤로가기(Backspace) 제외
-    if (e.nativeEvent?.inputType === 'deleteContentBackward') return
-    if (!activeChar || !userIdRef.current) return
+    if (!showTypingIndicator || !activeChar || !userIdRef.current) return
+    const hasContent = e.target.value.trim().length > 0
+    const currentTime = Date.now()
+    const shouldRefresh = hasContent && currentTime - lastTypingSentAtRef.current >= 2000
 
-    await supabase.from('room_members').update({ is_typing: true, typing_char_name: activeChar.name }).eq('room_id', roomId).eq('user_id', userIdRef.current)
+    if (shouldRefresh) {
+      lastTypingSentAtRef.current = currentTime
+      await supabase
+        .from('room_members')
+        .update({
+          is_typing: true,
+          typing_char_name: activeChar.name,
+          typing_expires_at: new Date(currentTime + 5000).toISOString(),
+        })
+        .eq('room_id', roomId)
+        .eq('user_id', userIdRef.current)
+    }
 
     clearTimeout(typingTimerRef.current)
-    typingTimerRef.current = setTimeout(async () => {
-      await supabase.from('room_members').update({ is_typing: false, typing_char_name: null }).eq('room_id', roomId).eq('user_id', userIdRef.current)
-    }, 1500)
+    typingTimerRef.current = setTimeout(
+      async () => {
+        lastTypingSentAtRef.current = 0
+        await supabase.from('room_members').update({ is_typing: false, typing_char_name: null, typing_expires_at: null }).eq('room_id', roomId).eq('user_id', userIdRef.current)
+      },
+      hasContent ? 5000 : 0
+    )
   }
 
   const persistMessage = async (tempId, message) => {
@@ -501,7 +528,7 @@ export default function Room() {
     if (userIdRef.current) {
       supabase
         .from('room_members')
-        .update({ is_typing: false, typing_char_name: null })
+        .update({ is_typing: false, typing_char_name: null, typing_expires_at: null })
         .eq('room_id', roomId)
         .eq('user_id', userIdRef.current)
         .then(() => {})
@@ -932,6 +959,28 @@ export default function Room() {
                 ))}
               </div>
             </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 10, padding: '8px 10px', background: t.bg, borderRadius: 8, border: `0.5px solid ${t.border}` }}>
+              <div>
+                <div style={{ fontSize: 12, color: t.theirText }}>입력 중 표시</div>
+                <div style={{ marginTop: 2, fontSize: 10, color: t.subText }}>{isOwner ? '이 방에서 작성 중 상태를 표시합니다.' : '방장만 변경할 수 있습니다.'}</div>
+              </div>
+              <button
+                type="button"
+                disabled={!isOwner}
+                aria-label="입력 중 표시 전환"
+                aria-pressed={showTypingIndicator}
+                onClick={async () => {
+                  if (!isOwner) return
+                  const next = !showTypingIndicator
+                  setShowTypingIndicator(next)
+                  if (!next) setTypingInfo(null)
+                  const { error } = await supabase.from('rooms').update({ show_typing_indicator: next }).eq('id', roomId)
+                  if (error) setShowTypingIndicator(!next)
+                }}
+                style={{ position: 'relative', width: 40, height: 22, flexShrink: 0, padding: 0, border: 0, borderRadius: 11, cursor: isOwner ? 'pointer' : 'default', opacity: isOwner ? 1 : 0.55, background: showTypingIndicator ? t.point : t.border }}>
+                <span style={{ position: 'absolute', top: 3, left: showTypingIndicator ? 21 : 3, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
+              </button>
+            </div>
             {isOwner && (
               <div style={{ marginTop: 10 }}>
                 <div style={{ fontSize: 12, color: t.subText, marginBottom: 6 }}>방 이름</div>
@@ -1191,7 +1240,7 @@ export default function Room() {
         })}
 
         {/* 입력중 표시 */}
-        {typingInfo && (
+        {showTypingIndicator && typingInfo && typingInfo.expiresAt > Date.now() && (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '2px 0' }}>
             <div style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
               <div style={{ width: 5, height: 5, borderRadius: '50%', background: t.subText, opacity: 0.6, animation: 'typing-dot 1.2s infinite', animationDelay: '0s' }} />
