@@ -164,7 +164,18 @@ export default function RoomList() {
     const { data: room } = await supabase.from('rooms').select().eq('invite_code', inviteCode.trim()).single()
     if (room) {
       await supabase.from('profiles').upsert({ id: user.id, email: user.email })
-      await supabase.from('room_members').upsert({ room_id: room.id, user_id: user.id, sort_order: rooms.length })
+      const { data: existingMember } = await supabase.from('room_members').select('room_id').eq('room_id', room.id).eq('user_id', user.id).maybeSingle()
+      const { error: joinError } = await supabase.from('room_members').upsert({ room_id: room.id, user_id: user.id, sort_order: rooms.length })
+      if (!joinError && !existingMember) {
+        const memberName = user.email?.split('@')[0] || '새 사용자'
+        await supabase.from('messages').insert({
+          room_id: room.id,
+          user_id: user.id,
+          character_id: null,
+          type: 'member_joined',
+          content: `${memberName}님이 대화방에 들어왔어요.`,
+        })
+      }
       setInviteCode('')
       setShowJoin(false)
       fetchRooms()
@@ -462,7 +473,17 @@ export default function RoomList() {
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap',
                   }}>
-                  {room.lastMsg ? `${room.lastMsg.characters?.name || ''}: ${room.lastMsg.type === 'chat' ? room.lastMsg.content : '[이미지]'}` : ''}
+                  {room.lastMsg
+                    ? room.lastMsg.type === 'chat'
+                      ? `${room.lastMsg.characters?.name || ''}: ${room.lastMsg.content}`
+                      : room.lastMsg.type === 'room_invite'
+                        ? '[대화방 초대]'
+                        : room.lastMsg.type === 'member_joined'
+                          ? room.lastMsg.content
+                          : room.lastMsg.type === 'image' || room.lastMsg.type === 'image_group'
+                            ? '[이미지]'
+                            : `[${room.lastMsg.type === 'narration' ? '나레이션' : '시스템 메시지'}]`
+                    : ''}
                 </div>
               </div>
               {room.unreadCount > 0 && (

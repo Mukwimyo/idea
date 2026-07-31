@@ -94,6 +94,15 @@ Deno.serve(async req => {
         bodyText = '전화·문자 기록이 도착했습니다.'
       }
     }
+    if (record.type === 'room_invite') {
+      try {
+        const invite = JSON.parse(record.content)
+        bodyText = `${invite.roomName} 대화방으로 초대했어요`
+      } catch {
+        bodyText = '다른 대화방으로 초대했어요'
+      }
+    }
+    if (record.type === 'member_joined') bodyText = record.content
 
     const notifPayload = JSON.stringify({
       title: senderName,

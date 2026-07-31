@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase, uploadFile, validateImageFile } from '../lib/supabase'
 import { THEMES, getTheme } from '../lib/themes'
-import { ChevronLeft, Settings, Search, Images, Paperclip, ArrowUp, Eye, ArrowDown, ChevronDown, ChevronUp, Quote, RotateCcw, AlertCircle, Sparkles, Minus, Phone, MessageSquare } from 'lucide-react'
+import { ChevronLeft, Settings, Search, Images, Paperclip, ArrowUp, Eye, ArrowDown, ChevronDown, ChevronUp, Quote, RotateCcw, AlertCircle, Sparkles, Minus, Phone, MessageSquare, Copy, DoorOpen, Send } from 'lucide-react'
 import ProfileImageModal from '../components/ProfileImageModal'
 import CommunicationSessions from '../components/CommunicationSessions'
 import CommunicationRecord from '../components/CommunicationRecord'
@@ -179,6 +179,9 @@ export default function Room() {
   const [showCommunication, setShowCommunication] = useState(false)
   const [showRoleplayMenu, setShowRoleplayMenu] = useState(false)
   const [closingRoleplayMenu, setClosingRoleplayMenu] = useState(false)
+  const [showRoomInvitePicker, setShowRoomInvitePicker] = useState(false)
+  const [invitableRooms, setInvitableRooms] = useState([])
+  const [joinedRoomIds, setJoinedRoomIds] = useState([])
   const [dividerText, setDividerText] = useState('')
   const [initialUnreadId, setInitialUnreadId] = useState(null)
   const [viewportHeight, setViewportHeight] = useState(() => window.visualViewport?.height || window.innerHeight)
@@ -293,6 +296,7 @@ export default function Room() {
     window.setTimeout(() => {
       setShowRoleplayMenu(false)
       setClosingRoleplayMenu(false)
+      setShowRoomInvitePicker(false)
     }, 190)
   }
 
@@ -304,6 +308,8 @@ export default function Room() {
       setUserId(user.id)
       userIdRef.current = user.id
       await supabase.from('profiles').update({ email: user.email }).eq('id', user.id)
+      const { data: ownMemberships } = await supabase.from('room_members').select('room_id').eq('user_id', user.id)
+      setJoinedRoomIds((ownMemberships || []).map(member => member.room_id))
 
       const { data: roomData } = await supabase.from('rooms').select().eq('id', roomId).single()
       setRoom(roomData)
@@ -902,6 +908,85 @@ export default function Room() {
     setDividerText('')
   }
 
+  const copyInviteCode = async () => {
+    if (!room?.invite_code) return
+    try {
+      await navigator.clipboard.writeText(room.invite_code)
+      showToast('초대 코드를 복사했어요.')
+    } catch {
+      showToast('초대 코드를 복사하지 못했어요.', 'error')
+    }
+  }
+
+  const loadInvitableRooms = async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    const { data, error } = await supabase.from('room_members').select('room_id, rooms(id, name)').eq('user_id', user.id)
+    if (error) {
+      showToast('초대할 방 목록을 불러오지 못했어요.', 'error')
+      return
+    }
+    setInvitableRooms((data || []).map(item => item.rooms).filter(targetRoom => targetRoom && targetRoom.id !== roomId))
+    setShowRoomInvitePicker(true)
+  }
+
+  const sendRoomInvite = async targetRoom => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    const tempId = `temp-room-invite-${Date.now()}`
+    const content = JSON.stringify({ roomId: targetRoom.id, roomName: targetRoom.name })
+    const tempMessage = {
+      id: tempId,
+      room_id: roomId,
+      user_id: user.id,
+      character_id: activeChar?.id || null,
+      characters: activeChar || null,
+      type: 'room_invite',
+      content,
+      created_at: new Date().toISOString(),
+      delivery_state: 'sending',
+      entrance_side: 'right',
+    }
+    setMessages(current => [...current, tempMessage])
+    await persistMessage(tempId, {
+      room_id: roomId,
+      user_id: user.id,
+      character_id: activeChar?.id || null,
+      type: 'room_invite',
+      content,
+    })
+    setShowRoomInvitePicker(false)
+    closeRoleplayMenu()
+    showToast(`${targetRoom.name} 초대를 보냈어요.`)
+  }
+
+  const enterInvitedRoom = async invite => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    const { data: existingMember } = await supabase.from('room_members').select('room_id').eq('room_id', invite.roomId).eq('user_id', user.id).maybeSingle()
+    if (!existingMember) {
+      const { count } = await supabase.from('room_members').select('*', { count: 'exact', head: true }).eq('user_id', user.id)
+      const { error } = await supabase.from('room_members').insert({ room_id: invite.roomId, user_id: user.id, sort_order: count || 0 })
+      if (error) {
+        showToast('방 초대를 수락하지 못했어요.', 'error')
+        return
+      }
+      const memberName = user.email?.split('@')[0] || '새 사용자'
+      await supabase.from('messages').insert({
+        room_id: invite.roomId,
+        user_id: user.id,
+        character_id: null,
+        type: 'member_joined',
+        content: `${memberName}님이 대화방에 들어왔어요.`,
+      })
+      setJoinedRoomIds(current => [...new Set([...current, invite.roomId])])
+    }
+    navigate(`/room/${invite.roomId}`)
+  }
+
   const sendImages = async fileList => {
     const files = Array.from(fileList || [])
     if (files.length === 0) return
@@ -1035,7 +1120,12 @@ export default function Room() {
       )
     }
     if (msg.delivery_state === 'upload_failed') return <span style={{ marginTop: 4, color: '#f87171', fontSize: 10 }}>파일 업로드 실패</span>
-    if (msg.delivery_state === 'sending') return <span style={{ marginTop: 3, color: t.subText, fontSize: 10, opacity: 0.7 }}>전송 중…</span>
+    if (msg.delivery_state === 'sending')
+      return (
+        <span style={{ position: 'absolute', right: 43, bottom: -7, color: t.subText, fontSize: 9, lineHeight: 1, opacity: 0.62, pointerEvents: 'none' }}>
+          전송 중…
+        </span>
+      )
     if (msg.delivery_state !== 'failed') return null
     return (
       <button
@@ -1197,7 +1287,10 @@ export default function Room() {
         <div className="top-panel-backdrop" style={{ position: 'fixed', top: 49, left: 0, right: 0, bottom: 0, zIndex: 50, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }} onClick={() => setShowInvite(false)}>
           <div className="top-panel-sheet" style={{ background: t.panel, padding: '14px 16px', borderBottom: `0.5px solid ${t.border}`, textAlign: 'center', maxWidth: 480, margin: '0 auto', width: '100%' }} onClick={e => e.stopPropagation()}>
             <div style={{ fontSize: 11, color: t.subText, marginBottom: 4 }}>초대 코드</div>
-            <div style={{ fontSize: 22, fontWeight: 600, color: t.point, letterSpacing: 3 }}>{room?.invite_code}</div>
+            <button onClick={copyInviteCode} style={{ margin: '0 auto', display: 'flex', alignItems: 'center', gap: 7, border: 0, background: 'none', color: t.point, cursor: 'pointer' }}>
+              <span style={{ fontSize: 22, fontWeight: 600, letterSpacing: 3 }}>{room?.invite_code}</span>
+              <Copy size={15} />
+            </button>
             <div style={{ fontSize: 10, color: t.subText, marginTop: 4, opacity: 0.6 }}>상대방에게 이 코드를 알려주세요</div>
           </div>
         </div>
@@ -1213,7 +1306,10 @@ export default function Room() {
             </div>
             <div style={{ marginBottom: 14, padding: 10, borderRadius: 10, background: t.bg, border: `1px solid ${t.border}` }}>
               <div style={{ fontSize: 10, color: t.subText }}>초대 코드</div>
-              <div style={{ marginTop: 3, color: t.point, letterSpacing: 2 }}>{room?.invite_code}</div>
+              <button onClick={copyInviteCode} style={{ marginTop: 3, display: 'flex', alignItems: 'center', gap: 7, padding: 0, border: 0, background: 'none', color: t.point, letterSpacing: 2, cursor: 'pointer' }}>
+                {room?.invite_code}
+                <Copy size={13} />
+              </button>
             </div>
             <div style={{ display: 'flex', gap: 7, marginBottom: 14 }}>
               <button
@@ -1515,6 +1611,46 @@ export default function Room() {
                 <span style={{ flex: 1, height: 1, background: t.border }} />
               </div>
             )
+
+          if (msg.type === 'member_joined')
+            return (
+              <div key={msg.id} id={'msg-' + msg.id} style={{ position: 'relative', paddingTop: timelineMarkerHeight }}>
+                {timelineMarkers}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', color: t.subText, fontSize: 10 }}>
+                  <span style={{ flex: 1, height: 1, background: t.border, opacity: 0.55 }} />
+                  <span>{msg.content}</span>
+                  <span style={{ flex: 1, height: 1, background: t.border, opacity: 0.55 }} />
+                </div>
+              </div>
+            )
+
+          if (msg.type === 'room_invite') {
+            let invite = null
+            try {
+              invite = JSON.parse(msg.content)
+            } catch {
+              invite = null
+            }
+            if (!invite?.roomId) return null
+            const alreadyJoined = joinedRoomIds.includes(invite.roomId)
+            return (
+              <div key={msg.id} id={'msg-' + msg.id} style={{ position: 'relative', paddingTop: timelineMarkerHeight }}>
+                {timelineMarkers}
+                <div style={{ margin: '2px auto', width: 'min(88%, 330px)', padding: 12, borderRadius: 14, border: `1px solid ${t.border}`, background: t.panel, boxShadow: '0 8px 22px rgba(0,0,0,0.15)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ width: 36, height: 36, display: 'grid', placeItems: 'center', flexShrink: 0, borderRadius: 11, background: `${t.point}22`, color: t.point }}><DoorOpen size={18} /></div>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ color: t.subText, fontSize: 10 }}>{alreadyJoined ? '연결된 대화방' : `${msg.characters?.name || '사용자'}의 대화방 초대`}</div>
+                      <div style={{ marginTop: 2, color: t.theirText, fontSize: 13, fontWeight: 600, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{invite.roomName}</div>
+                    </div>
+                    <button onClick={() => enterInvitedRoom(invite)} style={{ flexShrink: 0, padding: '7px 11px', border: 0, borderRadius: 9, background: t.point, color: '#fff', fontSize: 11, cursor: 'pointer' }}>
+                      {alreadyJoined ? '입장' : '초대 수락'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )
+          }
 
           if (msg.type === 'communication')
             return (
@@ -1859,6 +1995,28 @@ export default function Room() {
               <MessageSquare size={16} />
               <span>전화 · 문자</span>
             </button>
+            <button
+              onMouseDown={event => event.preventDefault()}
+              onClick={loadInvitableRooms}
+              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 11px', borderRadius: 10, border: `1px solid ${t.border}`, background: 'none', color: t.theirText }}>
+              <DoorOpen size={16} />
+              <span>다른 방으로 초대</span>
+            </button>
+            {showRoomInvitePicker && (
+              <div style={{ display: 'grid', gap: 5, paddingTop: 2 }}>
+                <div style={{ color: t.subText, fontSize: 10 }}>초대할 방을 선택하세요.</div>
+                {invitableRooms.length === 0 ? (
+                  <div style={{ padding: 9, borderRadius: 9, background: t.bg, color: t.subText, fontSize: 11, textAlign: 'center' }}>초대할 수 있는 다른 방이 없어요.</div>
+                ) : (
+                  invitableRooms.map(targetRoom => (
+                    <button key={targetRoom.id} onMouseDown={event => event.preventDefault()} onClick={() => sendRoomInvite(targetRoom)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 9, border: `1px solid ${t.border}`, background: t.bg, color: t.theirText, textAlign: 'left' }}>
+                      <span style={{ flex: 1, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{targetRoom.name}</span>
+                      <Send size={13} color={t.point} />
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
           </div>
         )}
         <div style={{ display: 'flex', gap: 4, alignItems: 'center', width: '100%', height: 42, padding: 5, borderRadius: 22, background: `color-mix(in srgb, ${t.panel} 78%, transparent)`, backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)', border: `1px solid ${t.border}`, boxShadow: '0 10px 30px rgba(0,0,0,0.24)', pointerEvents: 'auto' }}>
