@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase'
 export default function CommunicationRecord({ message, theme, onOpenSession }) {
   const [open, setOpen] = useState(false)
   const [items, setItems] = useState([])
+  const [loadError, setLoadError] = useState('')
   const t = theme
   let record
   try {
@@ -15,12 +16,19 @@ export default function CommunicationRecord({ message, theme, onOpenSession }) {
 
   useEffect(() => {
     if (!open || !record.sessionId) return
+    setLoadError('')
     supabase
       .from('communication_session_messages')
       .select('id, user_id, content, created_at, characters(name)')
       .eq('session_id', record.sessionId)
       .order('created_at')
-      .then(({ data }) => setItems(data || []))
+      .then(({ data, error }) => {
+        if (error) {
+          setLoadError('저장된 대화를 불러오지 못했습니다. 다시 접었다 펼쳐주세요.')
+          return
+        }
+        setItems(data || [])
+      })
   }, [open, record.sessionId])
 
   return (
@@ -44,7 +52,9 @@ export default function CommunicationRecord({ message, theme, onOpenSession }) {
       </button>
       {open && (
         <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${t.border}`, display: 'grid', gap: 7 }}>
-          {items.length === 0 && <div style={{ color: t.subText, fontSize: 11 }}>저장된 대화 내용이 없습니다.</div>}
+          {loadError
+            ? <div role="alert" style={{ color: '#ef7777', fontSize: 11 }}>{loadError}</div>
+            : items.length === 0 && <div style={{ color: t.subText, fontSize: 11 }}>저장된 대화 내용이 없습니다.</div>}
           {items.map(item => (
             <div key={item.id} style={{ color: t.theirText, fontSize: 12, lineHeight: 1.5 }}>
               <span style={{ marginRight: 7, color: t.subText }}>{item.characters?.name || '캐릭터'}</span>

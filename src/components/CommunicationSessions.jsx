@@ -19,12 +19,15 @@ export default function CommunicationSessions({ roomId, userId, myChars, theme, 
   const [sessions, setSessions] = useState([])
   const [messages, setMessages] = useState({})
   const [draft, setDraft] = useState('')
+  const [sendError, setSendError] = useState('')
+  const [sendingSessionId, setSendingSessionId] = useState(null)
   const [now, setNow] = useState(Date.now())
   const [characterLoadError, setCharacterLoadError] = useState('')
   const [hiddenSessionId, setHiddenSessionId] = useState(null)
   const [viewportHeight, setViewportHeight] = useState(() => window.visualViewport?.height || window.innerHeight)
   const [viewportOffsetTop, setViewportOffsetTop] = useState(() => window.visualViewport?.offsetTop || 0)
   const messageInputRef = useRef(null)
+  const sessionIdsRef = useRef(new Set())
   const t = theme
 
   const activeSession = sessions.find(session => ['ringing', 'active'].includes(session.status))
@@ -34,13 +37,25 @@ export default function CommunicationSessions({ roomId, userId, myChars, theme, 
   const selectedSender = myChars.find(character => character.id === effectiveSenderId)
   const selectedReceiver = receiverOptions.find(character => character.id === receiverId)
 
+  useEffect(() => {
+    sessionIdsRef.current = new Set(sessions.map(session => session.id))
+  }, [sessions])
+
   const fetchSessions = async () => {
-    const { data } = await supabase.from('communication_sessions').select('*').eq('room_id', roomId).in('status', ['ringing', 'active']).order('created_at', { ascending: false })
+    const { data, error } = await supabase.from('communication_sessions').select('*').eq('room_id', roomId).in('status', ['ringing', 'active']).order('created_at', { ascending: false })
+    if (error) {
+      setSendError('연락 상태를 불러오지 못했습니다. 네트워크 연결을 확인해주세요.')
+      return
+    }
     setSessions(data || [])
   }
 
   const fetchMessages = async sessionId => {
-    const { data } = await supabase.from('communication_session_messages').select('*').eq('session_id', sessionId).order('created_at')
+    const { data, error } = await supabase.from('communication_session_messages').select('*').eq('session_id', sessionId).order('created_at')
+    if (error) {
+      setSendError('저장된 대화를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.')
+      return
+    }
     setMessages(current => ({ ...current, [sessionId]: data || [] }))
   }
 
@@ -93,9 +108,18 @@ export default function CommunicationSessions({ roomId, userId, myChars, theme, 
       .channel(`communication-${roomId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'communication_sessions', filter: `room_id=eq.${roomId}` }, fetchSessions)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'communication_session_messages' }, payload => {
-        setMessages(current => ({ ...current, [payload.new.session_id]: [...(current[payload.new.session_id] || []), payload.new] }))
+        if (!sessionIdsRef.current.has(payload.new.session_id)) return
+        setMessages(current => {
+          const sessionMessages = current[payload.new.session_id] || []
+          if (sessionMessages.some(message => message.id === payload.new.id)) return current
+          return { ...current, [payload.new.session_id]: [...sessionMessages, payload.new] }
+        })
       })
-      .subscribe()
+      .subscribe(status => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          setSendError('실시간 연결이 끊겼습니다. 연결이 복구되면 대화를 다시 불러옵니다.')
+        }
+      })
     return () => supabase.removeChannel(channel)
   }, [roomId, userId, myChars])
 
@@ -160,11 +184,19 @@ export default function CommunicationSessions({ roomId, userId, myChars, theme, 
   }
 
   const updateSession = async (session, status) => {
+    if (sendingSessionId === session.id && ['declined', 'left', 'ended'].includes(status)) {
+      setSendError('메시지 전송이 끝난 뒤 종료해주세요.')
+      return
+    }
+    setSendError('')
     const patch = { status }
     if (status === 'active') patch.started_at = new Date().toISOString()
     if (['declined', 'left', 'ended'].includes(status)) patch.ended_at = new Date().toISOString()
     const { data: updated, error } = await supabase.from('communication_sessions').update(patch).eq('id', session.id).select().single()
-    if (error || !updated) return
+    if (error || !updated) {
+      setSendError('연락 상태를 변경하지 못했습니다. 다시 시도해주세요.')
+      return
+    }
     const senderName = characterById[session.sender_character_id]?.name || '캐릭터'
     const receiverName = characterById[session.receiver_character_id]?.name || '캐릭터'
     const isTerminal = ['declined', 'left', 'ended'].includes(status)
@@ -200,10 +232,56 @@ export default function CommunicationSessions({ roomId, userId, myChars, theme, 
   }
 
   const sendMessage = async session => {
-    if (!draft.trim()) return
+    const content = draft.trim()
+    if (!content || sendingSessionId === session.id) return
+    setSendError('')
+    setSendingSessionId(session.id)
+
+    const { data: latestSession, error: sessionError } = await supabase
+      .from('communication_sessions')
+      .select('status, sender_user_id, receiver_user_id')
+      .eq('id', session.id)
+      .maybeSingle()
+
+    if (sessionError || !latestSession) {
+      setSendError('통화 상태를 확인하지 못했습니다. 입력 내용은 유지됩니다.')
+      setSendingSessionId(null)
+      return
+    }
+    if (latestSession.status !== 'active') {
+      setSendError('이미 종료된 대화라 메시지를 보낼 수 없습니다.')
+      setSendingSessionId(null)
+      await fetchSessions()
+      return
+    }
+    if (![latestSession.sender_user_id, latestSession.receiver_user_id].includes(userId)) {
+      setSendError('이 대화의 참여자만 메시지를 보낼 수 있습니다.')
+      setSendingSessionId(null)
+      return
+    }
+
     const characterId = session.sender_user_id === userId ? session.sender_character_id : session.receiver_character_id
-    await supabase.from('communication_session_messages').insert({ session_id: session.id, user_id: userId, character_id: characterId, content: draft.trim() })
-    setDraft('')
+    const { data: savedMessage, error } = await supabase
+      .from('communication_session_messages')
+      .insert({ session_id: session.id, user_id: userId, character_id: characterId, content })
+      .select()
+      .single()
+
+    if (error || !savedMessage) {
+      setSendError(error?.message?.includes('row-level security')
+        ? '대화가 종료됐거나 전송 권한이 없어 저장하지 못했습니다.'
+        : '메시지를 저장하지 못했습니다. 입력 내용은 유지되며 다시 전송할 수 있습니다.')
+      setSendingSessionId(null)
+      return
+    }
+
+    setMessages(current => {
+      const sessionMessages = current[session.id] || []
+      if (sessionMessages.some(message => message.id === savedMessage.id)) return current
+      return { ...current, [session.id]: [...sessionMessages, savedMessage] }
+    })
+    setDraft(current => current.trim() === content ? '' : current)
+    setSendingSessionId(null)
     window.requestAnimationFrame(() => messageInputRef.current?.focus({ preventScroll: true }))
   }
 
@@ -298,10 +376,11 @@ export default function CommunicationSessions({ roomId, userId, myChars, theme, 
             <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 14 }}>
               {(messages[activeSession.id] || []).map(message => <div key={message.id} style={{ width: 'fit-content', maxWidth: '75%', margin: message.user_id === userId ? '0 0 9px auto' : '0 auto 9px 0', padding: '8px 11px', borderRadius: 12, background: message.user_id === userId ? t.myBubble : t.theirBubble, color: message.user_id === userId ? t.myText : t.theirText }}>{message.content}</div>)}
             </div>
+            {sendError && <div role="alert" style={{ padding: '7px 12px 0', color: '#ef7777', fontSize: 10, lineHeight: 1.45 }}>{sendError}</div>}
             <div style={{ flexShrink: 0, display: 'flex', gap: 7, padding: '10px 10px calc(10px + env(safe-area-inset-bottom))', borderTop: `1px solid ${t.border}` }}>
-              <input ref={messageInputRef} value={draft} onChange={event => setDraft(event.target.value)} onKeyDown={event => event.key === 'Enter' && sendMessage(activeSession)} placeholder="대화를 입력…" style={{ flex: 1, minWidth: 0, padding: 9, borderRadius: 10, background: t.bg, color: t.inputText, border: `1px solid ${t.border}` }} />
-              <button onPointerDown={event => event.preventDefault()} onClick={() => sendMessage(activeSession)} aria-label="전송" style={{ width: 40, border: 0, borderRadius: 10, background: t.point, color: '#fff' }}><Send size={16} /></button>
-              <button onClick={() => updateSession(activeSession, 'ended')} aria-label="종료" style={{ width: 40, borderRadius: 10, border: `1px solid ${t.border}`, background: 'none', color: t.subText }}><PhoneOff size={16} /></button>
+              <input ref={messageInputRef} value={draft} onChange={event => { setDraft(event.target.value); if (sendError) setSendError('') }} onKeyDown={event => { if (event.key === 'Enter' && !event.nativeEvent.isComposing) { event.preventDefault(); sendMessage(activeSession) } }} placeholder="대화를 입력…" style={{ flex: 1, minWidth: 0, padding: 9, borderRadius: 10, background: t.bg, color: t.inputText, border: `1px solid ${sendError ? '#ef7777' : t.border}` }} />
+              <button disabled={sendingSessionId === activeSession.id} onPointerDown={event => event.preventDefault()} onClick={() => sendMessage(activeSession)} aria-label={sendingSessionId === activeSession.id ? '전송 중' : '전송'} style={{ width: 40, border: 0, borderRadius: 10, background: t.point, color: '#fff', opacity: sendingSessionId === activeSession.id ? 0.5 : 1 }}><Send size={16} /></button>
+              <button disabled={sendingSessionId === activeSession.id} onClick={() => updateSession(activeSession, 'ended')} aria-label="종료" style={{ width: 40, borderRadius: 10, border: `1px solid ${t.border}`, background: 'none', color: t.subText, opacity: sendingSessionId === activeSession.id ? 0.4 : 1 }}><PhoneOff size={16} /></button>
             </div>
           </section>
         )}
