@@ -2,8 +2,13 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase, uploadFile, validateImageFile } from '../lib/supabase'
 import { THEMES, getTheme } from '../lib/themes'
-import { ChevronLeft, Link2, Settings, Search, Calendar, Paperclip, ArrowUp, Eye, ArrowDown, ChevronDown, ChevronUp, Quote } from 'lucide-react'
+import { ChevronLeft, Settings, Search, Images, Paperclip, ArrowUp, Eye, ArrowDown, ChevronDown, ChevronUp, Quote, RotateCcw, AlertCircle, Sparkles, Minus, Phone, MessageSquare, Copy, DoorOpen, Send } from 'lucide-react'
 import ProfileImageModal from '../components/ProfileImageModal'
+import CommunicationSessions from '../components/CommunicationSessions'
+import CommunicationRecord from '../components/CommunicationRecord'
+import Toast, { useToast } from '../components/Toast'
+import LoadingScreen from '../components/LoadingScreen'
+import EntryCharacterPicker from '../components/EntryCharacterPicker'
 
 const DEFAULT_AVATAR = `${import.meta.env.BASE_URL}default-avatar.png`
 
@@ -129,6 +134,7 @@ function parseContent(text, actColor, actionStyle) {
 export default function Room() {
   const { roomId } = useParams()
   const navigate = useNavigate()
+  const { toast, showToast } = useToast()
   const [room, setRoom] = useState(null)
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
@@ -140,6 +146,9 @@ export default function Room() {
   const [editingId, setEditingId] = useState(null)
   const [editText, setEditText] = useState('')
   const [showTheme, setShowTheme] = useState(false)
+  const [closingTheme, setClosingTheme] = useState(false)
+  const [showGallery, setShowGallery] = useState(false)
+  const [closingGallery, setClosingGallery] = useState(false)
   const [showSearch, setShowSearch] = useState(false)
   const [showCalendar, setShowCalendar] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -156,19 +165,40 @@ export default function Room() {
   const [newMsgAlert, setNewMsgAlert] = useState(false)
   const [roomNameText, setRoomNameText] = useState('')
   const [showCharList, setShowCharList] = useState(false)
+  const [closingCharList, setClosingCharList] = useState(false)
   const [typingInfo, setTypingInfo] = useState(null)
+  const [talkingFramesByCharacter, setTalkingFramesByCharacter] = useState({})
+  const [talkingFrameIndex, setTalkingFrameIndex] = useState(0)
+  const [showTypingIndicator, setShowTypingIndicator] = useState(true)
   const [showEntering, setShowEntering] = useState(true)
   const [showMessageTime, setShowMessageTime] = useState(true)
+  const [showEditedLabel, setShowEditedLabel] = useState(true)
   const [messageMenuId, setMessageMenuId] = useState(null)
+  const [imageMenuTarget, setImageMenuTarget] = useState(null)
   const [deletingMessageId, setDeletingMessageId] = useState(null)
   const [profilePreview, setProfilePreview] = useState(null)
+  const [showCommunication, setShowCommunication] = useState(false)
+  const [showRoleplayMenu, setShowRoleplayMenu] = useState(false)
+  const [closingRoleplayMenu, setClosingRoleplayMenu] = useState(false)
+  const [showRoomInvitePicker, setShowRoomInvitePicker] = useState(false)
+  const [invitableRooms, setInvitableRooms] = useState([])
+  const [joinedRoomIds, setJoinedRoomIds] = useState([])
+  const [pendingInviteEntry, setPendingInviteEntry] = useState(null)
+  const [entryCharacters, setEntryCharacters] = useState([])
+  const [entryJoining, setEntryJoining] = useState(false)
+  const [dividerText, setDividerText] = useState('')
+  const [initialUnreadId, setInitialUnreadId] = useState(null)
   const [viewportHeight, setViewportHeight] = useState(() => window.visualViewport?.height || window.innerHeight)
   const [viewportOffsetTop, setViewportOffsetTop] = useState(() => window.visualViewport?.offsetTop || 0)
   const scrollTimerRef = useRef(null)
   const typingTimerRef = useRef(null)
+  const remoteTypingTimerRef = useRef(null)
+  const lastTypingSentAtRef = useRef(0)
   const longPressTimerRef = useRef(null)
   const longPressStartRef = useRef(null)
   const longPressTriggeredRef = useRef(false)
+  const profileGestureStartRef = useRef(null)
+  const profileGestureHandledRef = useRef(false)
   const fileInputRef = useRef(null)
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
@@ -177,12 +207,101 @@ export default function Room() {
   const initialScrollDone = useRef(false)
   const channelRef = useRef(null)
   const userIdRef = useRef(null)
+  const messagesRef = useRef([])
+
+  useEffect(() => {
+    messagesRef.current = messages
+  }, [messages])
+
+  useEffect(() => {
+    if (!typingInfo?.characterId) {
+      setTalkingFrameIndex(0)
+      return undefined
+    }
+    const frames = talkingFramesByCharacter[typingInfo.characterId] || []
+    if (frames.length === 0) return undefined
+    let timer
+    let current = 0
+    const scheduleNextFrame = () => {
+      const total = frames.length + 1
+      let next = current
+      while (next === current) next = Math.floor(Math.random() * total)
+      current = next
+      setTalkingFrameIndex(next)
+      const delay = next === 0 ? 260 + Math.random() * 180 : 130 + Math.random() * 120
+      timer = window.setTimeout(scheduleNextFrame, delay)
+    }
+    timer = window.setTimeout(scheduleNextFrame, 140 + Math.random() * 100)
+    return () => window.clearTimeout(timer)
+  }, [typingInfo?.characterId, talkingFramesByCharacter])
+
+  const loadTalkingFrames = async characterId => {
+    if (!characterId || Object.prototype.hasOwnProperty.call(talkingFramesByCharacter, characterId)) return
+    const { data, error } = await supabase
+      .from('character_talking_frames')
+      .select('image_url, sort_order')
+      .eq('character_id', characterId)
+      .order('sort_order')
+    if (!error) {
+      setTalkingFramesByCharacter(current => ({ ...current, [characterId]: (data || []).map(frame => frame.image_url) }))
+    }
+  }
 
   const openPanel = panel => {
     setShowInvite(panel === 'invite')
     setShowTheme(panel === 'theme')
     setShowSearch(panel === 'search')
     setShowCalendar(panel === 'calendar')
+    setShowGallery(panel === 'gallery')
+    if (panel === 'theme') setClosingTheme(false)
+    if (panel === 'gallery') setClosingGallery(false)
+  }
+
+  const closeThemePanel = () => {
+    if (closingTheme) return
+    setClosingTheme(true)
+    window.setTimeout(() => {
+      setShowTheme(false)
+      setClosingTheme(false)
+    }, 220)
+  }
+
+  const closeGalleryPanel = () => {
+    if (closingGallery) return
+    setClosingGallery(true)
+    window.setTimeout(() => {
+      setShowGallery(false)
+      setClosingGallery(false)
+    }, 220)
+  }
+
+  const openCharList = () => {
+    setClosingCharList(false)
+    setShowCharList(true)
+  }
+
+  const closeCharList = () => {
+    if (!showCharList || closingCharList) return
+    setClosingCharList(true)
+    window.setTimeout(() => {
+      setShowCharList(false)
+      setClosingCharList(false)
+    }, 190)
+  }
+
+  const openRoleplayMenu = () => {
+    setClosingRoleplayMenu(false)
+    setShowRoleplayMenu(true)
+  }
+
+  const closeRoleplayMenu = () => {
+    if (!showRoleplayMenu || closingRoleplayMenu) return
+    setClosingRoleplayMenu(true)
+    window.setTimeout(() => {
+      setShowRoleplayMenu(false)
+      setClosingRoleplayMenu(false)
+      setShowRoomInvitePicker(false)
+    }, 190)
   }
 
   useEffect(() => {
@@ -193,20 +312,24 @@ export default function Room() {
       setUserId(user.id)
       userIdRef.current = user.id
       await supabase.from('profiles').update({ email: user.email }).eq('id', user.id)
+      const { data: ownMemberships } = await supabase.from('room_members').select('room_id').eq('user_id', user.id)
+      setJoinedRoomIds((ownMemberships || []).map(member => member.room_id))
 
       const { data: roomData } = await supabase.from('rooms').select().eq('id', roomId).single()
       setRoom(roomData)
       setReadReceipt(roomData?.read_receipt_style || 'text')
       setActionStyle(roomData?.action_style || 'dim')
+      setShowTypingIndicator(roomData?.show_typing_indicator ?? true)
       setIsOwner(roomData?.created_by === user.id)
 
-      const [{ data: profile }, { data: messageTimeSetting }] = await Promise.all([
+      const [{ data: profile }, { data: messageDisplaySetting }] = await Promise.all([
         supabase.from('profiles').select('theme_id, last_char_id, show_entering').eq('id', user.id).single(),
-        supabase.from('profiles').select('show_message_time').eq('id', user.id).maybeSingle(),
+        supabase.from('profiles').select('show_message_time, show_edited_label').eq('id', user.id).maybeSingle(),
       ])
       const enteringEnabled = profile?.show_entering ?? true
       setShowEntering(enteringEnabled)
-      setShowMessageTime(messageTimeSetting?.show_message_time ?? true)
+      setShowMessageTime(messageDisplaySetting?.show_message_time ?? true)
+      setShowEditedLabel(messageDisplaySetting?.show_edited_label ?? true)
       if (!enteringEnabled) setShowSlot(false)
       const myId = profile?.theme_id || 'dark-purple'
       setMyThemeId(myId)
@@ -216,6 +339,7 @@ export default function Room() {
       setSharedThemeId(sharedId)
       setFollowShared(follow)
       const resolvedTheme = getTheme(follow ? sharedId : myId)
+      localStorage.setItem('idea-theme-id', myId)
       setTheme(resolvedTheme)
       document.querySelector('meta[name="theme-color"]')?.setAttribute('content', resolvedTheme.panel)
 
@@ -238,12 +362,20 @@ export default function Room() {
         .channel('room-' + roomId)
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rooms', filter: `id=eq.${roomId}` }, payload => {
           setRoom(prev => ({ ...prev, ...payload.new }))
+          setShowTypingIndicator(payload.new.show_typing_indicator ?? true)
+          if (payload.new.show_typing_indicator === false) setTypingInfo(null)
         })
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'room_members', filter: `room_id=eq.${roomId}` }, payload => {
           // 상대방 타이핑 감지
           if (payload.new.user_id !== userIdRef.current) {
-            if (payload.new.is_typing && payload.new.typing_char_name) {
-              setTypingInfo({ charName: payload.new.typing_char_name })
+            const expiresAt = payload.new.typing_expires_at ? new Date(payload.new.typing_expires_at).getTime() : 0
+            const remaining = expiresAt - Date.now()
+            window.clearTimeout(remoteTypingTimerRef.current)
+            if ((payload.new.is_typing ?? true) && payload.new.typing_char_name && remaining > 0) {
+              const characterId = payload.new.typing_character_id || null
+              setTypingInfo({ charName: payload.new.typing_char_name, characterId, expiresAt })
+              if (characterId) loadTalkingFrames(characterId)
+              remoteTypingTimerRef.current = window.setTimeout(() => setTypingInfo(null), remaining)
             } else {
               setTypingInfo(null)
             }
@@ -284,7 +416,7 @@ export default function Room() {
       if (userIdRef.current) {
         supabase
           .from('room_members')
-          .update({ is_typing: false, typing_char_name: null })
+          .update({ is_typing: false, typing_char_name: null, typing_character_id: null, typing_expires_at: null })
           .eq('room_id', roomId)
           .eq('user_id', userIdRef.current)
           .then(() => {})
@@ -361,14 +493,15 @@ export default function Room() {
   }, [])
 
   useEffect(() => {
-    if (!messageMenuId) return undefined
+    if (!messageMenuId && !imageMenuTarget) return undefined
     const closeMenuOutside = event => {
       if (event.target.closest?.('[data-message-menu="true"]')) return
       setMessageMenuId(null)
+      setImageMenuTarget(null)
     }
     document.addEventListener('pointerdown', closeMenuOutside)
     return () => document.removeEventListener('pointerdown', closeMenuOutside)
-  }, [messageMenuId])
+  }, [messageMenuId, imageMenuTarget])
 
   useEffect(() => {
     if (isAtBottomRef.current) {
@@ -403,6 +536,11 @@ export default function Room() {
   const fetchMessages = async () => {
     const { data } = await supabase.from('messages').select('*, characters(name, color, text_color, avatar_letter, image_url)').eq('room_id', roomId).order('created_at', { ascending: true })
     if (data) {
+      if (!initialScrollDone.current && userIdRef.current) {
+        const firstUnread = data.find(message => message.user_id !== userIdRef.current && !(message.read_by || []).includes(userIdRef.current))
+        setInitialUnreadId(firstUnread?.id || null)
+      }
+      window.clearTimeout(remoteTypingTimerRef.current)
       setMessages(data)
       markAsRead(data)
       const dates = [...new Set(data.map(m => new Date(m.created_at).toLocaleDateString('ko-KR')))]
@@ -428,16 +566,34 @@ export default function Room() {
   }
 
   const handleTyping = async e => {
-    // 뒤로가기(Backspace) 제외
-    if (e.nativeEvent?.inputType === 'deleteContentBackward') return
-    if (!activeChar || !userIdRef.current) return
+    if (!showTypingIndicator || !activeChar || !userIdRef.current) return
+    const hasContent = e.target.value.trim().length > 0
+    const currentTime = Date.now()
+    const shouldRefresh = hasContent && currentTime - lastTypingSentAtRef.current >= 2000
 
-    await supabase.from('room_members').update({ is_typing: true, typing_char_name: activeChar.name }).eq('room_id', roomId).eq('user_id', userIdRef.current)
+    if (shouldRefresh) {
+      lastTypingSentAtRef.current = currentTime
+      await supabase
+        .from('room_members')
+        .update({
+          is_typing: true,
+          typing_char_name: activeChar.name,
+          typing_character_id: activeChar.id,
+          typing_expires_at: new Date(currentTime + 5000).toISOString(),
+        })
+        .eq('room_id', roomId)
+        .eq('user_id', userIdRef.current)
+    }
 
     clearTimeout(typingTimerRef.current)
     typingTimerRef.current = setTimeout(async () => {
-      await supabase.from('room_members').update({ is_typing: false, typing_char_name: null }).eq('room_id', roomId).eq('user_id', userIdRef.current)
-    }, 1500)
+      lastTypingSentAtRef.current = 0
+      await supabase
+        .from('room_members')
+        .update({ is_typing: false, typing_char_name: null, typing_character_id: null, typing_expires_at: null })
+        .eq('room_id', roomId)
+        .eq('user_id', userIdRef.current)
+    }, hasContent ? 5000 : 0)
   }
 
   const persistMessage = async (tempId, message) => {
@@ -446,8 +602,12 @@ export default function Room() {
     if (error) {
       console.error('message insert failed:', error.message)
       setMessages(prev => prev.map(m => (m.id === tempId ? { ...m, delivery_state: 'failed' } : m)))
+      const queue = JSON.parse(localStorage.getItem('idea-pending-messages') || '[]').filter(item => item.tempId !== tempId)
+      localStorage.setItem('idea-pending-messages', JSON.stringify([...queue, { tempId, message, roomId }]))
       return false
     }
+    const queue = JSON.parse(localStorage.getItem('idea-pending-messages') || '[]').filter(item => item.tempId !== tempId)
+    localStorage.setItem('idea-pending-messages', JSON.stringify(queue))
     return true
   }
 
@@ -460,18 +620,34 @@ export default function Room() {
       content: msg.content,
     })
 
+  useEffect(() => {
+    const retryPending = async () => {
+      if (!navigator.onLine) return
+      const queue = JSON.parse(localStorage.getItem('idea-pending-messages') || '[]').filter(item => item.roomId === roomId)
+      for (const item of queue) {
+        const existing = messagesRef.current.find(message => message.id === item.tempId)
+        if (!existing) {
+          setMessages(current => [...current, { ...item.message, id: item.tempId, created_at: new Date().toISOString(), delivery_state: 'failed' }])
+        }
+        await persistMessage(item.tempId, item.message)
+      }
+    }
+    window.addEventListener('online', retryPending)
+    retryPending()
+    return () => window.removeEventListener('online', retryPending)
+  }, [roomId])
+
   const sendMessage = async () => {
     if (!input.trim()) return
     const content = input.trim().replace(/\(([^)]*$)/g, '($1)')
     setInput('')
-    if (inputRef.current) inputRef.current.style.height = 'auto'
 
     // 전송 시 타이핑 상태 즉시 해제
     clearTimeout(typingTimerRef.current)
     if (userIdRef.current) {
       supabase
         .from('room_members')
-        .update({ is_typing: false, typing_char_name: null })
+        .update({ is_typing: false, typing_char_name: null, typing_character_id: null, typing_expires_at: null })
         .eq('room_id', roomId)
         .eq('user_id', userIdRef.current)
         .then(() => {})
@@ -548,6 +724,43 @@ export default function Room() {
     setMessages(prev => prev.filter(m => m.id !== msg.id))
   }
 
+  const deleteGalleryImage = async item => {
+    if (!item?.message || item.message.user_id !== userId) return
+    setImageMenuTarget(null)
+
+    const message = item.message
+    if (message.type === 'image') {
+      await deleteMessage(message)
+      return
+    }
+
+    let urls = []
+    try {
+      urls = JSON.parse(message.content)
+    } catch {
+      return
+    }
+    if (!confirm('이 이미지를 삭제할까요?')) return
+    const nextUrls = urls.filter((_, index) => index !== item.imageIndex)
+    if (nextUrls.length === 0) {
+      await deleteMessage(message)
+      return
+    }
+
+    const nextContent = JSON.stringify(nextUrls)
+    const { error } = await supabase
+      .from('messages')
+      .update({ content: nextContent, edited: true })
+      .eq('id', message.id)
+      .eq('user_id', userId)
+    if (error) {
+      alert('이미지를 삭제하지 못했어요.')
+      return
+    }
+    setMessages(prev => prev.map(entry => (entry.id === message.id ? { ...entry, content: nextContent, edited: true } : entry)))
+    setProfilePreview(null)
+  }
+
   const cancelLongPress = () => {
     clearTimeout(longPressTimerRef.current)
     longPressTimerRef.current = null
@@ -574,31 +787,64 @@ export default function Room() {
     }
   }
 
-  const openImageMessage = url => {
+  const openImageMessage = (url, urls = [url], index = 0) => {
     if (longPressTriggeredRef.current) {
       longPressTriggeredRef.current = false
       return
     }
-    window.open(url, '_blank')
+    setProfilePreview({ url, urls, index, name: '' })
   }
 
   const saveRoomName = async () => {
     if (!roomNameText.trim()) return
-    await supabase.from('rooms').update({ name: roomNameText.trim() }).eq('id', roomId)
+    const { error } = await supabase.from('rooms').update({ name: roomNameText.trim() }).eq('id', roomId)
+    if (error) {
+      showToast('대화방 이름을 저장하지 못했어요.', 'error')
+      return
+    }
     setRoom(prev => ({ ...prev, name: roomNameText.trim() }))
     setRoomNameText('')
+    showToast('대화방 이름이 저장됐어요.')
   }
 
   const saveSharedTheme = async id => {
     setSharedThemeId(id)
     if (followShared) setTheme(getTheme(id))
-    await supabase.from('rooms').update({ shared_theme_id: id }).eq('id', roomId)
+    const { error } = await supabase.from('rooms').update({ shared_theme_id: id }).eq('id', roomId)
+    showToast(error ? '공유 테마를 저장하지 못했어요.' : '공유 테마가 저장됐어요.', error ? 'error' : 'success')
   }
 
   const toggleFollow = async val => {
     setFollowShared(val)
     setTheme(getTheme(val ? sharedThemeId : myThemeId))
-    await supabase.from('rooms').update({ theme_follow: val }).eq('id', roomId)
+    const { error } = await supabase.from('rooms').update({ theme_follow: val }).eq('id', roomId)
+    showToast(error ? '테마 설정을 저장하지 못했어요.' : '테마 설정이 저장됐어요.', error ? 'error' : 'success')
+  }
+
+  const leaveRoom = async () => {
+    if (isOwner) {
+      showToast('방장은 대화방을 나갈 수 없어요.', 'error')
+      return
+    }
+    if (!confirm('이 대화방에서 나갈까요?')) return
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    const leavingCharacter = activeChar || myChars[0]
+    const leavingName = leavingCharacter?.name || '사용자'
+    await supabase.from('messages').insert({
+      room_id: roomId,
+      user_id: user.id,
+      character_id: leavingCharacter?.id || null,
+      type: 'member_left',
+      content: `${leavingName}님이 대화방에서 나갔어요.`,
+    })
+    const { error } = await supabase.from('room_members').delete().eq('room_id', roomId).eq('user_id', user.id)
+    if (error) {
+      showToast('대화방에서 나가지 못했어요.', 'error')
+      return
+    }
+    navigate('/')
   }
 
   const sendImage = async file => {
@@ -612,23 +858,33 @@ export default function Room() {
       data: { user },
     } = await supabase.auth.getUser()
     const ext = file.name.split('.').pop()
-    const path = `chat/${roomId}/${Date.now()}.${ext}`
-    const url = await uploadFile(file, path)
-    if (!url) return alert('업로드 실패')
+    const uniqueId = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`
+    const path = `chat/${roomId}/${uniqueId}.${ext}`
+    const localUrl = URL.createObjectURL(file)
     const tempMsg = {
-      id: 'temp-' + Date.now(),
+      id: `temp-image-${uniqueId}`,
       room_id: roomId,
       user_id: user.id,
       character_id: activeChar?.id,
       characters: activeChar ? { name: activeChar.name, color: activeChar.color, text_color: activeChar.text_color, avatar_letter: activeChar.avatar_letter, image_url: activeChar.image_url } : null,
       type: 'image',
-      content: url,
+      content: localUrl,
       edited: false,
       created_at: new Date().toISOString(),
-      delivery_state: 'sending',
+      delivery_state: 'uploading',
+      upload_progress: 0,
       entrance_side: 'right',
     }
     setMessages(prev => [...prev, tempMsg])
+    const url = await uploadFile(file, path, progress => {
+      setMessages(current => current.map(message => (message.id === tempMsg.id ? { ...message, upload_progress: progress } : message)))
+    })
+    if (!url) {
+      setMessages(current => current.map(message => (message.id === tempMsg.id ? { ...message, delivery_state: 'upload_failed' } : message)))
+      return
+    }
+    setMessages(current => current.map(message => (message.id === tempMsg.id ? { ...message, content: url, upload_progress: 100, delivery_state: 'sending' } : message)))
+    window.requestAnimationFrame(() => URL.revokeObjectURL(localUrl))
     await persistMessage(tempMsg.id, {
       room_id: roomId,
       user_id: user.id,
@@ -636,6 +892,243 @@ export default function Room() {
       type: 'image',
       content: url,
     })
+  }
+
+  const startImageLongPress = (event, message, imageIndex) => {
+    if (message.user_id !== userId || message.id.toString().startsWith('temp-')) return
+    event.stopPropagation()
+    cancelLongPress()
+    longPressTriggeredRef.current = false
+    longPressStartRef.current = { x: event.clientX, y: event.clientY }
+    longPressTimerRef.current = window.setTimeout(() => {
+      longPressTriggeredRef.current = true
+      setMessageMenuId(null)
+      setImageMenuTarget({ message, imageIndex })
+      longPressTimerRef.current = null
+    }, 550)
+  }
+
+  const sendDivider = async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) return
+    const content = dividerText.trim() || '구분선'
+    const divider = {
+      id: 'temp-' + Date.now(),
+      room_id: roomId,
+      user_id: user.id,
+      character_id: null,
+      type: 'chapter',
+      content,
+      edited: false,
+      created_at: new Date().toISOString(),
+      delivery_state: 'sending',
+      entrance_side: 'right',
+    }
+    setMessages(current => [...current, divider])
+    closeRoleplayMenu()
+    await persistMessage(divider.id, {
+      room_id: roomId,
+      user_id: user.id,
+      character_id: null,
+      type: 'chapter',
+      content,
+    })
+    setDividerText('')
+  }
+
+  const copyInviteCode = async () => {
+    if (!room?.invite_code) return
+    try {
+      await navigator.clipboard.writeText(room.invite_code)
+      showToast('초대 코드를 복사했어요.')
+    } catch {
+      showToast('초대 코드를 복사하지 못했어요.', 'error')
+    }
+  }
+
+  const loadInvitableRooms = async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    const { data, error } = await supabase.from('room_members').select('room_id, rooms(id, name)').eq('user_id', user.id)
+    if (error) {
+      showToast('초대할 방 목록을 불러오지 못했어요.', 'error')
+      return
+    }
+    setInvitableRooms((data || []).map(item => item.rooms).filter(targetRoom => targetRoom && targetRoom.id !== roomId))
+    setShowRoomInvitePicker(true)
+  }
+
+  const sendRoomInvite = async targetRoom => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    const tempId = `temp-room-invite-${Date.now()}`
+    const content = JSON.stringify({ roomId: targetRoom.id, roomName: targetRoom.name })
+    const tempMessage = {
+      id: tempId,
+      room_id: roomId,
+      user_id: user.id,
+      character_id: activeChar?.id || null,
+      characters: activeChar || null,
+      type: 'room_invite',
+      content,
+      created_at: new Date().toISOString(),
+      delivery_state: 'sending',
+      entrance_side: 'right',
+    }
+    setMessages(current => [...current, tempMessage])
+    await persistMessage(tempId, {
+      room_id: roomId,
+      user_id: user.id,
+      character_id: activeChar?.id || null,
+      type: 'room_invite',
+      content,
+    })
+    setShowRoomInvitePicker(false)
+    closeRoleplayMenu()
+    showToast(`${targetRoom.name} 초대를 보냈어요.`)
+  }
+
+  const enterInvitedRoom = async invite => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    const { data: existingMember } = await supabase.from('room_members').select('room_id').eq('room_id', invite.roomId).eq('user_id', user.id).maybeSingle()
+    if (existingMember) {
+      navigate(`/room/${invite.roomId}`)
+      return
+    }
+    const { data: characters } = await supabase.from('characters').select('*').eq('user_id', user.id).eq('is_archived', false).order('sort_order').order('created_at')
+    setEntryCharacters(characters || [])
+    setPendingInviteEntry(invite)
+  }
+
+  const completeInvitedRoomEntry = async character => {
+    if (!pendingInviteEntry || !character) return
+    setEntryJoining(true)
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    const { count } = await supabase.from('room_members').select('*', { count: 'exact', head: true }).eq('user_id', user.id)
+    const { error } = await supabase.from('room_members').insert({
+      room_id: pendingInviteEntry.roomId,
+      user_id: user.id,
+      sort_order: count || 0,
+      last_char_id: character.id,
+    })
+    if (error) {
+      setEntryJoining(false)
+      showToast('방 초대를 수락하지 못했어요.', 'error')
+      return
+    }
+    await supabase.from('room_characters').upsert({
+      room_id: pendingInviteEntry.roomId,
+      user_id: user.id,
+      character_id: character.id,
+      sort_order: 0,
+    })
+    await supabase.from('messages').insert({
+      room_id: pendingInviteEntry.roomId,
+      user_id: user.id,
+      character_id: character.id,
+      type: 'member_joined',
+      content: `${character.name}님이 대화방에 들어왔어요.`,
+    })
+    const targetRoomId = pendingInviteEntry.roomId
+    setJoinedRoomIds(current => [...new Set([...current, targetRoomId])])
+    setEntryJoining(false)
+    setPendingInviteEntry(null)
+    navigate(`/room/${targetRoomId}`)
+  }
+
+  const sendImages = async fileList => {
+    const files = Array.from(fileList || [])
+    if (files.length === 0) return
+    const invalid = files.map(validateImageFile).find(Boolean)
+    if (invalid) {
+      alert(invalid)
+      return
+    }
+    if (files.length === 1) {
+      await sendImage(files[0])
+    } else {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      const groupId = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`
+      const localUrls = files.map(file => URL.createObjectURL(file))
+      const progressByFile = files.map(() => 0)
+      const tempMsg = {
+        id: `temp-image-group-${groupId}`,
+        room_id: roomId,
+        user_id: user.id,
+        character_id: activeChar?.id,
+        characters: activeChar ? { name: activeChar.name, color: activeChar.color, text_color: activeChar.text_color, avatar_letter: activeChar.avatar_letter, image_url: activeChar.image_url } : null,
+        type: 'image_group',
+        content: JSON.stringify(localUrls),
+        edited: false,
+        created_at: new Date().toISOString(),
+        delivery_state: 'uploading',
+        upload_progress: 0,
+        entrance_side: 'right',
+      }
+      setMessages(current => [...current, tempMsg])
+      const uploadedUrls = await Promise.all(
+        files.map(async (file, index) => {
+          const ext = file.name.split('.').pop()
+          const path = `chat/${roomId}/${groupId}-${index}.${ext}`
+          return uploadFile(file, path, progress => {
+            progressByFile[index] = progress
+            const totalProgress = Math.round(progressByFile.reduce((sum, value) => sum + value, 0) / progressByFile.length)
+            setMessages(current => current.map(message => (message.id === tempMsg.id ? { ...message, upload_progress: totalProgress } : message)))
+          })
+        })
+      )
+      const successfulUrls = uploadedUrls.filter(Boolean)
+      window.requestAnimationFrame(() => localUrls.forEach(url => URL.revokeObjectURL(url)))
+      if (successfulUrls.length === 0) {
+        setMessages(current => current.map(message => (message.id === tempMsg.id ? { ...message, delivery_state: 'upload_failed' } : message)))
+      } else {
+        const content = JSON.stringify(successfulUrls)
+        setMessages(current => current.map(message => (message.id === tempMsg.id ? { ...message, content, upload_progress: 100, delivery_state: 'sending' } : message)))
+        await persistMessage(tempMsg.id, {
+          room_id: roomId,
+          user_id: user.id,
+          character_id: activeChar?.id,
+          type: 'image_group',
+          content,
+        })
+      }
+    }
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  const exportChat = () => {
+    const lines = messages
+      .filter(message => !message.id.toString().startsWith('temp-'))
+      .map(message => {
+        const time = new Date(message.created_at).toLocaleString('ko-KR')
+        const speaker = message.type === 'narration' ? '나레이션' : message.characters?.name || '알 수 없음'
+        let content = message.type === 'image' ? `[이미지] ${message.content}` : message.content
+        if (message.type === 'image_group') {
+          try {
+            content = `[이미지 ${JSON.parse(message.content).length}장]`
+          } catch {
+            content = '[이미지 묶음]'
+          }
+        }
+        return `[${time}] ${speaker}\n${content}`
+      })
+    const blob = new Blob([`${room?.name || 'IDEA 채팅'}\n\n${lines.join('\n\n')}`], { type: 'text/plain;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `${(room?.name || 'idea-chat').replace(/[\\/:*?"<>|]/g, '_')}.txt`
+    anchor.click()
+    URL.revokeObjectURL(url)
   }
 
   const t = theme || getTheme('dark-purple')
@@ -671,6 +1164,37 @@ export default function Room() {
       </div>
     )
   }
+  const renderDeliveryStatus = msg => {
+    if (msg.delivery_state === 'uploading') {
+      const progress = Math.max(0, Math.min(100, msg.upload_progress || 0))
+      return (
+        <div style={{ width: 150, marginTop: 5 }}>
+          <div style={{ marginBottom: 3, color: t.subText, fontSize: 10 }}>업로드 중 {progress}%</div>
+          <div style={{ height: 3, overflow: 'hidden', borderRadius: 2, background: t.border }}>
+            <div style={{ width: `${progress}%`, height: '100%', borderRadius: 2, background: t.point, transition: 'width 120ms linear' }} />
+          </div>
+        </div>
+      )
+    }
+    if (msg.delivery_state === 'upload_failed') return <span style={{ marginTop: 4, color: '#f87171', fontSize: 10 }}>파일 업로드 실패</span>
+    if (msg.delivery_state === 'sending')
+      return (
+        <span style={{ position: 'absolute', right: 43, bottom: -7, color: t.subText, fontSize: 9, lineHeight: 1, opacity: 0.62, pointerEvents: 'none' }}>
+          전송 중…
+        </span>
+      )
+    if (msg.delivery_state !== 'failed') return null
+    return (
+      <button
+        onClick={() => retryMessage(msg)}
+        style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 4, padding: '5px 8px', border: '1px solid #f8717188', borderRadius: 9, color: '#fca5a5', background: '#f8717114', fontSize: 10, cursor: 'pointer' }}>
+        <AlertCircle size={12} />
+        전송 실패
+        <RotateCcw size={12} />
+        다시 시도
+      </button>
+    )
+  }
   const isNarrActive = mode === 'narration'
   const finishMessageEntrance = messageId => {
     setMessages(prev => prev.map(message => (message.id === messageId ? { ...message, entrance_side: null } : message)))
@@ -679,23 +1203,91 @@ export default function Room() {
     if (!searchQuery) return true
     return msg.content?.toLowerCase().includes(searchQuery.toLowerCase())
   })
+  const galleryItems = messages.flatMap(message => {
+    if (message.type === 'image') {
+      return message.content ? [{ url: message.content, message, imageIndex: 0 }] : []
+    }
+    if (message.type !== 'image_group') return []
+    try {
+      const urls = JSON.parse(message.content)
+      return Array.isArray(urls) ? urls.filter(Boolean).map((url, imageIndex) => ({ url, message, imageIndex })) : []
+    } catch {
+      return []
+    }
+  })
+  const galleryUrls = galleryItems.map(item => item.url)
+  const galleryPreviewItems = galleryItems.map(item => ({
+    url: item.url,
+    uploader: item.message.characters?.name || '알 수 없음',
+    createdAt: item.message.created_at,
+  }))
+  const galleryGroups = galleryItems.reduce((groups, item) => {
+    const dateKey = new Date(item.message.created_at).toLocaleDateString('ko-KR')
+    const existing = groups.find(group => group.date === dateKey)
+    if (existing) existing.items.push(item)
+    else groups.push({ date: dateKey, items: [item] })
+    return groups
+  }, [])
+  const lastTypingProfileMessageId = typingInfo?.characterId
+    ? filteredMessages.reduce((lastId, message, index) => {
+        if (message.character_id !== typingInfo.characterId || message.user_id === userId) return lastId
+        if (!['chat', 'image', 'image_group'].includes(message.type)) return lastId
+        const previousMessage = filteredMessages[index - 1]
+        const showsIdentity =
+          !previousMessage ||
+          previousMessage.type === 'chapter' ||
+          previousMessage.type === 'narration' ||
+          previousMessage.character_id !== message.character_id ||
+          previousMessage.user_id !== message.user_id
+        return showsIdentity ? message.id : lastId
+      }, null)
+    : null
+  const talkingAvatarUrl = message => {
+    if (message.id !== lastTypingProfileMessageId || !typingInfo?.characterId) return message.characters?.image_url || DEFAULT_AVATAR
+    const frames = talkingFramesByCharacter[typingInfo.characterId] || []
+    if (talkingFrameIndex === 0 || frames.length === 0) return message.characters?.image_url || DEFAULT_AVATAR
+    return frames[(talkingFrameIndex - 1) % frames.length]
+  }
   const lastReadMessageId = [...filteredMessages].reverse().find(msg => msg.user_id === userId && (msg.read_by || []).some(id => id !== msg.user_id))?.id
 
   const iconBtn = (onClick, icon, active) => ({
     onClick,
-    style: { width: 40, height: 40, background: active ? t.point + '22' : 'none', border: `1px solid ${active ? t.point : t.border}`, borderRadius: 10, padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+    style: { width: 36, height: 36, background: active ? t.point + '1f' : 'none', border: 'none', borderRadius: 10, padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   })
 
   if (!theme)
-    return (
-      <div style={{ height: '100dvh', background: '#1a1a2e', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ color: '#7F77DD', fontSize: 28 }}>✦</div>
-      </div>
-    )
+    return <LoadingScreen />
 
   return (
-    <div style={{ height: viewportHeight + viewportOffsetTop, overflow: 'hidden', background: t.bg, '--scrollbar-color': t.border, display: 'flex', flexDirection: 'column', maxWidth: 480, margin: '0 auto', animation: !showEntering ? 'slide-in-right 0.3s ease' : 'none' }}>
+    <div
+      style={{
+        position: 'fixed',
+        top: viewportOffsetTop,
+        left: 0,
+        right: 0,
+        width: '100%',
+        height: viewportHeight,
+        overflow: 'hidden',
+        background: t.bg,
+        '--scrollbar-color': t.border,
+        display: 'flex',
+        flexDirection: 'column',
+        maxWidth: 480,
+        margin: '0 auto',
+        animation: !showEntering ? 'slide-in-right 0.3s ease' : 'none',
+      }}>
+      <Toast toast={toast} />
+      <EntryCharacterPicker
+        open={Boolean(pendingInviteEntry)}
+        roomName={pendingInviteEntry?.roomName}
+        characters={entryCharacters}
+        theme={t}
+        loading={entryJoining}
+        onSelect={completeInvitedRoomEntry}
+        onClose={() => !entryJoining && setPendingInviteEntry(null)}
+      />
       <ProfileImageModal profile={profilePreview} onClose={() => setProfilePreview(null)} />
+      <CommunicationSessions roomId={roomId} userId={userId} myChars={myChars} theme={t} open={showCommunication} onClose={() => setShowCommunication(false)} />
       {showSlot && room && showEntering && (
         <SlotEntrance
           roomName={room.name}
@@ -708,24 +1300,51 @@ export default function Room() {
       )}
 
       {/* 헤더 */}
-      <div style={{ background: t.panel, borderBottom: `0.5px solid ${t.border}`, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 8, position: 'sticky', top: 0, zIndex: 10 }}>
-        <button onClick={() => navigate('/')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 2px', display: 'flex', alignItems: 'center' }}>
+      <div
+        style={{
+          background: 'transparent',
+          padding: '8px 12px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          width: '100%',
+          zIndex: 10,
+          isolation: 'isolate',
+        }}>
+        <div
+          aria-hidden="true"
+          style={{
+            position: 'absolute',
+            zIndex: -1,
+            inset: '0 0 -17px',
+            pointerEvents: 'none',
+            background: `linear-gradient(to bottom, color-mix(in srgb, ${t.panel} 68%, transparent) 0%, color-mix(in srgb, ${t.panel} 48%, transparent) 42%, color-mix(in srgb, ${t.panel} 18%, transparent) 72%, transparent 100%)`,
+            backdropFilter: 'blur(9px)',
+            WebkitBackdropFilter: 'blur(9px)',
+            maskImage: 'linear-gradient(to bottom, #000 0%, #000 46%, rgba(0,0,0,0.72) 68%, transparent 100%)',
+            WebkitMaskImage: 'linear-gradient(to bottom, #000 0%, #000 46%, rgba(0,0,0,0.72) 68%, transparent 100%)',
+          }}
+        />
+        <button onClick={() => navigate('/')} style={{ width: 32, height: 36, flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <ChevronLeft size={22} color={t.subText} />
         </button>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 15, fontWeight: 600, color: t.theirText, lineHeight: 1.3 }}>{room?.name}</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 15, fontWeight: 600, color: t.theirText, lineHeight: 1.3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{room?.name}</div>
         </div>
-        <button {...iconBtn(() => openPanel(showInvite ? null : 'invite'), null, showInvite)}>
-          <Link2 size={15} color={showInvite ? t.point : t.subText} />
-        </button>
-        <button {...iconBtn(() => openPanel(showTheme ? null : 'theme'), null, showTheme)}>
-          <Settings size={15} color={showTheme ? t.point : t.subText} />
-        </button>
         <button {...iconBtn(() => openPanel(showSearch ? null : 'search'), null, showSearch)}>
           <Search size={15} color={showSearch ? t.point : t.subText} />
         </button>
-        <button {...iconBtn(() => openPanel(showCalendar ? null : 'calendar'), null, showCalendar)}>
-          <Calendar size={15} color={showCalendar ? t.point : t.subText} />
+        <button
+          {...iconBtn(() => (showGallery ? closeGalleryPanel() : openPanel('gallery')), null, showGallery)}
+          aria-label="대화방 갤러리">
+          <Images size={15} color={showGallery ? t.point : t.subText} />
+        </button>
+        <button {...iconBtn(() => (showTheme ? closeThemePanel() : openPanel('theme')), null, showTheme)}>
+          <Settings size={15} color={showTheme ? t.point : t.subText} />
         </button>
       </div>
 
@@ -734,7 +1353,10 @@ export default function Room() {
         <div className="top-panel-backdrop" style={{ position: 'fixed', top: 49, left: 0, right: 0, bottom: 0, zIndex: 50, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }} onClick={() => setShowInvite(false)}>
           <div className="top-panel-sheet" style={{ background: t.panel, padding: '14px 16px', borderBottom: `0.5px solid ${t.border}`, textAlign: 'center', maxWidth: 480, margin: '0 auto', width: '100%' }} onClick={e => e.stopPropagation()}>
             <div style={{ fontSize: 11, color: t.subText, marginBottom: 4 }}>초대 코드</div>
-            <div style={{ fontSize: 22, fontWeight: 600, color: t.point, letterSpacing: 3 }}>{room?.invite_code}</div>
+            <button onClick={copyInviteCode} style={{ margin: '0 auto', display: 'flex', alignItems: 'center', gap: 7, border: 0, background: 'none', color: t.point, cursor: 'pointer' }}>
+              <span style={{ fontSize: 22, fontWeight: 600, letterSpacing: 3 }}>{room?.invite_code}</span>
+              <Copy size={15} />
+            </button>
             <div style={{ fontSize: 10, color: t.subText, marginTop: 4, opacity: 0.6 }}>상대방에게 이 코드를 알려주세요</div>
           </div>
         </div>
@@ -742,8 +1364,32 @@ export default function Room() {
 
       {/* 테마 패널 */}
       {showTheme && (
-        <div className="top-panel-backdrop" style={{ position: 'fixed', top: 49, left: 0, right: 0, bottom: 0, zIndex: 50, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }} onClick={() => setShowTheme(false)}>
-          <div className="top-panel-sheet" style={{ background: t.panel, padding: '12px 14px', borderBottom: `0.5px solid ${t.border}`, maxWidth: 480, margin: '0 auto', width: '100%', overflowY: 'auto', maxHeight: '80vh' }} onClick={e => e.stopPropagation()}>
+        <div className={`top-panel-backdrop${closingTheme ? ' settings-backdrop-closing' : ''}`} style={{ position: 'fixed', inset: 0, zIndex: 80, display: 'flex', justifyContent: 'flex-end', background: 'rgba(0,0,0,0.24)' }} onClick={closeThemePanel}>
+          <div className={`top-panel-sheet settings-page-drawer${closingTheme ? ' is-closing' : ''}`} style={{ background: t.panel, padding: '14px', borderLeft: `0.5px solid ${t.border}`, maxWidth: 480, marginLeft: 'auto', width: '100%', height: '100%', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 14 }}>
+              <div style={{ flex: 1, fontSize: 15, color: t.theirText }}>대화방 설정</div>
+              <button onClick={closeThemePanel} style={{ border: `1px solid ${t.border}`, borderRadius: 9, background: 'none', color: t.subText, padding: '6px 10px' }}>닫기</button>
+            </div>
+            <div style={{ marginBottom: 14, padding: 10, borderRadius: 10, background: t.bg, border: `1px solid ${t.border}` }}>
+              <div style={{ fontSize: 10, color: t.subText }}>초대 코드</div>
+              <button onClick={copyInviteCode} style={{ marginTop: 3, display: 'flex', alignItems: 'center', gap: 7, padding: 0, border: 0, background: 'none', color: t.point, letterSpacing: 2, cursor: 'pointer' }}>
+                {room?.invite_code}
+                <Copy size={13} />
+              </button>
+            </div>
+            <div style={{ display: 'flex', gap: 7, marginBottom: 14 }}>
+              <button
+                onClick={() => {
+                  closeThemePanel()
+                  setShowCalendar(true)
+                }}
+                style={{ flex: 1, padding: '8px 10px', borderRadius: 9, border: `1px solid ${t.border}`, background: 'none', color: t.theirText }}>
+                날짜로 이동
+              </button>
+              <button onClick={exportChat} style={{ flex: 1, padding: '8px 10px', borderRadius: 9, border: `1px solid ${t.border}`, background: 'none', color: t.theirText }}>
+                채팅 내보내기
+              </button>
+            </div>
             <div style={{ fontSize: 11, color: t.subText, marginBottom: 10 }}>채팅방 테마 설정</div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, padding: '8px 10px', background: t.bg, borderRadius: 8, border: `0.5px solid ${t.border}` }}>
               <div>
@@ -783,7 +1429,8 @@ export default function Room() {
                     key={s}
                     onClick={async () => {
                       setReadReceipt(s)
-                      await supabase.from('rooms').update({ read_receipt_style: s }).eq('id', roomId)
+                      const { error } = await supabase.from('rooms').update({ read_receipt_style: s }).eq('id', roomId)
+                      showToast(error ? '읽음 확인 설정을 저장하지 못했어요.' : '읽음 확인 설정이 저장됐어요.', error ? 'error' : 'success')
                     }}
                     style={{ padding: '3px 9px', borderRadius: 10, fontSize: 11, cursor: 'pointer', border: readReceipt === s ? `1.5px solid ${t.point}` : `0.5px solid ${t.border}`, background: readReceipt === s ? t.point + '22' : 'none', color: readReceipt === s ? t.point : t.subText }}>
                     {s === 'text' ? '읽음' : s === 'number' ? '1' : '없음'}
@@ -802,13 +1449,37 @@ export default function Room() {
                     key={s.val}
                     onClick={async () => {
                       setActionStyle(s.val)
-                      await supabase.from('rooms').update({ action_style: s.val }).eq('id', roomId)
+                      const { error } = await supabase.from('rooms').update({ action_style: s.val }).eq('id', roomId)
+                      showToast(error ? '지문 스타일을 저장하지 못했어요.' : '지문 스타일이 저장됐어요.', error ? 'error' : 'success')
                     }}
                     style={{ padding: '3px 9px', borderRadius: 10, fontSize: 11, cursor: 'pointer', border: actionStyle === s.val ? `1.5px solid ${t.point}` : `0.5px solid ${t.border}`, background: actionStyle === s.val ? t.point + '22' : 'none', color: actionStyle === s.val ? t.point : t.subText }}>
                     {s.label}
                   </button>
                 ))}
               </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 10, padding: '8px 10px', background: t.bg, borderRadius: 8, border: `0.5px solid ${t.border}` }}>
+              <div>
+                <div style={{ fontSize: 12, color: t.theirText }}>입력 중 표시</div>
+                <div style={{ marginTop: 2, fontSize: 10, color: t.subText }}>{isOwner ? '이 방에서 작성 중 상태를 표시합니다.' : '방장만 변경할 수 있습니다.'}</div>
+              </div>
+              <button
+                type="button"
+                disabled={!isOwner}
+                aria-label="입력 중 표시 전환"
+                aria-pressed={showTypingIndicator}
+                onClick={async () => {
+                  if (!isOwner) return
+                  const next = !showTypingIndicator
+                  setShowTypingIndicator(next)
+                  if (!next) setTypingInfo(null)
+                  const { error } = await supabase.from('rooms').update({ show_typing_indicator: next }).eq('id', roomId)
+                  if (error) setShowTypingIndicator(!next)
+                  showToast(error ? '입력 중 표시 설정을 저장하지 못했어요.' : '입력 중 표시 설정이 저장됐어요.', error ? 'error' : 'success')
+                }}
+                style={{ position: 'relative', width: 40, height: 22, flexShrink: 0, padding: 0, border: 0, borderRadius: 11, cursor: isOwner ? 'pointer' : 'default', opacity: isOwner ? 1 : 0.55, background: showTypingIndicator ? t.point : t.border }}>
+                <span style={{ position: 'absolute', top: 3, left: showTypingIndicator ? 21 : 3, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
+              </button>
             </div>
             {isOwner && (
               <div style={{ marginTop: 10 }}>
@@ -822,7 +1493,7 @@ export default function Room() {
                 <div style={{ marginTop: 10 }}>
                   <div style={{ fontSize: 12, color: t.subText, marginBottom: 6 }}>대표 이미지</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <div style={{ width: 44, height: 44, borderRadius: '50%', background: t.bg, border: `0.5px solid ${t.border}`, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, color: t.subText, flexShrink: 0 }}>{room?.cover_image ? <img src={room.cover_image} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '✦'}</div>
+                    <div className="squircle-media" style={{ width: 53, height: 53, background: t.bg, border: `0.5px solid ${t.border}`, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, color: t.subText, flexShrink: 0 }}>{room?.cover_image ? <img src={room.cover_image} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '✦'}</div>
                     <label style={{ flex: 1, background: t.bg, border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '5px 12px', color: t.subText, fontSize: 12, cursor: 'pointer', textAlign: 'center' }}>
                       이미지 선택
                       <input
@@ -861,6 +1532,56 @@ export default function Room() {
       )}
 
       {/* 검색 패널 */}
+      {showGallery && (
+        <div
+          className={`top-panel-backdrop${closingGallery ? ' settings-backdrop-closing' : ''}`}
+          style={{ position: 'fixed', inset: 0, zIndex: 80, display: 'flex', justifyContent: 'flex-end', background: 'rgba(0,0,0,0.24)' }}
+          onClick={closeGalleryPanel}>
+          <div
+            className={`top-panel-sheet settings-page-drawer${closingGallery ? ' is-closing' : ''}`}
+            style={{ background: t.panel, padding: 14, borderLeft: `0.5px solid ${t.border}`, maxWidth: 480, marginLeft: 'auto', width: '100%', height: '100%', overflowY: 'auto' }}
+            onClick={event => event.stopPropagation()}>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 14 }}>
+              <div style={{ flex: 1, fontSize: 15, color: t.theirText }}>대화방 갤러리</div>
+              <div style={{ marginRight: 10, color: t.subText, fontSize: 11 }}>{galleryItems.length}장</div>
+              <button onClick={closeGalleryPanel} style={{ border: 0, borderRadius: 9, background: 'none', color: t.subText, padding: '6px 8px' }}>닫기</button>
+            </div>
+            {galleryItems.length === 0 ? (
+              <div style={{ padding: '48px 12px', color: t.subText, fontSize: 12, textAlign: 'center' }}>아직 전송된 이미지가 없어요.</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+                {galleryGroups.map(group => (
+                  <section key={group.date}>
+                    <div style={{ marginBottom: 7, color: t.subText, fontSize: 11 }}>{group.date}</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 4 }}>
+                      {group.items.map(item => {
+                        const index = galleryItems.findIndex(candidate => candidate.message.id === item.message.id && candidate.imageIndex === item.imageIndex)
+                        return (
+                          <div key={`${item.message.id}-${item.imageIndex}`} style={{ position: 'relative', aspectRatio: '1 / 1', overflow: 'hidden', borderRadius: 8, background: t.bg }}>
+                            <button
+                              onClick={() => setProfilePreview({ url: item.url, urls: galleryUrls, items: galleryPreviewItems, index, name: '' })}
+                              aria-label={`${group.date} 이미지 크게 보기`}
+                              style={{ width: '100%', height: '100%', padding: 0, border: 0, background: 'none', cursor: 'pointer' }}>
+                              <img src={item.url} alt="" loading="lazy" style={{ width: '100%', height: '100%', display: 'block', objectFit: 'cover' }} />
+                            </button>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </section>
+                ))}
+              </div>
+            )}
+            <button
+              onClick={leaveRoom}
+              disabled={isOwner}
+              style={{ width: '100%', marginTop: 18, padding: '9px 12px', borderRadius: 10, border: `1px solid ${isOwner ? t.border : '#f87171'}`, background: 'none', color: isOwner ? t.subText : '#f87171', fontSize: 12, cursor: isOwner ? 'default' : 'pointer', opacity: isOwner ? 0.48 : 1 }}>
+              {isOwner ? '방장은 대화방을 나갈 수 없어요' : '대화방 나가기'}
+            </button>
+          </div>
+        </div>
+      )}
+
       {showSearch && (
         <div className="top-panel-backdrop" style={{ position: 'fixed', top: 49, left: 0, right: 0, bottom: 0, zIndex: 50, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }} onClick={() => setShowSearch(false)}>
           <div className="top-panel-sheet" style={{ background: t.panel, padding: '10px 14px', borderBottom: `0.5px solid ${t.border}`, maxWidth: 480, margin: '0 auto', width: '100%' }} onClick={e => e.stopPropagation()}>
@@ -903,13 +1624,36 @@ export default function Room() {
       )}
 
       {/* 메시지 목록 */}
-      <div ref={messageListRef} onScroll={handleScroll} className={`chat-scroll${hideScroll ? ' hide-scroll' : ''}`} style={{ position: 'relative', flex: 1, minHeight: 0, padding: `12px 10px ${showCharList && myChars.length > 0 ? 126 : 82}px`, display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto', background: t.bg, transition: 'padding-bottom 210ms cubic-bezier(0.2, 0.8, 0.2, 1)' }}>
+      <div ref={messageListRef} onScroll={handleScroll} className={`chat-scroll${hideScroll ? ' hide-scroll' : ''}`} style={{ position: 'relative', flex: 1, minHeight: 0, padding: `58px 10px ${showCharList && myChars.length > 0 ? 126 : 82}px`, scrollPaddingTop: 58, display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto', background: t.bg, transition: 'padding-bottom 210ms cubic-bezier(0.2, 0.8, 0.2, 1)' }}>
         {filteredMessages.map((msg, messageIndex) => {
           const isMine = msg.user_id === userId
           const messageEntranceClass = msg.entrance_side === 'right' ? 'message-enter-right' : msg.entrance_side === 'left' ? 'message-enter-left' : ''
           const char = msg.characters
           const previousMessage = filteredMessages[messageIndex - 1]
           const nextMessage = filteredMessages[messageIndex + 1]
+          const currentDateKey = new Date(msg.created_at).toLocaleDateString('ko-KR')
+          const previousDateKey = previousMessage ? new Date(previousMessage.created_at).toLocaleDateString('ko-KR') : null
+          const showDateDivider = currentDateKey !== previousDateKey
+          const showUnreadDivider = msg.id === initialUnreadId
+          const timelineMarkerHeight = (showDateDivider ? 30 : 0) + (showUnreadDivider ? 28 : 0)
+          const timelineMarkers = timelineMarkerHeight > 0 && (
+            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: timelineMarkerHeight, display: 'flex', flexDirection: 'column', justifyContent: 'space-around', pointerEvents: 'none' }}>
+              {showDateDivider && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                  <span style={{ flex: 1, height: 1, background: t.border, opacity: 0.55 }} />
+                  <span style={{ padding: '3px 9px', borderRadius: 10, color: t.subText, background: `${t.panel}cc`, border: `1px solid ${t.border}`, fontSize: 10 }}>{currentDateKey}</span>
+                  <span style={{ flex: 1, height: 1, background: t.border, opacity: 0.55 }} />
+                </div>
+              )}
+              {showUnreadDivider && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 9, color: t.point, fontSize: 10, fontWeight: 600 }}>
+                  <span style={{ flex: 1, height: 1, background: t.point, opacity: 0.65 }} />
+                  <span>여기부터 안 읽은 메시지</span>
+                  <span style={{ flex: 1, height: 1, background: t.point, opacity: 0.65 }} />
+                </div>
+              )}
+            </div>
+          )
           const showMessageIdentity =
             !previousMessage ||
             previousMessage.type === 'chapter' ||
@@ -921,7 +1665,7 @@ export default function Room() {
           const nextMessageHasTime = nextMessage && nextMessage.type !== 'chapter' && nextMessage.type !== 'narration'
           const showMessageTimestamp = showMessageTime && (!nextMessageHasTime || Math.floor(currentMinute / 60000) !== Math.floor(nextMinute / 60000))
           const showReadReceipt = readReceipt !== 'none' && msg.id === lastReadMessageId
-          const showMessageMeta = showMessageTimestamp || showReadReceipt || msg.delivery_state === 'failed'
+          const showMessageMeta = showMessageTimestamp || showReadReceipt || Boolean(msg.delivery_state)
           const ownMessageLongPressStyle = isMine
             ? {
                 userSelect: 'none',
@@ -931,7 +1675,62 @@ export default function Room() {
             : {}
 
           if (msg.type === 'chapter')
-            return null
+            return (
+              <div key={msg.id} id={'msg-' + msg.id} style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 10, padding: `${timelineMarkerHeight + 8}px 8px 8px` }}>
+                {timelineMarkers}
+                <span style={{ flex: 1, height: 1, background: t.border }} />
+                <span style={{ color: t.subText, fontSize: 10 }}>{msg.content || '구분선'}</span>
+                <span style={{ flex: 1, height: 1, background: t.border }} />
+              </div>
+            )
+
+          if (msg.type === 'member_joined' || msg.type === 'member_left')
+            return (
+              <div key={msg.id} id={'msg-' + msg.id} style={{ position: 'relative', paddingTop: timelineMarkerHeight }}>
+                {timelineMarkers}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', color: t.subText, fontSize: 10 }}>
+                  <span style={{ flex: 1, height: 1, background: t.border, opacity: 0.55 }} />
+                  <span>{msg.content}</span>
+                  <span style={{ flex: 1, height: 1, background: t.border, opacity: 0.55 }} />
+                </div>
+              </div>
+            )
+
+          if (msg.type === 'room_invite') {
+            let invite = null
+            try {
+              invite = JSON.parse(msg.content)
+            } catch {
+              invite = null
+            }
+            if (!invite?.roomId) return null
+            const alreadyJoined = joinedRoomIds.includes(invite.roomId)
+            return (
+              <div key={msg.id} id={'msg-' + msg.id} style={{ position: 'relative', paddingTop: timelineMarkerHeight }}>
+                {timelineMarkers}
+                <div style={{ margin: '2px auto', width: 'min(88%, 330px)', padding: 12, borderRadius: 14, border: `1px solid ${t.border}`, background: t.panel, boxShadow: '0 8px 22px rgba(0,0,0,0.15)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ width: 36, height: 36, display: 'grid', placeItems: 'center', flexShrink: 0, borderRadius: 11, background: `${t.point}22`, color: t.point }}><DoorOpen size={18} /></div>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ color: t.subText, fontSize: 10 }}>{alreadyJoined ? '연결된 장소' : `${msg.characters?.name || '사용자'}의 대화방 초대`}</div>
+                      <div style={{ marginTop: 2, color: t.theirText, fontSize: 13, fontWeight: 600, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{invite.roomName}</div>
+                    </div>
+                    <button onClick={() => enterInvitedRoom(invite)} style={{ flexShrink: 0, padding: '7px 11px', border: 0, borderRadius: 9, background: t.point, color: '#fff', fontSize: 11, cursor: 'pointer' }}>
+                      {alreadyJoined ? '입장' : '초대 수락'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )
+          }
+
+          if (msg.type === 'communication')
+            return (
+              <div key={msg.id} id={'msg-' + msg.id} style={{ position: 'relative', paddingTop: timelineMarkerHeight }}>
+                {timelineMarkers}
+                <CommunicationRecord message={msg} theme={t} onOpenSession={() => setShowCommunication(true)} />
+              </div>
+            )
 
           if (msg.type === 'narration')
             return (
@@ -947,21 +1746,21 @@ export default function Room() {
                 onPointerLeave={cancelLongPress}
                 onContextMenu={event => isMine && event.preventDefault()}
                 onSelectStart={event => isMine && event.preventDefault()}
-                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: '2px 0', touchAction: 'pan-y', ...ownMessageLongPressStyle }}>
+                style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: `${timelineMarkerHeight + 2}px 0 2px`, touchAction: 'pan-y', ...ownMessageLongPressStyle }}>
+                {timelineMarkers}
                 <div style={{ display: 'flex', gap: 3 }}>
                   {[0, 1, 2].map(i => (
                     <div key={i} style={{ width: 3, height: 3, borderRadius: '50%', background: t.narrColor }} />
                   ))}
                 </div>
                 {editingId === msg.id ? (
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    <input value={editText} onChange={event => setEditText(event.target.value)} onKeyDown={event => event.key === 'Enter' && editMessage(msg.id)} style={{ background: t.bg, border: `0.5px solid ${t.point}`, borderRadius: 8, padding: '6px 10px', color: t.inputText, fontSize: 12, outline: 'none' }} />
-                    <button onClick={() => editMessage(msg.id)} style={{ background: t.point, border: 'none', borderRadius: 8, padding: '6px 10px', color: '#fff', fontSize: 11, cursor: 'pointer' }}>
-                      저장
-                    </button>
-                    <button onClick={() => setEditingId(null)} style={{ background: 'none', border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '6px 10px', color: t.subText, fontSize: 11, cursor: 'pointer' }}>
-                      취소
-                    </button>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
+                    <input value={editText} onChange={event => setEditText(event.target.value)} onKeyDown={event => event.key === 'Enter' && editMessage(msg.id)} style={{ minWidth: 210, background: t.bg, border: `0.5px solid ${t.point}`, borderRadius: 8, padding: '7px 10px', color: t.inputText, fontSize: 12, outline: 'none' }} />
+                    <div style={{ display: 'flex', alignItems: 'center', border: `1px solid ${t.border}`, borderRadius: 9, overflow: 'hidden', background: t.panel, boxShadow: '0 3px 10px rgba(0,0,0,0.2)' }}>
+                      <button onClick={() => editMessage(msg.id)} style={{ border: 0, background: 'none', color: t.theirText, padding: '7px 13px', fontSize: 11, cursor: 'pointer' }}>저장</button>
+                      <div style={{ width: 1, alignSelf: 'stretch', background: t.border }} />
+                      <button onClick={() => setEditingId(null)} style={{ border: 0, background: 'none', color: '#f87171', padding: '7px 13px', fontSize: 11, cursor: 'pointer' }}>취소</button>
+                    </div>
                   </div>
                 ) : (
                   msg.content.split('\n').map((line, i) => (
@@ -976,13 +1775,65 @@ export default function Room() {
                   ))}
                 </div>
                 {renderMessageActions(msg)}
-                {msg.delivery_state === 'failed' && (
-                  <button onClick={() => retryMessage(msg)} style={{ background: 'none', border: 0, color: '#f87171', fontSize: 10, cursor: 'pointer' }}>
-                    전송 실패 · 다시 시도
-                  </button>
-                )}
+                {renderDeliveryStatus(msg)}
               </div>
             )
+
+          if (msg.type === 'image_group') {
+            let imageUrls = []
+            try {
+              imageUrls = JSON.parse(msg.content)
+            } catch {
+              imageUrls = []
+            }
+            return (
+              <div
+                className={messageEntranceClass}
+                onAnimationEnd={() => messageEntranceClass && finishMessageEntrance(msg.id)}
+                key={msg.id}
+                id={'msg-' + msg.id}
+                onPointerDown={event => startLongPress(event, msg)}
+                onPointerMove={moveLongPress}
+                onPointerUp={cancelLongPress}
+                onPointerCancel={cancelLongPress}
+                onPointerLeave={cancelLongPress}
+                onContextMenu={event => isMine && event.preventDefault()}
+                onSelectStart={event => isMine && event.preventDefault()}
+                style={{ position: 'relative', display: 'flex', flexDirection: isMine ? 'row-reverse' : 'row', alignItems: 'flex-start', gap: 6, paddingTop: timelineMarkerHeight, touchAction: 'pan-y', ...ownMessageLongPressStyle }}>
+                {timelineMarkers}
+                <div style={{ flexShrink: 0, width: 43, height: showMessageIdentity ? 43 : 0 }}>
+                  {showMessageIdentity && <div style={{ width: 43, height: 43, overflow: 'hidden' }}><img className="squircle-media" src={talkingAvatarUrl(msg)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>}
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMine ? 'flex-end' : 'flex-start', maxWidth: '76%' }}>
+                  {showMessageIdentity && char?.name && <div style={{ marginBottom: 4, color: t.subText, fontSize: 11 }}>{char.name}</div>}
+                  <div style={{ width: 190, display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 3, overflow: 'hidden', borderRadius: 11 }}>
+                    {imageUrls.map((url, imageIndex) => (
+                      <img
+                        key={`${url}-${imageIndex}`}
+                        src={url}
+                        alt=""
+                        onPointerDown={event => startImageLongPress(event, msg, imageIndex)}
+                        onPointerMove={moveLongPress}
+                        onPointerUp={cancelLongPress}
+                        onPointerCancel={cancelLongPress}
+                        onPointerLeave={cancelLongPress}
+                        onContextMenu={event => isMine && event.preventDefault()}
+                        onSelectStart={event => isMine && event.preventDefault()}
+                        onClick={() => openImageMessage(url, imageUrls, imageIndex)}
+                        style={{ display: 'block', width: '100%', height: 92, objectFit: 'cover', cursor: 'pointer', userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none', gridColumn: imageUrls.length % 2 === 1 && imageIndex === imageUrls.length - 1 ? '1 / -1' : undefined }}
+                      />
+                    ))}
+                  </div>
+                  {imageMenuTarget?.message.id === msg.id ? (
+                    <div className="message-action-menu" data-message-menu="true" onPointerDown={event => event.stopPropagation()} style={{ display: 'flex', alignItems: 'center', marginTop: 5, border: `1px solid ${t.border}`, borderRadius: 9, overflow: 'hidden', background: t.panel, boxShadow: '0 3px 10px rgba(0,0,0,0.2)' }}>
+                      <button onClick={() => deleteGalleryImage({ message: msg, imageIndex: imageMenuTarget.imageIndex })} style={{ border: 0, background: 'none', color: '#f87171', padding: '7px 13px', fontSize: 11, cursor: 'pointer' }}>삭제</button>
+                    </div>
+                  ) : renderMessageActions(msg, false)}
+                  {renderDeliveryStatus(msg)}
+                </div>
+              </div>
+            )
+          }
 
           if (msg.type === 'image')
             return (
@@ -998,20 +1849,17 @@ export default function Room() {
                 onPointerLeave={cancelLongPress}
                 onContextMenu={event => isMine && event.preventDefault()}
                 onSelectStart={event => isMine && event.preventDefault()}
-                style={{ display: 'flex', flexDirection: isMine ? 'row-reverse' : 'row', alignItems: 'flex-start', gap: 6, touchAction: 'pan-y', ...ownMessageLongPressStyle }}>
-                <div style={{ flexShrink: 0, width: 36, height: showMessageIdentity ? 36 : 0 }}>
-                  {showMessageIdentity && <div role="button" tabIndex={0} aria-label={`${char?.name || '프로필'} 사진 크게 보기`} onPointerDown={event => event.stopPropagation()} onClick={() => setProfilePreview({ url: char?.image_url || DEFAULT_AVATAR, name: char?.name })} onKeyDown={event => (event.key === 'Enter' || event.key === ' ') && setProfilePreview({ url: char?.image_url || DEFAULT_AVATAR, name: char?.name })} style={{ width: 36, height: 36, borderRadius: '50%', background: char?.color || t.border, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 500, color: char?.text_color || t.subText, cursor: 'zoom-in' }}><img src={char?.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>}
+                style={{ position: 'relative', display: 'flex', flexDirection: isMine ? 'row-reverse' : 'row', alignItems: 'flex-start', gap: 6, paddingTop: timelineMarkerHeight, touchAction: 'pan-y', ...ownMessageLongPressStyle }}>
+                {timelineMarkers}
+                <div style={{ flexShrink: 0, width: 43, height: showMessageIdentity ? 43 : 0 }}>
+                  {showMessageIdentity && <div role="button" tabIndex={0} aria-label={`${char?.name || '프로필'} 사진 크게 보기`} onPointerDown={event => event.stopPropagation()} onClick={() => setProfilePreview({ url: char?.image_url || DEFAULT_AVATAR, name: char?.name })} onKeyDown={event => (event.key === 'Enter' || event.key === ' ') && setProfilePreview({ url: char?.image_url || DEFAULT_AVATAR, name: char?.name })} style={{ width: 43, height: 43, background: 'transparent', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 500, color: char?.text_color || t.subText, cursor: 'zoom-in' }}><img className="squircle-media" src={talkingAvatarUrl(msg)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>}
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMine ? 'flex-end' : 'flex-start', maxWidth: '72%' }}>
                   {showMessageIdentity && char?.name && <div style={{ maxWidth: '100%', marginBottom: 4, color: t.subText, fontSize: 11, lineHeight: 1.35, overflowWrap: 'anywhere', textAlign: isMine ? 'right' : 'left' }}>{char.name}</div>}
                   <img src={msg.content} style={{ maxWidth: 180, borderRadius: 10, cursor: 'pointer' }} onClick={() => openImageMessage(msg.content)} />
                   {showMessageTimestamp && <div style={{ fontSize: 10, color: t.subText, marginTop: 2, opacity: 0.72 }}>{new Date(msg.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}</div>}
                   {renderMessageActions(msg, false)}
-                  {msg.delivery_state === 'failed' && (
-                    <button onClick={() => retryMessage(msg)} style={{ background: 'none', border: 0, color: '#f87171', fontSize: 10, cursor: 'pointer', padding: 0 }}>
-                      전송 실패 · 다시 시도
-                    </button>
-                  )}
+                  {renderDeliveryStatus(msg)}
                 </div>
               </div>
             )
@@ -1033,39 +1881,35 @@ export default function Room() {
               onPointerLeave={cancelLongPress}
               onContextMenu={event => isMine && event.preventDefault()}
               onSelectStart={event => isMine && event.preventDefault()}
-              style={{ display: 'flex', flexDirection: isMine ? 'row-reverse' : 'row', alignItems: 'flex-start', gap: 6, touchAction: 'pan-y', ...ownMessageLongPressStyle }}>
-              <div style={{ flexShrink: 0, width: 36, height: showMessageIdentity ? 36 : 0 }}>
-                {showMessageIdentity && <div role="button" tabIndex={0} aria-label={`${char?.name || '프로필'} 사진 크게 보기`} onPointerDown={event => event.stopPropagation()} onClick={() => setProfilePreview({ url: char?.image_url || DEFAULT_AVATAR, name: char?.name })} onKeyDown={event => (event.key === 'Enter' || event.key === ' ') && setProfilePreview({ url: char?.image_url || DEFAULT_AVATAR, name: char?.name })} style={{ width: 36, height: 36, borderRadius: '50%', background: char?.color || t.border, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 500, color: char?.text_color || t.subText, cursor: 'zoom-in' }}><img src={char?.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>}
+              style={{ position: 'relative', display: 'flex', flexDirection: isMine ? 'row-reverse' : 'row', alignItems: 'flex-start', gap: 6, paddingTop: timelineMarkerHeight, touchAction: 'pan-y', ...ownMessageLongPressStyle }}>
+              {timelineMarkers}
+              <div style={{ flexShrink: 0, width: 43, height: showMessageIdentity ? 43 : 0 }}>
+                {showMessageIdentity && <div role="button" tabIndex={0} aria-label={`${char?.name || '프로필'} 사진 크게 보기`} onPointerDown={event => event.stopPropagation()} onClick={() => setProfilePreview({ url: char?.image_url || DEFAULT_AVATAR, name: char?.name })} onKeyDown={event => (event.key === 'Enter' || event.key === ' ') && setProfilePreview({ url: char?.image_url || DEFAULT_AVATAR, name: char?.name })} style={{ width: 43, height: 43, background: 'transparent', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 500, color: char?.text_color || t.subText, cursor: 'zoom-in' }}><img className="squircle-media" src={talkingAvatarUrl(msg)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>}
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMine ? 'flex-end' : 'flex-start', maxWidth: '72%' }}>
                 {showMessageIdentity && char?.name && <div style={{ maxWidth: '100%', marginBottom: 4, color: t.subText, fontSize: 11, lineHeight: 1.35, overflowWrap: 'anywhere', textAlign: isMine ? 'right' : 'left' }}>{char.name}</div>}
                 {editingId === msg.id ? (
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    <input value={editText} onChange={e => setEditText(e.target.value)} onKeyDown={e => e.key === 'Enter' && editMessage(msg.id)} style={{ background: t.bg, border: `0.5px solid ${t.point}`, borderRadius: 8, padding: '6px 10px', color: t.inputText, fontSize: 12, outline: 'none' }} />
-                    <button onClick={() => editMessage(msg.id)} style={{ background: t.point, border: 'none', borderRadius: 8, padding: '6px 10px', color: '#fff', fontSize: 11, cursor: 'pointer' }}>
-                      저장
-                    </button>
-                    <button onClick={() => setEditingId(null)} style={{ background: 'none', border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '6px 10px', color: t.subText, fontSize: 11, cursor: 'pointer' }}>
-                      취소
-                    </button>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMine ? 'flex-end' : 'flex-start', gap: 5 }}>
+                    <input value={editText} onChange={e => setEditText(e.target.value)} onKeyDown={e => e.key === 'Enter' && editMessage(msg.id)} style={{ width: 'min(62vw, 280px)', background: t.bg, border: `0.5px solid ${t.point}`, borderRadius: 8, padding: '7px 10px', color: t.inputText, fontSize: 12, outline: 'none', boxSizing: 'border-box' }} />
+                    <div style={{ display: 'flex', alignItems: 'center', border: `1px solid ${t.border}`, borderRadius: 9, overflow: 'hidden', background: t.panel, boxShadow: '0 3px 10px rgba(0,0,0,0.2)' }}>
+                      <button onClick={() => editMessage(msg.id)} style={{ border: 0, background: 'none', color: t.theirText, padding: '7px 13px', fontSize: 11, cursor: 'pointer' }}>저장</button>
+                      <div style={{ width: 1, alignSelf: 'stretch', background: t.border }} />
+                      <button onClick={() => setEditingId(null)} style={{ border: 0, background: 'none', color: '#f87171', padding: '7px 13px', fontSize: 11, cursor: 'pointer' }}>취소</button>
+                    </div>
                   </div>
                 ) : (
                   <div
                     data-message-bubble
-                    style={{ background: bubbleBg, color: bubbleColor, padding: '8px 12px', borderRadius: 13, fontSize: 14, lineHeight: 1.55, border: 'none', cursor: isMine ? 'pointer' : 'default' }}>
+                    style={{ background: bubbleBg, color: bubbleColor, padding: '8px 12px', borderRadius: 13, fontSize: 'calc(14px * var(--idea-font-scale, 1))', lineHeight: 1.55, border: 'none', cursor: isMine ? 'pointer' : 'default' }}>
                     {parseContent(msg.content, actColor, actionStyle)}
-                    {msg.edited && <span style={{ fontSize: 9, opacity: 0.5, marginLeft: 4 }}>수정됨</span>}
+                    {msg.edited && showEditedLabel && <span style={{ fontSize: 9, opacity: 0.5, marginLeft: 4 }}>수정됨</span>}
                   </div>
                 )}
                 {renderMessageActions(msg)}
                 {showMessageMeta && <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 2 }}>
                   {showReadReceipt && <Eye size={10} color={t.subText} opacity={0.4} />}
                   {showMessageTimestamp && <div style={{ fontSize: 10, color: t.subText, opacity: 0.72 }}>{searchQuery ? new Date(msg.created_at).toLocaleDateString('ko-KR') + ' ' + new Date(msg.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : new Date(msg.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}</div>}
-                  {msg.delivery_state === 'failed' && (
-                    <button onClick={() => retryMessage(msg)} style={{ background: 'none', border: 0, color: '#f87171', fontSize: 10, cursor: 'pointer', padding: 0 }}>
-                      전송 실패 · 다시 시도
-                    </button>
-                  )}
+                  {renderDeliveryStatus(msg)}
                 </div>}
               </div>
             </div>
@@ -1073,7 +1917,7 @@ export default function Room() {
         })}
 
         {/* 입력중 표시 */}
-        {typingInfo && (
+        {showTypingIndicator && typingInfo && typingInfo.expiresAt > Date.now() && (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '2px 0' }}>
             <div style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
               <div style={{ width: 5, height: 5, borderRadius: '50%', background: t.subText, opacity: 0.6, animation: 'typing-dot 1.2s infinite', animationDelay: '0s' }} />
@@ -1106,12 +1950,47 @@ export default function Room() {
           }}
         />
         {myChars.length > 0 && (
-          <button onMouseDown={e => e.preventDefault()} onClick={() => setShowCharList(v => !v)} style={{ position: 'absolute', top: -18, left: 14, background: `color-mix(in srgb, ${t.panel} 78%, transparent)`, backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)', border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '3px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'auto' }}>
+          <button
+            onMouseDown={e => e.preventDefault()}
+            onPointerDown={event => {
+              profileGestureStartRef.current = event.clientY
+              profileGestureHandledRef.current = false
+              event.currentTarget.setPointerCapture?.(event.pointerId)
+            }}
+            onPointerMove={event => {
+              if (profileGestureStartRef.current === null || profileGestureHandledRef.current) return
+              const distance = profileGestureStartRef.current - event.clientY
+              if (distance > 24) {
+                profileGestureHandledRef.current = true
+                openCharList()
+              } else if (distance < -24) {
+                profileGestureHandledRef.current = true
+                closeCharList()
+              }
+            }}
+            onPointerUp={event => {
+              profileGestureStartRef.current = null
+              event.currentTarget.releasePointerCapture?.(event.pointerId)
+            }}
+            onPointerCancel={() => {
+              profileGestureStartRef.current = null
+              profileGestureHandledRef.current = false
+            }}
+            onClick={() => {
+              if (profileGestureHandledRef.current) {
+                profileGestureHandledRef.current = false
+                return
+              }
+              if (showCharList) closeCharList()
+              else openCharList()
+            }}
+            aria-label="프로필 변경 메뉴"
+            style={{ position: 'absolute', top: -18, left: 14, background: `color-mix(in srgb, ${t.panel} 78%, transparent)`, backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)', border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '3px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'auto', touchAction: 'none' }}>
             {showCharList ? <ChevronDown size={13} color={t.subText} /> : <ChevronUp size={13} color={t.subText} />}
           </button>
         )}
         {myChars.length > 0 && showCharList && (
-          <div className="profile-picker-reveal" style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, marginBottom: 7, padding: '7px 9px', borderRadius: 14, background: `color-mix(in srgb, ${t.panel} 76%, transparent)`, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: `1px solid ${t.border}`, boxShadow: '0 8px 24px rgba(0,0,0,0.16)', pointerEvents: 'auto' }}>
+          <div className={`profile-picker-reveal${closingCharList ? ' is-closing' : ''}`} style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, marginBottom: 7, padding: '7px 9px', borderRadius: 14, background: `color-mix(in srgb, ${t.panel} 76%, transparent)`, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: `1px solid ${t.border}`, boxShadow: '0 8px 24px rgba(0,0,0,0.16)', pointerEvents: closingCharList ? 'none' : 'auto' }}>
             <span style={{ fontSize: 10, color: t.subText, flexShrink: 0 }}>나</span>
             <div className="character-strip" style={{ display: 'flex', gap: 5, flex: 1, minWidth: 0, flexWrap: 'nowrap', overflowX: 'auto', overflowY: 'hidden', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', touchAction: 'pan-x', paddingBottom: 2 }}>
               {myChars.map(c => (
@@ -1127,7 +2006,7 @@ export default function Room() {
                     await supabase.from('room_members').update({ last_char_id: c.id }).eq('room_id', roomId).eq('user_id', user.id)
                   }}
                   style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, padding: '3px 8px 3px 4px', borderRadius: 20, border: activeChar?.id === c.id && mode === 'chat' ? `1.5px solid ${c.color || t.point}` : `1px solid ${t.border}`, background: activeChar?.id === c.id && mode === 'chat' ? c.color + '22' : 'none', cursor: 'pointer' }}>
-                  <div style={{ width: 18, height: 18, borderRadius: '50%', background: c.color || t.point, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, color: c.text_color || '#fff', overflow: 'hidden', flexShrink: 0 }}><img src={c.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>
+                  <div style={{ width: 22, height: 22, background: c.color || t.point, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, color: c.text_color || '#fff', overflow: 'hidden', flexShrink: 0 }}><img className="squircle-media" src={c.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>
                   <span style={{ fontSize: 11, color: activeChar?.id === c.id && mode === 'chat' ? t.theirText : t.subText }}>{c.name}</span>
                 </button>
               ))}
@@ -1145,18 +2024,83 @@ export default function Room() {
             + 캐릭터 추가하기
           </button>
         )}
-        <div style={{ display: 'flex', gap: 5, alignItems: 'flex-end', width: '100%', minHeight: 52, padding: 6, borderRadius: 26, background: `color-mix(in srgb, ${t.panel} 78%, transparent)`, backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)', border: `1px solid ${t.border}`, boxShadow: '0 10px 30px rgba(0,0,0,0.24)', pointerEvents: 'auto' }}>
-          <button onMouseDown={e => e.preventDefault()} onClick={() => fileInputRef.current?.click()} aria-label="이미지 업로드" style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: `${t.border}88`, cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        {showRoleplayMenu && (
+          <div className={`roleplay-tool-menu${closingRoleplayMenu ? ' is-closing' : ''}`} style={{ display: 'grid', gap: 6, marginBottom: 7, padding: 8, borderRadius: 14, background: `color-mix(in srgb, ${t.panel} 92%, transparent)`, backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)', border: `1px solid ${t.border}`, pointerEvents: closingRoleplayMenu ? 'none' : 'auto' }}>
+            <button
+              onMouseDown={event => event.preventDefault()}
+              onClick={() => {
+                setMode(isNarrActive ? 'chat' : 'narration')
+                closeRoleplayMenu()
+                inputRef.current?.focus()
+              }}
+              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 11px', borderRadius: 10, border: `1px solid ${isNarrActive ? t.point : t.border}`, background: isNarrActive ? `${t.point}22` : 'none', color: isNarrActive ? t.point : t.theirText }}>
+              <Quote size={16} />
+              <span style={{ flex: 1, textAlign: 'left' }}>나레이션</span>
+              <span style={{ fontSize: 10, color: t.subText }}>{isNarrActive ? '사용 중' : '전환'}</span>
+            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+              <Minus size={16} color={t.subText} style={{ flexShrink: 0 }} />
+              <input
+                value={dividerText}
+                onChange={event => setDividerText(event.target.value)}
+                onKeyDown={event => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault()
+                    sendDivider()
+                  }
+                }}
+                placeholder="구분선 문구"
+                style={{ flex: 1, minWidth: 0, padding: '8px 9px', borderRadius: 9, border: `1px solid ${t.border}`, background: t.bg, color: t.inputText, outline: 'none' }}
+              />
+              <button onMouseDown={event => event.preventDefault()} onClick={sendDivider} style={{ flexShrink: 0, padding: '8px 11px', borderRadius: 9, border: 0, background: t.point, color: '#fff' }}>
+                추가
+              </button>
+            </div>
+            <button
+              onMouseDown={event => event.preventDefault()}
+              onClick={() => {
+                closeRoleplayMenu()
+                setShowCommunication(true)
+              }}
+              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 11px', borderRadius: 10, border: `1px solid ${t.border}`, background: 'none', color: t.theirText }}>
+              <Phone size={16} />
+              <MessageSquare size={16} />
+              <span>전화 · 문자</span>
+            </button>
+            <button
+              onMouseDown={event => event.preventDefault()}
+              onClick={loadInvitableRooms}
+              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 11px', borderRadius: 10, border: `1px solid ${t.border}`, background: 'none', color: t.theirText }}>
+              <DoorOpen size={16} />
+              <span>다른 방으로 초대</span>
+            </button>
+            {showRoomInvitePicker && (
+              <div style={{ display: 'grid', gap: 5, paddingTop: 2 }}>
+                <div style={{ color: t.subText, fontSize: 10 }}>초대할 방을 선택하세요.</div>
+                {invitableRooms.length === 0 ? (
+                  <div style={{ padding: 9, borderRadius: 9, background: t.bg, color: t.subText, fontSize: 11, textAlign: 'center' }}>초대할 수 있는 다른 방이 없어요.</div>
+                ) : (
+                  invitableRooms.map(targetRoom => (
+                    <button key={targetRoom.id} onMouseDown={event => event.preventDefault()} onClick={() => sendRoomInvite(targetRoom)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 9, border: `1px solid ${t.border}`, background: t.bg, color: t.theirText, textAlign: 'left' }}>
+                      <span style={{ flex: 1, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{targetRoom.name}</span>
+                      <Send size={13} color={t.point} />
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+        )}
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center', width: '100%', height: 42, padding: 5, borderRadius: 22, background: `color-mix(in srgb, ${t.panel} 78%, transparent)`, backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)', border: `1px solid ${t.border}`, boxShadow: '0 10px 30px rgba(0,0,0,0.24)', pointerEvents: 'auto' }}>
+          <button onMouseDown={e => e.preventDefault()} onClick={() => fileInputRef.current?.click()} aria-label="이미지 업로드" style={{ width: 32, height: 32, borderRadius: '50%', border: 'none', background: `${t.border}88`, cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Paperclip size={16} color={t.subText} />
           </button>
-          <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" ref={fileInputRef} onChange={e => sendImage(e.target.files[0])} style={{ display: 'none' }} />
+          <input type="file" multiple accept="image/jpeg,image/png,image/webp,image/gif" ref={fileInputRef} onChange={e => sendImages(e.target.files)} style={{ display: 'none' }} />
           <textarea
               ref={inputRef}
               value={input}
               onChange={e => {
                 setInput(e.target.value)
-                e.target.style.height = 'auto'
-                e.target.style.height = Math.min(e.target.scrollHeight, 80) + 'px'
                 handleTyping(e)
               }}
               onKeyDown={e => {
@@ -1179,14 +2123,14 @@ export default function Room() {
               placeholder={isNarrActive ? '나레이션 입력...' : activeChar ? `${activeChar.name}${instrumentalParticle(activeChar.name)} 입력...` : '캐릭터를 먼저 추가해주세요'}
               enterKeyHint="enter"
               rows={1}
-              style={{ flex: 1, minWidth: 0, minHeight: 40, maxHeight: 80, background: 'transparent', border: 'none', borderRadius: 0, padding: '9px 7px', color: isNarrActive ? t.narrColor : t.inputText, fontSize: 14, outline: 'none', resize: 'none', lineHeight: 1.5, fontStyle: isNarrActive ? 'italic' : 'normal' }}
+              style={{ flex: 1, minWidth: 0, height: 32, minHeight: 32, maxHeight: 32, overflowY: 'auto', background: 'transparent', border: 'none', borderRadius: 0, padding: '5px 6px', color: isNarrActive ? t.narrColor : t.inputText, fontSize: 'calc(14px * var(--idea-font-scale, 1))', outline: 'none', resize: 'none', lineHeight: 1.55, fontStyle: isNarrActive ? 'italic' : 'normal' }}
             />
             {myChars.length > 0 && (
-              <button onMouseDown={e => e.preventDefault()} onClick={() => setMode(mode === 'narration' ? 'chat' : 'narration')} aria-label="나레이션 전환" style={{ width: 40, height: 40, flexShrink: 0, padding: 0, borderRadius: '50%', cursor: 'pointer', border: `1px solid ${isNarrActive ? t.point : 'transparent'}`, background: isNarrActive ? `${t.point}2f` : `${t.border}66`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Quote size={16} color={isNarrActive ? t.narrColor : t.subText} />
+              <button onMouseDown={e => e.preventDefault()} onClick={() => { if (showRoleplayMenu) closeRoleplayMenu(); else openRoleplayMenu() }} aria-label="역극 편의기능 메뉴" style={{ width: 32, height: 32, flexShrink: 0, padding: 0, borderRadius: '50%', cursor: 'pointer', border: `1px solid ${showRoleplayMenu || isNarrActive ? t.point : 'transparent'}`, background: showRoleplayMenu || isNarrActive ? `${t.point}2f` : `${t.border}66`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Sparkles size={16} color={showRoleplayMenu || isNarrActive ? t.narrColor : t.subText} />
               </button>
             )}
-          <button onMouseDown={e => e.preventDefault()} onClick={sendMessage} aria-label="전송" style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: t.point, cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <button onMouseDown={e => e.preventDefault()} onClick={sendMessage} aria-label="전송" style={{ width: 32, height: 32, borderRadius: '50%', border: 'none', background: t.point, cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <ArrowUp size={18} color="#fff" strokeWidth={2.5} />
           </button>
         </div>

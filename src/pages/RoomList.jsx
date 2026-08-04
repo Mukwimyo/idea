@@ -2,10 +2,13 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { getTheme } from '../lib/themes'
-import { Settings, Users, ChevronRight, Trash2, CirclePlus, LogIn, Search, ListRestart, GripVertical, X } from 'lucide-react'
+import { Settings, Users, ChevronRight, Trash2, CirclePlus, LogIn, Search, ListRestart, GripVertical, X, Star } from 'lucide-react'
 import { DndContext, PointerSensor, TouchSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core'
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import { IconButton } from '../components/ui'
+import LoadingScreen from '../components/LoadingScreen'
+import EntryCharacterPicker from '../components/EntryCharacterPicker'
 
 function SortableRoomCard({ roomId, disabled, children }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: roomId, disabled })
@@ -22,15 +25,20 @@ export default function RoomList() {
   const [showJoin, setShowJoin] = useState(false)
   const [roomName, setRoomName] = useState('')
   const [inviteCode, setInviteCode] = useState('')
+  const [pendingJoinRoom, setPendingJoinRoom] = useState(null)
+  const [entryCharacters, setEntryCharacters] = useState([])
+  const [entryJoining, setEntryJoining] = useState(false)
   const [loading, setLoading] = useState(false)
   const [theme, setTheme] = useState(null)
   const [userId, setUserId] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [reordering, setReordering] = useState(false)
+  const [playInitialRoomAnimation, setPlayInitialRoomAnimation] = useState(() => sessionStorage.getItem('idea-room-list-entered') !== '1')
   const navigate = useNavigate()
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }), useSensor(TouchSensor, { activationConstraint: { delay: 220, tolerance: 6 } }))
 
   const channelRef = useRef(null)
+  const initialRoomAnimationRef = useRef(false)
 
   useEffect(() => {
     const init = async () => {
@@ -39,7 +47,8 @@ export default function RoomList() {
       } = await supabase.auth.getUser()
       setUserId(user.id)
       const { data } = await supabase.from('profiles').select('theme_id').eq('id', user.id).single()
-      const resolvedTheme = getTheme(data?.theme_id || 'dark-purple')
+    const resolvedTheme = getTheme(data?.theme_id || 'dark-purple')
+    localStorage.setItem('idea-theme-id', data?.theme_id || 'dark-purple')
       setTheme(resolvedTheme)
       document.querySelector('meta[name="theme-color"]')?.setAttribute('content', resolvedTheme.panel)
       fetchRooms(user.id)
@@ -65,12 +74,29 @@ export default function RoomList() {
       if (channelRef.current) supabase.removeChannel(channelRef.current)
     }
   }, [])
+
+  useEffect(() => {
+    if (!playInitialRoomAnimation || rooms.length === 0 || initialRoomAnimationRef.current) return
+    initialRoomAnimationRef.current = true
+    sessionStorage.setItem('idea-room-list-entered', '1')
+    const finishTimer = window.setTimeout(() => setPlayInitialRoomAnimation(false), Math.min(rooms.length, 10) * 70 + 520)
+    return () => window.clearTimeout(finishTimer)
+  }, [playInitialRoomAnimation, rooms.length])
   const fetchRooms = async uid => {
     const id = uid || userId
-    const { data } = await supabase.from('room_members').select('room_id, sort_order, rooms(*)').eq('user_id', id)
+    let { data, error } = await supabase.from('room_members').select('room_id, sort_order, is_favorite, rooms(*)').eq('user_id', id)
+    if (error) {
+      const fallback = await supabase.from('room_members').select('room_id, sort_order, rooms(*)').eq('user_id', id)
+      data = fallback.data?.map(member => ({ ...member, is_favorite: false })) || null
+      error = fallback.error
+    }
+    if (error) {
+      console.error('room list fetch failed:', error.message)
+      return
+    }
     if (!data) return
 
-    const rooms = data.map(d => ({ ...d.rooms, sort_order: d.sort_order ?? 0 })).filter(room => room.id)
+    const rooms = data.map(d => ({ ...d.rooms, sort_order: d.sort_order ?? 0, is_favorite: d.is_favorite === true })).filter(room => room.id)
 
     const enriched = await Promise.all(
       rooms.map(async room => {
@@ -85,12 +111,28 @@ export default function RoomList() {
     const hasCustomOrder = data.some(member => (member.sort_order ?? 0) > 0)
     setRooms(
       enriched.sort((a, b) => {
+        if (a.is_favorite !== b.is_favorite) return a.is_favorite ? -1 : 1
         if (hasCustomOrder) return a.sort_order - b.sort_order
         const aTime = a.lastMsg?.created_at || a.created_at || ''
         const bTime = b.lastMsg?.created_at || b.created_at || ''
         return bTime.localeCompare(aTime)
       })
     )
+  }
+
+  const toggleFavorite = async (event, room) => {
+    event.stopPropagation()
+    const next = !room.is_favorite
+    setRooms(current =>
+      current
+        .map(item => (item.id === room.id ? { ...item, is_favorite: next } : item))
+        .sort((a, b) => (a.is_favorite === b.is_favorite ? a.sort_order - b.sort_order : a.is_favorite ? -1 : 1))
+    )
+    const { error } = await supabase.from('room_members').update({ is_favorite: next }).eq('room_id', room.id).eq('user_id', userId)
+    if (error) {
+      setRooms(current => current.map(item => (item.id === room.id ? { ...item, is_favorite: !next } : item)))
+      alert('즐겨찾기를 저장하지 못했습니다.')
+    }
   }
 
   const createRoom = async () => {
@@ -126,14 +168,57 @@ export default function RoomList() {
     const { data: room } = await supabase.from('rooms').select().eq('invite_code', inviteCode.trim()).single()
     if (room) {
       await supabase.from('profiles').upsert({ id: user.id, email: user.email })
-      await supabase.from('room_members').upsert({ room_id: room.id, user_id: user.id, sort_order: rooms.length })
-      setInviteCode('')
-      setShowJoin(false)
-      fetchRooms()
+      const { data: existingMember } = await supabase.from('room_members').select('room_id').eq('room_id', room.id).eq('user_id', user.id).maybeSingle()
+      if (existingMember) {
+        setInviteCode('')
+        setShowJoin(false)
+        fetchRooms()
+      } else {
+        const { data: characters } = await supabase.from('characters').select('*').eq('user_id', user.id).eq('is_archived', false).order('sort_order').order('created_at')
+        setEntryCharacters(characters || [])
+        setPendingJoinRoom(room)
+      }
     } else {
       alert('초대 코드를 찾을 수 없어요.')
     }
     setLoading(false)
+  }
+
+  const completeJoinRoom = async character => {
+    if (!pendingJoinRoom || !character) return
+    setEntryJoining(true)
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    const { error } = await supabase.from('room_members').insert({
+      room_id: pendingJoinRoom.id,
+      user_id: user.id,
+      sort_order: rooms.length,
+      last_char_id: character.id,
+    })
+    if (error) {
+      setEntryJoining(false)
+      alert('대화방에 입장하지 못했어요.')
+      return
+    }
+    await supabase.from('room_characters').upsert({
+      room_id: pendingJoinRoom.id,
+      user_id: user.id,
+      character_id: character.id,
+      sort_order: 0,
+    })
+    await supabase.from('messages').insert({
+      room_id: pendingJoinRoom.id,
+      user_id: user.id,
+      character_id: character.id,
+      type: 'member_joined',
+      content: `${character.name}님이 대화방에 들어왔어요.`,
+    })
+    setEntryJoining(false)
+    setPendingJoinRoom(null)
+    setInviteCode('')
+    setShowJoin(false)
+    fetchRooms()
   }
 
   const deleteRoom = async (e, roomId, createdBy) => {
@@ -166,26 +251,37 @@ export default function RoomList() {
   }
 
   if (!theme)
-    return (
-      <div
-        style={{
-          minHeight: '100vh',
-          background: '#1a1a2e',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}>
-        <div style={{ color: '#7F77DD', fontSize: 28 }}>✦</div>
-      </div>
-    )
+    return <LoadingScreen />
 
   const t = theme
+  const logoVariant = t.dark ? 'dark' : 'light'
+  const headerLogo = `${import.meta.env.BASE_URL}branding/idea-logo-header-${logoVariant}.png`
+  const backgroundLogo = `${import.meta.env.BASE_URL}branding/idea-logo-background-tile-${logoVariant}.png`
   const normalizedSearch = searchQuery.trim().toLocaleLowerCase('ko-KR')
   const filteredRooms = rooms.filter(room => room.name.toLocaleLowerCase('ko-KR').includes(normalizedSearch))
 
   return (
-    <div style={{ minHeight: '100vh', background: t.bg, padding: 16 }}>
-      <div style={{ maxWidth: 400, margin: '0 auto' }}>
+    <div
+      style={{
+        minHeight: '100vh',
+        backgroundColor: t.bg,
+        backgroundImage: `url("${backgroundLogo}")`,
+        backgroundRepeat: 'repeat',
+        backgroundPosition: 'center top',
+        backgroundSize: '450px 450px',
+        padding: 16,
+        transition: 'background-color 0.3s',
+      }}>
+      <EntryCharacterPicker
+        open={Boolean(pendingJoinRoom)}
+        roomName={pendingJoinRoom?.name}
+        characters={entryCharacters}
+        theme={t}
+        loading={entryJoining}
+        onSelect={completeJoinRoom}
+        onClose={() => !entryJoining && setPendingJoinRoom(null)}
+      />
+      <div style={{ maxWidth: 400, margin: '0 auto', position: 'relative' }}>
         {/* 헤더 */}
         <div
           style={{
@@ -195,7 +291,9 @@ export default function RoomList() {
             marginBottom: 14,
             paddingTop: 8,
           }}>
-          <div style={{ fontSize: 20, color: t.theirText, fontWeight: 600, flex: 1 }}>이데아</div>
+          <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center' }}>
+            <img src={headerLogo} alt="IDEA" style={{ display: 'block', width: 84, height: 'auto', maxHeight: 42, objectFit: 'contain', objectPosition: 'left center' }} />
+          </div>
           <button
             onClick={() => { setShowJoin(false); setShowCreate(current => !current) }}
             aria-label="새 역극방"
@@ -389,11 +487,11 @@ export default function RoomList() {
             </div>
           )}
           {rooms.length > 0 && filteredRooms.length === 0 && <div style={{ textAlign: 'center', color: t.subText, fontSize: 13, marginTop: 32, opacity: 0.6 }}>검색 결과가 없어요.</div>}
-          {filteredRooms.map(room => (
+          {filteredRooms.map((room, roomIndex) => (
             <SortableRoomCard key={room.id} roomId={room.id} disabled={!reordering}>
               {({ listeners }) => (
             <div
-              className="room-card-transition"
+              className={`room-card-transition${playInitialRoomAnimation ? ' room-card-first-enter' : ''}`}
               onClick={() => !reordering && navigate(`/room/${room.id}`)}
               style={{
                 background: t.panel,
@@ -405,9 +503,10 @@ export default function RoomList() {
                 gap: 12,
                 border: `1px solid ${t.border}`,
                 boxShadow: `0 1px 4px rgba(0,0,0,0.15)`,
+                animationDelay: playInitialRoomAnimation ? `${Math.min(roomIndex, 10) * 70}ms` : undefined,
               }}>
               {reordering && <button {...listeners} onClick={event => event.stopPropagation()} aria-label={`${room.name} 순서 이동`} style={{ border: 0, background: 'none', padding: 2, display: 'flex', cursor: 'grab', touchAction: 'none' }}><GripVertical size={18} color={t.subText} /></button>}
-              <div style={{ width: 40, height: 40, borderRadius: '50%', background: t.point, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, color: t.bg, flexShrink: 0, overflow: 'hidden' }}>{room.cover_image ? <img src={room.cover_image} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '✦'}</div>
+              <div className="squircle-media" style={{ width: 48, height: 48, background: t.point, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, color: t.bg, flexShrink: 0, overflow: 'hidden' }}>{room.cover_image ? <img src={room.cover_image} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '✦'}</div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 14, fontWeight: 500, color: t.theirText }}>{room.name}</div>
                 <div
@@ -419,7 +518,17 @@ export default function RoomList() {
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap',
                   }}>
-                  {room.lastMsg ? `${room.lastMsg.characters?.name || ''}: ${room.lastMsg.type === 'chat' ? room.lastMsg.content : '[이미지]'}` : ''}
+                  {room.lastMsg
+                    ? room.lastMsg.type === 'chat'
+                      ? `${room.lastMsg.characters?.name || ''}: ${room.lastMsg.content}`
+                      : room.lastMsg.type === 'room_invite'
+                        ? '[대화방 초대]'
+                        : room.lastMsg.type === 'member_joined' || room.lastMsg.type === 'member_left'
+                          ? room.lastMsg.content
+                          : room.lastMsg.type === 'image' || room.lastMsg.type === 'image_group'
+                            ? '[이미지]'
+                            : `[${room.lastMsg.type === 'narration' ? '나레이션' : '시스템 메시지'}]`
+                    : ''}
                 </div>
               </div>
               {room.unreadCount > 0 && (
@@ -435,6 +544,17 @@ export default function RoomList() {
                   }}>
                   {room.unreadCount}
                 </div>
+              )}
+              {!reordering && (
+                <IconButton
+                  onClick={event => toggleFavorite(event, room)}
+                  label={room.is_favorite ? `${room.name} 즐겨찾기 해제` : `${room.name} 즐겨찾기`}
+                  borderColor="transparent"
+                  pointColor={t.point}
+                  color={t.subText}
+                  style={{ width: 36, height: 36 }}>
+                  <Star size={17} color={room.is_favorite ? t.point : t.subText} fill={room.is_favorite ? t.point : 'none'} opacity={room.is_favorite ? 1 : 0.55} />
+                </IconButton>
               )}
               {!reordering && room.created_by === userId && (
                 <button

@@ -85,7 +85,24 @@ Deno.serve(async req => {
       if (char) senderName = char.name
     }
 
-    const bodyText = record.type === 'image' ? '사진을 보냈어요' : record.type === 'narration' ? record.content : record.content
+    let bodyText = record.type === 'image' || record.type === 'image_group' ? '사진을 보냈어요' : record.type === 'narration' ? record.content : record.content
+    if (record.type === 'communication') {
+      try {
+        const communication = JSON.parse(record.content)
+        bodyText = `${communication.title} · ${communication.statusLabel}`
+      } catch {
+        bodyText = '전화·문자 기록이 도착했습니다.'
+      }
+    }
+    if (record.type === 'room_invite') {
+      try {
+        const invite = JSON.parse(record.content)
+        bodyText = `${invite.roomName} 대화방으로 초대했어요`
+      } catch {
+        bodyText = '다른 대화방으로 초대했어요'
+      }
+    }
+    if (record.type === 'member_joined' || record.type === 'member_left') bodyText = record.content
 
     const notifPayload = JSON.stringify({
       title: senderName,

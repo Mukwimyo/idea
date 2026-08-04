@@ -15,8 +15,36 @@ export const validateImageFile = file => {
   return null
 }
 
-export const uploadFile = async (file, path) => {
+export const uploadFile = async (file, path, onProgress) => {
   if (validateImageFile(file)) return null
+  if (typeof onProgress === 'function' && typeof XMLHttpRequest !== 'undefined') {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+    const encodedPath = path.split('/').map(segment => encodeURIComponent(segment)).join('/')
+    const uploadUrl = `${supabaseUrl}/storage/v1/object/idea-uploads/${encodedPath}`
+    const uploaded = await new Promise(resolve => {
+      const request = new XMLHttpRequest()
+      request.open('POST', uploadUrl)
+      request.setRequestHeader('Authorization', `Bearer ${session?.access_token || supabaseAnonKey}`)
+      request.setRequestHeader('apikey', supabaseAnonKey)
+      request.setRequestHeader('x-upsert', 'true')
+      request.setRequestHeader('Content-Type', file.type)
+      request.upload.addEventListener('progress', event => {
+        if (event.lengthComputable) onProgress(Math.min(100, Math.round((event.loaded / event.total) * 100)))
+      })
+      request.addEventListener('load', () => resolve(request.status >= 200 && request.status < 300))
+      request.addEventListener('error', () => resolve(false))
+      request.addEventListener('abort', () => resolve(false))
+      request.send(file)
+    })
+    if (!uploaded) return null
+    onProgress(100)
+    const {
+      data: { publicUrl },
+    } = supabase.storage.from('idea-uploads').getPublicUrl(path)
+    return publicUrl
+  }
   const { error } = await supabase.storage.from('idea-uploads').upload(path, file, {
     upsert: true,
     contentType: file.type,

@@ -2,12 +2,13 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase, uploadFile, validateImageFile } from '../lib/supabase'
 import { getTheme } from '../lib/themes'
-import { ChevronLeft, X, RotateCcw, Search, Check, ArrowDownAZ, GripVertical } from 'lucide-react'
+import { ChevronLeft, X, RotateCcw, Search, Check, ArrowDownAZ, GripVertical, Play, Pause, Trash2 } from 'lucide-react'
 import Cropper from 'react-easy-crop'
 import { DndContext, PointerSensor, TouchSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core'
-import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy, rectSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import ProfileImageModal from '../components/ProfileImageModal'
+import LoadingScreen from '../components/LoadingScreen'
 
 const DEFAULT_CHARACTER_COLOR = '#AFA9EC'
 const DEFAULT_CHARACTER_TEXT_COLOR = '#26215C'
@@ -22,6 +23,15 @@ function SortableCard({ id, disabled, children }) {
       style={{ transform: CSS.Transform.toString(transform), transition, position: 'relative', zIndex: isDragging ? 2 : 1, opacity: isDragging ? 0.72 : 1 }}
       {...attributes}>
       {children({ listeners })}
+    </div>
+  )
+}
+
+function SortableFrame({ frame, children }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: frame.id })
+  return (
+    <div ref={setNodeRef} {...attributes} {...listeners} style={{ position: 'relative', aspectRatio: '1 / 1', transform: CSS.Transform.toString(transform), transition, zIndex: isDragging ? 3 : 1, opacity: isDragging ? 0.7 : 1, touchAction: 'none' }}>
+      {children}
     </div>
   )
 }
@@ -52,6 +62,10 @@ export default function Characters() {
   const [editDescription, setEditDescription] = useState('')
   const [editImageFile, setEditImageFile] = useState(null)
   const [editImagePreview, setEditImagePreview] = useState(null)
+  const [talkingFrames, setTalkingFrames] = useState([])
+  const [talkingFramesLoading, setTalkingFramesLoading] = useState(false)
+  const [talkingPreviewPlaying, setTalkingPreviewPlaying] = useState(false)
+  const [talkingPreviewIndex, setTalkingPreviewIndex] = useState(0)
 
   const [showCropper, setShowCropper] = useState(false)
   const [cropSrc, setCropSrc] = useState(null)
@@ -72,6 +86,23 @@ export default function Characters() {
     init()
   }, [])
 
+  useEffect(() => {
+    if (!talkingPreviewPlaying || talkingFrames.length === 0) return undefined
+    let timer
+    let current = 0
+    const scheduleNextFrame = () => {
+      const total = talkingFrames.length + 1
+      let next = current
+      while (next === current) next = Math.floor(Math.random() * total)
+      current = next
+      setTalkingPreviewIndex(next)
+      const delay = next === 0 ? 260 + Math.random() * 180 : 130 + Math.random() * 120
+      timer = window.setTimeout(scheduleNextFrame, delay)
+    }
+    timer = window.setTimeout(scheduleNextFrame, 160)
+    return () => window.clearTimeout(timer)
+  }, [talkingPreviewPlaying, talkingFrames.length])
+
   const init = async () => {
     const {
       data: { user },
@@ -79,6 +110,7 @@ export default function Characters() {
     setUserId(user.id)
     const { data } = await supabase.from('profiles').select('theme_id').eq('id', user.id).single()
     const resolvedTheme = getTheme(data?.theme_id || 'dark-purple')
+    localStorage.setItem('idea-theme-id', data?.theme_id || 'dark-purple')
     setTheme(resolvedTheme)
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', resolvedTheme.panel)
     if (roomId) {
@@ -265,12 +297,85 @@ export default function Characters() {
     fetchChars()
   }
 
+  const fetchTalkingFrames = async characterId => {
+    const { data, error } = await supabase
+      .from('character_talking_frames')
+      .select('*')
+      .eq('character_id', characterId)
+      .order('sort_order')
+      .order('created_at')
+    if (!error) setTalkingFrames(data || [])
+  }
+
   const startEdit = c => {
     setEditingChar(c.id)
     setEditName(c.name)
     setEditDescription(c.description || '')
     setEditImagePreview(c.image_url || null)
     setEditImageFile(null)
+    setTalkingFrames([])
+    setTalkingPreviewPlaying(false)
+    setTalkingPreviewIndex(0)
+    fetchTalkingFrames(c.id)
+  }
+
+  const uploadTalkingFrames = async (character, files) => {
+    const selected = Array.from(files || []).slice(0, Math.max(0, 4 - talkingFrames.length))
+    if (selected.length === 0) return
+    for (const file of selected) {
+      const validationError = validateImageFile(file)
+      if (validationError) {
+        alert(validationError)
+        return
+      }
+    }
+    setTalkingFramesLoading(true)
+    const rows = []
+    for (let index = 0; index < selected.length; index += 1) {
+      const file = selected[index]
+      const ext = file.name.split('.').pop()
+      const path = `talking-frames/${userId}/${character.id}/${Date.now()}-${index}.${ext}`
+      const imageUrl = await uploadFile(file, path)
+      rows.push({
+        character_id: character.id,
+        user_id: userId,
+        image_url: imageUrl,
+        sort_order: talkingFrames.length + index,
+      })
+    }
+    const { error } = await supabase.from('character_talking_frames').insert(rows)
+    setTalkingFramesLoading(false)
+    if (error) {
+      alert('말하기 프레임을 저장하지 못했어요. Supabase 마이그레이션 적용 여부를 확인해 주세요.')
+      return
+    }
+    fetchTalkingFrames(character.id)
+  }
+
+  const deleteTalkingFrame = async frame => {
+    const { error } = await supabase.from('character_talking_frames').delete().eq('id', frame.id).eq('user_id', userId)
+    if (error) {
+      alert('말하기 프레임을 삭제하지 못했어요.')
+      return
+    }
+    setTalkingFrames(current => current.filter(item => item.id !== frame.id))
+    setTalkingPreviewIndex(0)
+  }
+
+  const reorderTalkingFrames = async ({ active, over }) => {
+    if (!over || active.id === over.id) return
+    const oldIndex = talkingFrames.findIndex(frame => frame.id === active.id)
+    const newIndex = talkingFrames.findIndex(frame => frame.id === over.id)
+    if (oldIndex < 0 || newIndex < 0) return
+    const reordered = arrayMove(talkingFrames, oldIndex, newIndex)
+    setTalkingFrames(reordered)
+    const results = await Promise.all(
+      reordered.map((frame, index) => supabase.from('character_talking_frames').update({ sort_order: index }).eq('id', frame.id).eq('user_id', userId))
+    )
+    if (results.some(result => result.error)) {
+      alert('말하기 프레임 순서를 저장하지 못했어요.')
+      fetchTalkingFrames(editingChar)
+    }
   }
 
   const saveEdit = async c => {
@@ -319,11 +424,7 @@ export default function Characters() {
   }
 
   if (!theme)
-    return (
-      <div style={{ minHeight: '100vh', background: '#1a1a2e', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ color: '#7F77DD', fontSize: 28 }}>✦</div>
-      </div>
-    )
+    return <LoadingScreen />
 
   const t = theme
   const normalizedSearch = searchQuery.trim().toLocaleLowerCase('ko-KR')
@@ -380,8 +481,8 @@ export default function Characters() {
                   <button onClick={() => toggleRoomCharacter(character.id)} style={{ width: 24, height: 24, borderRadius: 7, border: 0, background: t.point, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
                     <Check size={15} color="#fff" />
                   </button>
-                  <div role="button" tabIndex={0} aria-label={`${character.name} 프로필 사진 크게 보기`} onClick={() => setProfilePreview({ url: character.image_url || DEFAULT_AVATAR, name: character.name })} onKeyDown={event => (event.key === 'Enter' || event.key === ' ') && setProfilePreview({ url: character.image_url || DEFAULT_AVATAR, name: character.name })} style={{ width: 36, height: 36, borderRadius: '50%', background: character.color, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', color: character.text_color, flexShrink: 0, cursor: 'zoom-in' }}>
-                    <img src={character.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <div role="button" tabIndex={0} aria-label={`${character.name} 프로필 사진 크게 보기`} onClick={() => setProfilePreview({ url: character.image_url || DEFAULT_AVATAR, name: character.name })} onKeyDown={event => (event.key === 'Enter' || event.key === ' ') && setProfilePreview({ url: character.image_url || DEFAULT_AVATAR, name: character.name })} style={{ width: 43, height: 43, borderRadius: 12, background: character.color, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', color: character.text_color, flexShrink: 0, cursor: 'zoom-in' }}>
+                    <img className="squircle-media" src={character.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   </div>
                   <div style={{ flex: 1, color: t.theirText, fontSize: 13 }}>{character.name}</div>
                   </div>}
@@ -397,8 +498,8 @@ export default function Characters() {
             {availableCharacters.map(character => (
               <button key={character.id} onClick={() => toggleRoomCharacter(character.id)} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', background: t.panel, border: `1px solid ${t.border}`, borderRadius: 11, padding: '10px 11px', cursor: 'pointer', textAlign: 'left' }}>
                 <div style={{ width: 24, height: 24, borderRadius: 7, border: `1px solid ${t.border}`, flexShrink: 0 }} />
-                <div role="button" tabIndex={0} aria-label={`${character.name} 프로필 사진 크게 보기`} onClick={event => { event.stopPropagation(); setProfilePreview({ url: character.image_url || DEFAULT_AVATAR, name: character.name }) }} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); setProfilePreview({ url: character.image_url || DEFAULT_AVATAR, name: character.name }) } }} style={{ width: 36, height: 36, borderRadius: '50%', background: character.color, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', color: character.text_color, flexShrink: 0, cursor: 'zoom-in' }}>
-                  <img src={character.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <div role="button" tabIndex={0} aria-label={`${character.name} 프로필 사진 크게 보기`} onClick={event => { event.stopPropagation(); setProfilePreview({ url: character.image_url || DEFAULT_AVATAR, name: character.name }) }} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); setProfilePreview({ url: character.image_url || DEFAULT_AVATAR, name: character.name }) } }} style={{ width: 43, height: 43, borderRadius: 12, background: character.color, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', color: character.text_color, flexShrink: 0, cursor: 'zoom-in' }}>
+                  <img className="squircle-media" src={character.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 </div>
                 <div style={{ color: t.theirText, fontSize: 13 }}>{character.name}</div>
               </button>
@@ -430,7 +531,7 @@ export default function Characters() {
       {showCropper && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 200, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
           <div style={{ position: 'relative', width: 300, height: 300 }}>
-            <Cropper image={cropSrc} crop={crop} zoom={zoom} aspect={1} cropShape="round" onCropChange={setCrop} onZoomChange={setZoom} onCropComplete={(_, p) => setCroppedAreaPixels(p)} />
+            <Cropper image={cropSrc} crop={crop} zoom={zoom} aspect={1} cropShape="rect" onCropChange={setCrop} onZoomChange={setZoom} onCropComplete={(_, p) => setCroppedAreaPixels(p)} />
           </div>
           <input type="range" min={1} max={3} step={0.1} value={zoom} onChange={e => setZoom(Number(e.target.value))} style={{ width: 200 }} />
           <div style={{ display: 'flex', gap: 10 }}>
@@ -448,7 +549,7 @@ export default function Characters() {
       {editShowCropper && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 200, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
           <div style={{ position: 'relative', width: 300, height: 300 }}>
-            <Cropper image={editCropSrc} crop={editCrop} zoom={editZoom} aspect={1} cropShape="round" onCropChange={setEditCrop} onZoomChange={setEditZoom} onCropComplete={(_, p) => setEditCroppedAreaPixels(p)} />
+            <Cropper image={editCropSrc} crop={editCrop} zoom={editZoom} aspect={1} cropShape="rect" onCropChange={setEditCrop} onZoomChange={setEditZoom} onCropComplete={(_, p) => setEditCroppedAreaPixels(p)} />
           </div>
           <input type="range" min={1} max={3} step={0.1} value={editZoom} onChange={e => setEditZoom(Number(e.target.value))} style={{ width: 200 }} />
           <div style={{ display: 'flex', gap: 10 }}>
@@ -505,7 +606,7 @@ export default function Characters() {
               <div style={{ fontSize: 13, color: t.subText, marginBottom: 10 }}>새 캐릭터</div>
               <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
                 <label style={{ cursor: 'pointer' }}>
-                  <div style={{ width: 72, height: 72, borderRadius: '50%', background: imagePreview ? 'transparent' : t.bg, border: `0.5px dashed ${t.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>{imagePreview ? <img src={imagePreview} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 24, color: t.border }}>+</span>}</div>
+                  <div className="squircle-media" style={{ width: 86, height: 86, background: imagePreview ? 'transparent' : t.bg, border: `0.5px dashed ${t.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>{imagePreview ? <img src={imagePreview} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 24, color: t.border }}>+</span>}</div>
                   <div style={{ fontSize: 10, color: t.subText, textAlign: 'center', marginTop: 4 }}>프로필 이미지</div>
                   <input type="file" accept="image/*" onChange={handleImageChange} style={{ display: 'none' }} />
                 </label>
@@ -564,13 +665,50 @@ export default function Characters() {
                   <div style={{ transformOrigin: 'top', animation: 'character-card-expand 240ms cubic-bezier(0.2, 0.8, 0.2, 1)' }}>
                     <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
                       <label style={{ cursor: 'pointer' }}>
-                        <div style={{ width: 72, height: 72, borderRadius: '50%', background: editImagePreview ? 'transparent' : t.bg, border: `0.5px dashed ${t.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>{editImagePreview ? <img src={editImagePreview} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 24, color: t.border }}>+</span>}</div>
+                        <div className="squircle-media" style={{ width: 86, height: 86, background: editImagePreview ? 'transparent' : t.bg, border: `0.5px dashed ${t.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>{editImagePreview ? <img src={editImagePreview} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 24, color: t.border }}>+</span>}</div>
                         <div style={{ fontSize: 10, color: t.subText, textAlign: 'center', marginTop: 4 }}>프로필 이미지</div>
                         <input type="file" accept="image/*" onChange={handleEditImageChange} style={{ display: 'none' }} />
                       </label>
                     </div>
                     <input value={editName} onChange={e => setEditName(e.target.value)} placeholder="캐릭터 이름 *" style={{ width: '100%', background: t.bg, border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '9px 12px', color: t.inputText, fontSize: 13, outline: 'none', boxSizing: 'border-box', marginBottom: 8 }} />
                     <textarea value={editDescription} onChange={e => setEditDescription(e.target.value)} placeholder="캐릭터 설명 (선택)" style={{ width: '100%', background: t.bg, border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '9px 12px', color: t.inputText, fontSize: 13, outline: 'none', boxSizing: 'border-box', resize: 'none', height: 70, marginBottom: 10 }} />
+                    <div style={{ marginBottom: 12, padding: 11, borderRadius: 10, background: t.bg, border: `0.5px solid ${t.border}` }}>
+                      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 9 }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ color: t.theirText, fontSize: 12 }}>입력 중 말하기 애니메이션</div>
+                          <div style={{ marginTop: 2, color: t.subText, fontSize: 10 }}>입 모양이 다른 이미지를 2~4장 등록해 주세요.</div>
+                        </div>
+                        <button type="button" onClick={() => { setTalkingPreviewPlaying(current => !current); setTalkingPreviewIndex(0) }} disabled={talkingFrames.length === 0} aria-label={talkingPreviewPlaying ? '미리보기 정지' : '미리보기 재생'} style={{ width: 32, height: 32, display: 'grid', placeItems: 'center', border: `0.5px solid ${t.border}`, borderRadius: 9, background: 'none', color: t.subText, opacity: talkingFrames.length === 0 ? 0.35 : 1 }}>
+                          {talkingPreviewPlaying ? <Pause size={14} /> : <Play size={14} />}
+                        </button>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 9 }}>
+                        <div className="squircle-media" style={{ width: 62, height: 62, flexShrink: 0, overflow: 'hidden', background: t.panel, border: `0.5px solid ${t.border}` }}>
+                          <img src={talkingPreviewIndex === 0 ? editImagePreview || DEFAULT_AVATAR : talkingFrames[talkingPreviewIndex - 1]?.image_url || editImagePreview || DEFAULT_AVATAR} alt="말하기 애니메이션 미리보기" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        </div>
+                        <div style={{ flex: 1, color: t.subText, fontSize: 10, lineHeight: 1.5 }}>기본 프로필과 등록된 프레임을 번갈아 재생합니다. 얼굴 위치와 이미지 크기를 동일하게 맞추면 자연스러워요.</div>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 6 }}>
+                        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={reorderTalkingFrames}>
+                          <SortableContext items={talkingFrames.map(frame => frame.id)} strategy={rectSortingStrategy}>
+                            {talkingFrames.map((frame, index) => (
+                              <SortableFrame key={frame.id} frame={frame}>
+                                <div style={{ width: '100%', height: '100%', overflow: 'hidden', borderRadius: 8, background: t.panel, cursor: 'grab' }}>
+                                  <img src={frame.image_url} alt={`말하기 프레임 ${index + 1}`} draggable={false} style={{ width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' }} />
+                                  <button type="button" onPointerDown={event => event.stopPropagation()} onClick={() => deleteTalkingFrame(frame)} aria-label={`말하기 프레임 ${index + 1} 삭제`} style={{ position: 'absolute', top: 3, right: 3, width: 22, height: 22, display: 'grid', placeItems: 'center', padding: 0, border: 0, borderRadius: '50%', background: 'rgba(0,0,0,0.62)', color: '#fff' }}><Trash2 size={11} /></button>
+                                </div>
+                              </SortableFrame>
+                            ))}
+                          </SortableContext>
+                        </DndContext>
+                        {talkingFrames.length < 4 && (
+                          <label style={{ aspectRatio: '1 / 1', display: 'grid', placeItems: 'center', borderRadius: 8, border: `0.5px dashed ${t.border}`, color: t.subText, cursor: talkingFramesLoading ? 'wait' : 'pointer', opacity: talkingFramesLoading ? 0.5 : 1 }}>
+                            <span style={{ fontSize: 20 }}>+</span>
+                            <input type="file" accept="image/*" multiple disabled={talkingFramesLoading} onChange={event => { uploadTalkingFrames(c, event.target.files); event.target.value = '' }} style={{ display: 'none' }} />
+                          </label>
+                        )}
+                      </div>
+                    </div>
                     <div style={{ display: 'flex', gap: 8 }}>
                       <button onClick={() => saveEdit(c)} disabled={loading} style={{ flex: 1, background: t.point, border: 'none', borderRadius: 8, padding: 9, color: '#fff', fontSize: 12, cursor: 'pointer' }}>
                         {loading ? '...' : '저장'}
@@ -585,7 +723,7 @@ export default function Characters() {
                     <button {...listeners} disabled={alphabeticalView} aria-label={`${c.name} 순서 이동`} style={{ display: 'flex', background: 'none', border: 0, padding: 1, cursor: alphabeticalView ? 'default' : 'grab', touchAction: 'none', opacity: alphabeticalView ? 0.25 : 0.65 }}>
                       <GripVertical size={17} color={t.subText} />
                     </button>
-                    <div role="button" tabIndex={0} aria-label={`${c.name} 프로필 사진 크게 보기`} onClick={() => setProfilePreview({ url: c.image_url || DEFAULT_AVATAR, name: c.name })} onKeyDown={event => (event.key === 'Enter' || event.key === ' ') && setProfilePreview({ url: c.image_url || DEFAULT_AVATAR, name: c.name })} style={{ width: 44, height: 44, borderRadius: '50%', background: c.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 500, color: c.text_color, flexShrink: 0, overflow: 'hidden', cursor: 'zoom-in' }}><img src={c.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>
+                    <div className="squircle-media" role="button" tabIndex={0} aria-label={`${c.name} 프로필 사진 크게 보기`} onClick={() => setProfilePreview({ url: c.image_url || DEFAULT_AVATAR, name: c.name })} onKeyDown={event => (event.key === 'Enter' || event.key === ' ') && setProfilePreview({ url: c.image_url || DEFAULT_AVATAR, name: c.name })} style={{ width: 53, height: 53, background: c.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 500, color: c.text_color, flexShrink: 0, overflow: 'hidden', cursor: 'zoom-in' }}><img src={c.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>
                     <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => startEdit(c)}>
                       <div style={{ fontSize: 14, fontWeight: 500, color: t.theirText }}>{c.name}</div>
                       {c.description && <div style={{ fontSize: 11, color: t.subText, marginTop: 2 }}>{c.description}</div>}
@@ -608,7 +746,7 @@ export default function Characters() {
               {archivedChars.length === 0 && <div style={{ textAlign: 'center', color: t.subText, fontSize: 12, opacity: 0.5 }}>보관된 캐릭터가 없어요</div>}
               {archivedChars.map(c => (
                 <div key={c.id} style={{ background: t.bg, borderRadius: 12, padding: '12px 15px', display: 'flex', alignItems: 'center', gap: 12, border: `0.5px solid ${t.border}`, marginBottom: 8, opacity: 0.6 }}>
-                  <div role="button" tabIndex={0} aria-label={`${c.name} 프로필 사진 크게 보기`} onClick={() => setProfilePreview({ url: c.image_url || DEFAULT_AVATAR, name: c.name })} onKeyDown={event => (event.key === 'Enter' || event.key === ' ') && setProfilePreview({ url: c.image_url || DEFAULT_AVATAR, name: c.name })} style={{ width: 40, height: 40, borderRadius: '50%', background: c.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 500, color: c.text_color, flexShrink: 0, overflow: 'hidden', cursor: 'zoom-in' }}><img src={c.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>
+                  <div className="squircle-media" role="button" tabIndex={0} aria-label={`${c.name} 프로필 사진 크게 보기`} onClick={() => setProfilePreview({ url: c.image_url || DEFAULT_AVATAR, name: c.name })} onKeyDown={event => (event.key === 'Enter' || event.key === ' ') && setProfilePreview({ url: c.image_url || DEFAULT_AVATAR, name: c.name })} style={{ width: 48, height: 48, background: c.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 500, color: c.text_color, flexShrink: 0, overflow: 'hidden', cursor: 'zoom-in' }}><img src={c.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 13, fontWeight: 500, color: t.theirText }}>{c.name}</div>
                     {c.description && <div style={{ fontSize: 11, color: t.subText, marginTop: 2 }}>{c.description}</div>}

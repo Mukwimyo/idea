@@ -6,6 +6,9 @@ import RoomList from './pages/RoomList'
 import Room from './pages/Room'
 import Characters from './pages/Characters'
 import Settings from './pages/Settings'
+import Help from './pages/Help'
+import PwaPrompts from './components/PwaPrompts'
+import LoadingScreen from './components/LoadingScreen'
 
 const FONT_MAP = {
   'godo-b': 'GodoB',
@@ -21,6 +24,12 @@ const FONT_MAP = {
 
 export default function App() {
   const [session, setSession] = useState(undefined)
+  const [splashReady, setSplashReady] = useState(false)
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSplashReady(true), 650)
+    return () => window.clearTimeout(timer)
+  }, [])
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => setSession(session))
@@ -32,43 +41,40 @@ export default function App() {
       if (!user) return
       supabase
         .from('profiles')
-        .select('font_id')
+        .select('font_id, font_scale, theme_id')
         .eq('id', user.id)
         .single()
         .then(({ data }) => {
           if (data?.font_id && FONT_MAP[data.font_id]) {
             document.body.style.fontFamily = FONT_MAP[data.font_id]
           }
+          if (data?.theme_id) localStorage.setItem('idea-theme-id', data.theme_id)
+          const fontScale = Number(data?.font_scale || localStorage.getItem('idea-font-scale') || 1)
+          document.documentElement.style.setProperty('--idea-font-scale', String(fontScale))
+          localStorage.setItem('idea-font-scale', String(fontScale))
         })
     })
 
     return () => subscription.unsubscribe()
   }, [])
 
-  if (session === undefined)
-    return (
-      <div
-        style={{
-          minHeight: '100vh',
-          background: '#1a1a2e',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}>
-        <div style={{ color: '#7F77DD', fontSize: 28 }}>✦</div>
-      </div>
-    )
+  if (session === undefined || !splashReady)
+    return <LoadingScreen />
 
   return (
-    <BrowserRouter basename="/idea">
-      <Routes>
-        <Route path="/auth" element={!session ? <Auth /> : <Navigate to="/" />} />
-        <Route path="/" element={session ? <RoomList /> : <Navigate to="/auth" />} />
-        <Route path="/room/:roomId" element={session ? <Room /> : <Navigate to="/auth" />} />
-        <Route path="/room/:roomId/characters" element={session ? <Characters /> : <Navigate to="/auth" />} />
-        <Route path="/characters" element={session ? <Characters /> : <Navigate to="/auth" />} />
-        <Route path="/settings" element={session ? <Settings /> : <Navigate to="/auth" />} />
-      </Routes>
-    </BrowserRouter>
+    <>
+      <PwaPrompts />
+      <BrowserRouter basename="/idea">
+        <Routes>
+          <Route path="/auth" element={!session ? <Auth /> : <Navigate to="/" />} />
+          <Route path="/" element={session ? <RoomList /> : <Navigate to="/auth" />} />
+          <Route path="/room/:roomId" element={session ? <Room /> : <Navigate to="/auth" />} />
+          <Route path="/room/:roomId/characters" element={session ? <Characters /> : <Navigate to="/auth" />} />
+          <Route path="/characters" element={session ? <Characters /> : <Navigate to="/auth" />} />
+          <Route path="/settings" element={session ? <Settings /> : <Navigate to="/auth" />} />
+          <Route path="/help" element={session ? <Help /> : <Navigate to="/auth" />} />
+        </Routes>
+      </BrowserRouter>
+    </>
   )
 }

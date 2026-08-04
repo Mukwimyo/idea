@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { THEMES, getTheme } from '../lib/themes'
-import { ChevronLeft, ChevronRight, LogOut, Users, Bell, BellOff } from 'lucide-react'
+import { ChevronLeft, ChevronRight, LogOut, Users, Bell, BellOff, CircleHelp } from 'lucide-react'
 import { supabase, subscribePush, unsubscribePush } from '../lib/supabase'
+import Toast, { useToast } from '../components/Toast'
 
 const FONTS = [
   { id: 'sans', name: '기본', family: 'sans-serif' },
@@ -132,13 +133,17 @@ function ThemePreview({ t }) {
 
 export default function Settings() {
   const navigate = useNavigate()
+  const { toast, showToast } = useToast()
   const [myThemeId, setMyThemeId] = useState('dark-purple')
   const [saving, setSaving] = useState(false)
   const [myFontId, setMyFontId] = useState('sans')
+  const [fontScale, setFontScale] = useState(() => Number(localStorage.getItem('idea-font-scale') || 1))
   const [pushEnabled, setPushEnabled] = useState(false)
   const [showEntering, setShowEntering] = useState(true)
   const [showMessageTime, setShowMessageTime] = useState(true)
+  const [showEditedLabel, setShowEditedLabel] = useState(true)
   const [pushLoading, setPushLoading] = useState(false)
+  const [closing, setClosing] = useState(false)
 
   useEffect(() => {
     loadSettings()
@@ -148,14 +153,21 @@ export default function Settings() {
     const {
       data: { user },
     } = await supabase.auth.getUser()
-    const [{ data }, { data: messageTimeSetting }] = await Promise.all([
-      supabase.from('profiles').select('theme_id, font_id, show_entering').eq('id', user.id).single(),
-      supabase.from('profiles').select('show_message_time').eq('id', user.id).maybeSingle(),
+    const [{ data }, { data: messageDisplaySetting }] = await Promise.all([
+      supabase.from('profiles').select('theme_id, font_id, font_scale, show_entering').eq('id', user.id).single(),
+      supabase.from('profiles').select('show_message_time, show_edited_label').eq('id', user.id).maybeSingle(),
     ])
     if (data?.theme_id) setMyThemeId(data.theme_id)
     if (data?.font_id) setMyFontId(data.font_id)
+    if (data?.font_scale) {
+      const scale = Number(data.font_scale)
+      setFontScale(scale)
+      localStorage.setItem('idea-font-scale', String(scale))
+      document.documentElement.style.setProperty('--idea-font-scale', String(scale))
+    }
     if (data?.show_entering !== undefined) setShowEntering(data.show_entering)
-    if (messageTimeSetting?.show_message_time !== undefined) setShowMessageTime(messageTimeSetting.show_message_time)
+    if (messageDisplaySetting?.show_message_time !== undefined) setShowMessageTime(messageDisplaySetting.show_message_time)
+    if (messageDisplaySetting?.show_edited_label !== undefined) setShowEditedLabel(messageDisplaySetting.show_edited_label)
 
     if ('serviceWorker' in navigator) {
       const registration = await navigator.serviceWorker.getRegistration('/idea/sw.js')
@@ -168,12 +180,14 @@ export default function Settings() {
 
   const saveTheme = async id => {
     setMyThemeId(id)
+    localStorage.setItem('idea-theme-id', id)
     setSaving(true)
     const {
       data: { user },
     } = await supabase.auth.getUser()
-    await supabase.from('profiles').update({ theme_id: id }).eq('id', user.id)
+    const { error } = await supabase.from('profiles').update({ theme_id: id }).eq('id', user.id)
     setSaving(false)
+    showToast(error ? '테마를 저장하지 못했어요.' : '테마가 저장됐어요.', error ? 'error' : 'success')
   }
 
   const saveFont = async id => {
@@ -181,8 +195,21 @@ export default function Settings() {
     const {
       data: { user },
     } = await supabase.auth.getUser()
-    await supabase.from('profiles').update({ font_id: id }).eq('id', user.id)
+    const { error } = await supabase.from('profiles').update({ font_id: id }).eq('id', user.id)
     document.body.style.fontFamily = FONTS.find(f => f.id === id)?.family || 'sans-serif'
+    showToast(error ? '폰트를 저장하지 못했어요.' : '폰트가 저장됐어요.', error ? 'error' : 'success')
+  }
+
+  const saveFontScale = async value => {
+    const scale = Number(value)
+    setFontScale(scale)
+    localStorage.setItem('idea-font-scale', String(scale))
+    document.documentElement.style.setProperty('--idea-font-scale', String(scale))
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    const { error } = await supabase.from('profiles').update({ font_scale: scale }).eq('id', user.id)
+    showToast(error ? '글자 크기를 저장하지 못했어요.' : '글자 크기가 저장됐어요.', error ? 'error' : 'success')
   }
 
   const togglePush = async () => {
@@ -193,14 +220,18 @@ export default function Settings() {
     if (pushEnabled) {
       await unsubscribePush(user.id)
       setPushEnabled(false)
+      showToast('푸시 알림을 껐어요.')
     } else {
       const result = await subscribePush(user.id)
       if (result.success) {
         setPushEnabled(true)
+        showToast('푸시 알림을 켰어요.')
       } else if (result.reason === 'denied') {
         alert('알림 권한이 거부됐어요. 브라우저 설정에서 허용해주세요.')
+        showToast('알림 권한이 필요해요.', 'error')
       } else if (result.reason === 'unsupported') {
         alert('이 브라우저는 푸시 알림을 지원하지 않아요.')
+        showToast('푸시 알림을 지원하지 않는 브라우저예요.', 'error')
       }
     }
     setPushLoading(false)
@@ -214,17 +245,29 @@ export default function Settings() {
     await supabase.auth.signOut()
   }
 
+  const closeSettings = () => {
+    if (closing) return
+    setClosing(true)
+    window.setTimeout(() => navigate(-1), 220)
+  }
+
   const t = getTheme(myThemeId)
   const darkThemes = THEMES.filter(th => th.dark)
   const lightThemes = THEMES.filter(th => !th.dark)
 
   return (
     <div
+      className={`settings-page-drawer${closing ? ' is-closing' : ''}`}
       style={{
-        minHeight: '100vh',
+        position: 'fixed',
+        inset: 0,
+        zIndex: 100,
+        minHeight: '100dvh',
+        overflowY: 'auto',
         background: t.bg,
         transition: 'background 0.3s',
       }}>
+      <Toast toast={toast} />
       <div style={{ maxWidth: 480, margin: '0 auto', padding: 16 }}>
         <div
           style={{
@@ -235,7 +278,7 @@ export default function Settings() {
             paddingTop: 8,
           }}>
           <button
-            onClick={() => navigate(-1)}
+            onClick={closeSettings}
             style={{
               background: 'none',
               border: 'none',
@@ -409,6 +452,29 @@ export default function Settings() {
               </div>
             ))}
           </div>
+          <div style={{ marginTop: 12, padding: '12px 14px', borderRadius: 12, border: `0.5px solid ${t.border}`, background: t.panel }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 10 }}>
+              <div style={{ fontSize: 13, color: t.theirText }}>채팅 글자 크기</div>
+              <div style={{ fontSize: 12, color: t.subText }}>{Math.round(fontScale * 100)}%</div>
+            </div>
+            <input
+              type="range"
+              min="0.8"
+              max="1.3"
+              step="0.05"
+              value={fontScale}
+              onChange={event => {
+                const scale = Number(event.target.value)
+                setFontScale(scale)
+                localStorage.setItem('idea-font-scale', String(scale))
+                document.documentElement.style.setProperty('--idea-font-scale', String(scale))
+              }}
+              onPointerUp={event => saveFontScale(event.currentTarget.value)}
+              onKeyUp={event => saveFontScale(event.currentTarget.value)}
+              aria-label="채팅 글자 크기"
+              style={{ width: '100%', accentColor: t.point }}
+            />
+          </div>
         </div>
 
         <div style={{ marginBottom: 28 }}>
@@ -475,7 +541,8 @@ export default function Settings() {
                 const {
                   data: { user },
                 } = await supabase.auth.getUser()
-                await supabase.from('profiles').update({ show_entering: next }).eq('id', user.id)
+                const { error } = await supabase.from('profiles').update({ show_entering: next }).eq('id', user.id)
+                showToast(error ? '입장 애니메이션 설정을 저장하지 못했어요.' : '입장 애니메이션 설정이 저장됐어요.', error ? 'error' : 'success')
               }}
               style={{ width: 40, height: 22, borderRadius: 11, cursor: 'pointer', transition: 'background 0.2s', background: showEntering ? t.point : t.border, position: 'relative', flexShrink: 0 }}>
               <div style={{ position: 'absolute', top: 3, left: showEntering ? 20 : 3, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
@@ -493,10 +560,36 @@ export default function Settings() {
                 const {
                   data: { user },
                 } = await supabase.auth.getUser()
-                await supabase.from('profiles').update({ show_message_time: next }).eq('id', user.id)
+                const { error } = await supabase.from('profiles').update({ show_message_time: next }).eq('id', user.id)
+                showToast(error ? '시간 표시 설정을 저장하지 못했어요.' : '시간 표시 설정이 저장됐어요.', error ? 'error' : 'success')
               }}
               style={{ width: 40, height: 22, borderRadius: 11, cursor: 'pointer', transition: 'background 0.2s', background: showMessageTime ? t.point : t.border, position: 'relative', flexShrink: 0 }}>
               <div style={{ position: 'absolute', top: 3, left: showMessageTime ? 20 : 3, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
+            </div>
+          </div>
+          <div style={{ background: t.panel, border: `0.5px solid ${t.border}`, borderRadius: 12, padding: '12px 14px', marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div>
+              <div style={{ fontSize: 13, color: t.theirText }}>수정됨 표시</div>
+              <div style={{ fontSize: 10, color: t.subText, marginTop: 2 }}>편집한 메시지 옆의 수정 이력을 표시해요.</div>
+            </div>
+            <div
+              onClick={async () => {
+                const next = !showEditedLabel
+                setShowEditedLabel(next)
+                const {
+                  data: { user },
+                } = await supabase.auth.getUser()
+                const { error } = await supabase.from('profiles').update({ show_edited_label: next }).eq('id', user.id)
+                showToast(error ? '수정됨 표시 설정을 저장하지 못했어요.' : '수정됨 표시 설정이 저장됐어요.', error ? 'error' : 'success')
+              }}
+              role="switch"
+              aria-checked={showEditedLabel}
+              tabIndex={0}
+              onKeyDown={event => {
+                if (event.key === 'Enter' || event.key === ' ') event.currentTarget.click()
+              }}
+              style={{ width: 40, height: 22, borderRadius: 11, cursor: 'pointer', transition: 'background 0.2s', background: showEditedLabel ? t.point : t.border, position: 'relative', flexShrink: 0 }}>
+              <div style={{ position: 'absolute', top: 3, left: showEditedLabel ? 20 : 3, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
             </div>
           </div>
         </div>
@@ -546,6 +639,22 @@ export default function Settings() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <LogOut size={15} color="#f87171" />
                 <div style={{ fontSize: 13, color: '#f87171' }}>로그아웃</div>
+              </div>
+              <ChevronRight size={16} color={t.subText} />
+            </div>
+            <div
+              style={{
+                padding: '12px 14px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                borderTop: `0.5px solid ${t.border}`,
+                cursor: 'pointer',
+              }}
+              onClick={() => navigate('/help')}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <CircleHelp size={15} color={t.subText} />
+                <div style={{ fontSize: 13, color: t.theirText }}>앱 사용법</div>
               </div>
               <ChevronRight size={16} color={t.subText} />
             </div>

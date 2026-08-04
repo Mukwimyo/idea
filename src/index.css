@@ -15,6 +15,91 @@ body {
     overscroll-behavior-y: contain;
 }
 
+:root {
+    --idea-font-scale: 1;
+    --ui-radius-sm: 8px;
+    --ui-radius-md: 12px;
+    --ui-control-height: 44px;
+    --ui-motion-fast: 160ms;
+    --ui-shadow-float: 0 12px 32px rgba(0, 0, 0, 0.28);
+}
+
+.settings-page-drawer {
+    animation: settings-drawer-in 240ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.settings-page-drawer.is-closing,
+.top-panel-sheet.settings-page-drawer.is-closing {
+    animation: settings-drawer-out 220ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+.settings-backdrop-closing {
+    animation: settings-backdrop-out 220ms ease both !important;
+}
+
+@keyframes settings-drawer-in {
+    from { transform: translateX(100%); }
+    to { transform: translateX(0); }
+}
+
+@keyframes settings-drawer-out {
+    from { transform: translateX(0); }
+    to { transform: translateX(100%); }
+}
+
+@keyframes settings-backdrop-out {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .settings-page-drawer { animation: none; }
+}
+
+.app-status-banner {
+    position: fixed;
+    top: max(10px, env(safe-area-inset-top));
+    left: 50%;
+    z-index: 1000;
+    width: min(calc(100% - 24px), 440px);
+    min-height: var(--ui-control-height);
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 8px 10px 8px 13px;
+    border: 1px solid #51479a;
+    border-radius: var(--ui-radius-md);
+    color: #f5f3ff;
+    background: rgba(45, 33, 87, 0.94);
+    box-shadow: var(--ui-shadow-float);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    animation: ui-slide-down 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.app-status-banner--offline {
+    border-color: #8b5d52;
+    background: rgba(64, 39, 42, 0.96);
+}
+
+.app-status-banner span {
+    flex: 1;
+    min-width: 0;
+    font-size: 12px;
+    line-height: 1.45;
+}
+
+.app-status-banner button {
+    min-height: 32px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: var(--ui-radius-sm);
+    color: inherit;
+    background: rgba(255, 255, 255, 0.12);
+    cursor: pointer;
+}
+
 input,
 textarea,
 button {
@@ -85,6 +170,11 @@ button:disabled {
     animation: ui-slide-down 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
+.top-panel-sheet.settings-page-drawer {
+    transform-origin: center right;
+    animation: settings-drawer-in 240ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
 .message-action-menu {
     transform-origin: top center;
     animation: ui-pop-in 160ms cubic-bezier(0.2, 0.85, 0.25, 1) both;
@@ -100,12 +190,30 @@ button:disabled {
     animation: ui-expand-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
+.profile-picker-reveal.is-closing {
+    animation: ui-collapse-out 190ms cubic-bezier(0.4, 0, 0.8, 0.2) both;
+}
+
+.roleplay-tool-menu {
+    transform-origin: bottom center;
+    animation: ui-expand-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.roleplay-tool-menu.is-closing {
+    animation: ui-collapse-out 190ms cubic-bezier(0.4, 0, 0.8, 0.2) both;
+}
+
 .reorder-mode-reveal {
     animation: ui-fade-rise-in 180ms ease-out both;
 }
 
 .room-card-transition {
     transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+
+.room-card-first-enter {
+    opacity: 0;
+    animation: room-card-drop-in 420ms cubic-bezier(0.2, 0.82, 0.25, 1.08) forwards;
 }
 
 .message-enter-right {
@@ -146,6 +254,39 @@ button:disabled {
     to { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes ui-collapse-out {
+    from {
+        opacity: 1;
+        transform: translateY(0) scaleY(1);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(6px) scaleY(0.92);
+    }
+}
+
+@keyframes ui-slide-up {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes room-card-drop-in {
+    from {
+        opacity: 0;
+        transform: translateY(-20px) scale(0.985);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
 @keyframes message-slide-from-right {
     from { opacity: 0; transform: translate3d(min(16vw, 64px), 2px, 0); }
     to { opacity: 1; transform: translate3d(0, 0, 0); }
@@ -168,6 +309,11 @@ button:disabled {
         animation: none;
     }
 
+    .room-card-first-enter {
+        opacity: 1;
+        animation: none;
+    }
+
     .room-card-transition {
         transition: none;
     }
@@ -176,4 +322,48 @@ button:disabled {
     [role="button"] {
         transition: none;
     }
+}
+@keyframes toast-enter {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 8px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+}
+
+.idea-loading-logo {
+    animation: idea-loading-breathe 1.35s ease-in-out infinite;
+}
+
+@keyframes idea-loading-breathe {
+    0%, 100% {
+        opacity: 0.78;
+        transform: translateY(2px) scale(0.985);
+    }
+    50% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .idea-loading-logo {
+        animation: none;
+    }
+}
+/* A continuous-corner superellipse used by character and room artwork. */
+.squircle-media {
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpath fill='black' d='M50 0C68 0 79 2 88 8C96 16 100 29 100 50C100 71 96 84 88 92C79 98 68 100 50 100C32 100 21 98 12 92C4 84 0 71 0 50C0 29 4 16 12 8C21 2 32 0 50 0Z'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpath fill='black' d='M50 0C68 0 79 2 88 8C96 16 100 29 100 50C100 71 96 84 88 92C79 98 68 100 50 100C32 100 21 98 12 92C4 84 0 71 0 50C0 29 4 16 12 8C21 2 32 0 50 0Z'/%3E%3C/svg%3E");
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+}
+
+div:has(> img.squircle-media) {
+  background-color: transparent !important;
 }
