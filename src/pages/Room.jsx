@@ -2,13 +2,14 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase, uploadFile, validateImageFile } from '../lib/supabase'
 import { THEMES, getTheme } from '../lib/themes'
-import { ChevronLeft, Settings, Search, Images, Paperclip, ArrowUp, Eye, ArrowDown, ChevronDown, ChevronUp, Quote, RotateCcw, AlertCircle, Sparkles, Minus, Phone, MessageSquare, Copy, DoorOpen, Send } from 'lucide-react'
+import { ChevronLeft, Settings, Search, Images, Paperclip, ArrowUp, Eye, ArrowDown, ChevronDown, ChevronUp, Quote, RotateCcw, AlertCircle, Sparkles, Minus, Phone, MessageSquare, Copy, DoorOpen, Send, Music } from 'lucide-react'
 import ProfileImageModal from '../components/ProfileImageModal'
 import CommunicationSessions from '../components/CommunicationSessions'
 import CommunicationRecord from '../components/CommunicationRecord'
 import Toast, { useToast } from '../components/Toast'
 import LoadingScreen from '../components/LoadingScreen'
 import EntryCharacterPicker from '../components/EntryCharacterPicker'
+import SharedBackgroundAudio from '../components/SharedBackgroundAudio'
 
 const DEFAULT_AVATAR = `${import.meta.env.BASE_URL}default-avatar.png`
 
@@ -178,6 +179,7 @@ export default function Room() {
   const [deletingMessageId, setDeletingMessageId] = useState(null)
   const [profilePreview, setProfilePreview] = useState(null)
   const [showCommunication, setShowCommunication] = useState(false)
+  const [showBackgroundAudio, setShowBackgroundAudio] = useState(false)
   const [showRoleplayMenu, setShowRoleplayMenu] = useState(false)
   const [closingRoleplayMenu, setClosingRoleplayMenu] = useState(false)
   const [showRoomInvitePicker, setShowRoomInvitePicker] = useState(false)
@@ -1288,6 +1290,7 @@ export default function Room() {
       />
       <ProfileImageModal profile={profilePreview} onClose={() => setProfilePreview(null)} />
       <CommunicationSessions roomId={roomId} userId={userId} myChars={myChars} theme={t} open={showCommunication} onClose={() => setShowCommunication(false)} />
+      <SharedBackgroundAudio roomId={roomId} userId={userId} theme={t} open={showBackgroundAudio} onClose={() => setShowBackgroundAudio(false)} />
       {showSlot && room && showEntering && (
         <SlotEntrance
           roomName={room.name}
@@ -2066,6 +2069,16 @@ export default function Room() {
               <Phone size={16} />
               <MessageSquare size={16} />
               <span>전화 · 문자</span>
+            </button>
+            <button
+              onMouseDown={event => event.preventDefault()}
+              onClick={() => {
+                closeRoleplayMenu()
+                setShowBackgroundAudio(true)
+              }}
+              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 11px', borderRadius: 10, border: `1px solid ${t.border}`, background: 'none', color: t.theirText }}>
+              <Music size={16} />
+              <span>공유 배경음</span>
             </button>
             <button
               onMouseDown={event => event.preventDefault()}
