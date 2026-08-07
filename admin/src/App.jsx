@@ -156,7 +156,7 @@ function AudioManager({ tracks, rooms, userId, onChanged }) {
       {message && <div className={message.includes('실패') || message.includes('이하') || message.includes('먼저') ? 'error notice' : 'notice'}>{message}</div>}
       <div className="list">{tracks.map(track => <article className="track-card" key={track.id}>
         <button className="round-button" onClick={() => preview(track)}>{playingId === track.id ? <Pause size={16} /> : <Play size={16} />}</button>
-        <div className="grow"><strong>{track.title}</strong><small>{formatBytes(track.file_size)} · {formatDuration(track.duration_seconds)} · {rooms.filter(room => room.track_id === track.id).length}개 방</small></div>
+        <div className="grow"><strong>{track.title}</strong><small>{Number(track.file_size) > 0 ? formatBytes(track.file_size) : '용량 정보 없음'} · {Number(track.duration_seconds) > 0 ? formatDuration(track.duration_seconds) : '재생시간 정보 없음'} · {rooms.filter(room => room.track_id === track.id).length}개 방</small></div>
         <button className="icon-button danger" onClick={() => remove(track)} aria-label="삭제"><Trash2 size={16} /></button>
       </article>)}</div>
       {tracks.length === 0 && <div className="empty">등록된 배경음이 없습니다.</div>}
