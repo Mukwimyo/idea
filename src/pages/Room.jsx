@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase, uploadFile, validateImageFile } from '../lib/supabase'
 import { THEMES, getTheme } from '../lib/themes'
-import { ChevronLeft, Settings, Search, Images, ArrowUp, Eye, ArrowDown, ChevronDown, ChevronUp, Quote, RotateCcw, AlertCircle, Minus, Phone, Copy, DoorOpen, Send, Music, Grid2X2, ImagePlus, Pin } from 'lucide-react'
+import { ChevronLeft, Settings, Search, Images, ArrowUp, Eye, ArrowDown, ChevronDown, ChevronUp, Quote, RotateCcw, AlertCircle, Minus, Phone, Copy, DoorOpen, Send, Music, Grid2X2, ImagePlus, Pin, Bookmark } from 'lucide-react'
 import ProfileImageModal from '../components/ProfileImageModal'
 import CommunicationSessions from '../components/CommunicationSessions'
 import CommunicationRecord from '../components/CommunicationRecord'
@@ -138,7 +138,7 @@ export default function Room() {
   const { toast, showToast } = useToast()
   const [room, setRoom] = useState(null)
   const [messages, setMessages] = useState([])
-  const [input, setInput] = useState('')
+  const [input, setInput] = useState(() => localStorage.getItem(`idea-room-draft:${roomId}`) || '')
   const [mode, setMode] = useState('chat')
   const [myChars, setMyChars] = useState([])
   const [activeChar, setActiveChar] = useState(null)
@@ -177,6 +177,7 @@ export default function Room() {
   const [messageMenuId, setMessageMenuId] = useState(null)
   const [imageMenuTarget, setImageMenuTarget] = useState(null)
   const [deletingMessageId, setDeletingMessageId] = useState(null)
+  const [bookmarkedMessageIds, setBookmarkedMessageIds] = useState(() => new Set())
   const [profilePreview, setProfilePreview] = useState(null)
   const [showCommunication, setShowCommunication] = useState(false)
   const [showBackgroundAudio, setShowBackgroundAudio] = useState(false)
@@ -216,6 +217,15 @@ export default function Room() {
   useEffect(() => {
     messagesRef.current = messages
   }, [messages])
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const key = `idea-room-draft:${roomId}`
+      if (input) localStorage.setItem(key, input)
+      else localStorage.removeItem(key)
+    }, 180)
+    return () => window.clearTimeout(timer)
+  }, [input, roomId])
 
   useEffect(() => {
     if (!typingInfo?.characterId) {
@@ -317,6 +327,8 @@ export default function Room() {
       } = await supabase.auth.getUser()
       setUserId(user.id)
       userIdRef.current = user.id
+      const { data: bookmarks } = await supabase.from('message_bookmarks').select('message_id').eq('user_id', user.id).eq('room_id', roomId)
+      setBookmarkedMessageIds(new Set((bookmarks || []).map(bookmark => bookmark.message_id)))
       await supabase.from('profiles').update({ email: user.email }).eq('id', user.id)
       const { data: ownMemberships } = await supabase.from('room_members').select('room_id').eq('user_id', user.id)
       setJoinedRoomIds((ownMemberships || []).map(member => member.room_id))
@@ -774,7 +786,7 @@ export default function Room() {
   }
 
   const startLongPress = (event, msg) => {
-    if (msg.user_id !== userId || msg.id.toString().startsWith('temp-')) return
+    if (msg.id.toString().startsWith('temp-')) return
     cancelLongPress()
     longPressTriggeredRef.current = false
     longPressStartRef.current = { x: event.clientX, y: event.clientY }
@@ -1137,6 +1149,32 @@ export default function Room() {
     URL.revokeObjectURL(url)
   }
 
+  const toggleMessageBookmark = async msg => {
+    const isBookmarked = bookmarkedMessageIds.has(msg.id)
+    setMessageMenuId(null)
+    setBookmarkedMessageIds(current => {
+      const next = new Set(current)
+      if (isBookmarked) next.delete(msg.id)
+      else next.add(msg.id)
+      return next
+    })
+    const query = isBookmarked
+      ? supabase.from('message_bookmarks').delete().eq('user_id', userId).eq('message_id', msg.id)
+      : supabase.from('message_bookmarks').insert({ user_id: userId, room_id: roomId, message_id: msg.id })
+    const { error } = await query
+    if (error) {
+      setBookmarkedMessageIds(current => {
+        const next = new Set(current)
+        if (isBookmarked) next.add(msg.id)
+        else next.delete(msg.id)
+        return next
+      })
+      showToast('북마크를 저장하지 못했어요.', 'error')
+      return
+    }
+    showToast(isBookmarked ? '북마크를 해제했어요.' : '중요 대사로 북마크했어요.')
+  }
+
   const pinQuickTool = toolId => {
     setQuickTool(toolId)
     localStorage.setItem('idea-room-quick-tool', toolId)
@@ -1190,6 +1228,8 @@ export default function Room() {
 
   const renderMessageActions = (msg, canEdit = true) => {
     if (messageMenuId !== msg.id) return null
+    const isMine = msg.user_id === userId
+    const isBookmarked = bookmarkedMessageIds.has(msg.id)
     return (
       <div
         className="message-action-menu"
@@ -1205,7 +1245,12 @@ export default function Room() {
           background: t.panel,
           boxShadow: '0 3px 10px rgba(0,0,0,0.2)',
         }}>
-        {canEdit && (
+        <button onClick={() => toggleMessageBookmark(msg)} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, border: 0, background: 'none', color: isBookmarked ? t.point : t.theirText, padding: '7px 11px', fontSize: 11, cursor: 'pointer' }}>
+          <Bookmark size={12} fill={isBookmarked ? 'currentColor' : 'none'} />
+          {isBookmarked ? '해제' : '북마크'}
+        </button>
+        {isMine && <div style={{ width: 1, alignSelf: 'stretch', background: t.border }} />}
+        {isMine && canEdit && (
           <>
             <button onClick={() => startEditingMessage(msg)} style={{ border: 0, background: 'none', color: t.theirText, padding: '7px 13px', fontSize: 11, cursor: 'pointer' }}>
               수정
@@ -1213,9 +1258,11 @@ export default function Room() {
             <div style={{ width: 1, alignSelf: 'stretch', background: t.border }} />
           </>
         )}
-        <button disabled={deletingMessageId === msg.id} onClick={() => deleteMessage(msg)} style={{ border: 0, background: 'none', color: '#f87171', padding: '7px 13px', fontSize: 11, cursor: 'pointer' }}>
-          삭제
-        </button>
+        {isMine && (
+          <button disabled={deletingMessageId === msg.id} onClick={() => deleteMessage(msg)} style={{ border: 0, background: 'none', color: '#f87171', padding: '7px 13px', fontSize: 11, cursor: 'pointer' }}>
+            삭제
+          </button>
+        )}
       </div>
     )
   }
@@ -1800,8 +1847,8 @@ export default function Room() {
                 onPointerUp={cancelLongPress}
                 onPointerCancel={cancelLongPress}
                 onPointerLeave={cancelLongPress}
-                onContextMenu={event => isMine && event.preventDefault()}
-                onSelectStart={event => isMine && event.preventDefault()}
+                onContextMenu={event => event.preventDefault()}
+                onSelectStart={event => event.preventDefault()}
                 style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: `${timelineMarkerHeight + 2}px 0 2px`, touchAction: 'pan-y', ...ownMessageLongPressStyle }}>
                 {timelineMarkers}
                 <div style={{ display: 'flex', gap: 3 }}>
@@ -1853,8 +1900,8 @@ export default function Room() {
                 onPointerUp={cancelLongPress}
                 onPointerCancel={cancelLongPress}
                 onPointerLeave={cancelLongPress}
-                onContextMenu={event => isMine && event.preventDefault()}
-                onSelectStart={event => isMine && event.preventDefault()}
+                onContextMenu={event => event.preventDefault()}
+                onSelectStart={event => event.preventDefault()}
                 style={{ position: 'relative', display: 'flex', flexDirection: isMine ? 'row-reverse' : 'row', alignItems: 'flex-start', gap: 6, paddingTop: timelineMarkerHeight, touchAction: 'pan-y', ...ownMessageLongPressStyle }}>
                 {timelineMarkers}
                 <div style={{ flexShrink: 0, width: 43, height: showMessageIdentity ? 43 : 0 }}>
@@ -1873,8 +1920,8 @@ export default function Room() {
                         onPointerUp={cancelLongPress}
                         onPointerCancel={cancelLongPress}
                         onPointerLeave={cancelLongPress}
-                        onContextMenu={event => isMine && event.preventDefault()}
-                        onSelectStart={event => isMine && event.preventDefault()}
+                        onContextMenu={event => event.preventDefault()}
+                        onSelectStart={event => event.preventDefault()}
                         onClick={() => openImageMessage(url, imageUrls, imageIndex)}
                         style={{ display: 'block', width: '100%', height: 92, objectFit: 'cover', cursor: 'pointer', userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none', gridColumn: imageUrls.length % 2 === 1 && imageIndex === imageUrls.length - 1 ? '1 / -1' : undefined }}
                       />
@@ -1903,8 +1950,8 @@ export default function Room() {
                 onPointerUp={cancelLongPress}
                 onPointerCancel={cancelLongPress}
                 onPointerLeave={cancelLongPress}
-                onContextMenu={event => isMine && event.preventDefault()}
-                onSelectStart={event => isMine && event.preventDefault()}
+                onContextMenu={event => event.preventDefault()}
+                onSelectStart={event => event.preventDefault()}
                 style={{ position: 'relative', display: 'flex', flexDirection: isMine ? 'row-reverse' : 'row', alignItems: 'flex-start', gap: 6, paddingTop: timelineMarkerHeight, touchAction: 'pan-y', ...ownMessageLongPressStyle }}>
                 {timelineMarkers}
                 <div style={{ flexShrink: 0, width: 43, height: showMessageIdentity ? 43 : 0 }}>
@@ -1935,8 +1982,8 @@ export default function Room() {
               onPointerUp={cancelLongPress}
               onPointerCancel={cancelLongPress}
               onPointerLeave={cancelLongPress}
-              onContextMenu={event => isMine && event.preventDefault()}
-              onSelectStart={event => isMine && event.preventDefault()}
+              onContextMenu={event => event.preventDefault()}
+              onSelectStart={event => event.preventDefault()}
               style={{ position: 'relative', display: 'flex', flexDirection: isMine ? 'row-reverse' : 'row', alignItems: 'flex-start', gap: 6, paddingTop: timelineMarkerHeight, touchAction: 'pan-y', ...ownMessageLongPressStyle }}>
               {timelineMarkers}
               <div style={{ flexShrink: 0, width: 43, height: showMessageIdentity ? 43 : 0 }}>
