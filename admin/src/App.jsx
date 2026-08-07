@@ -210,18 +210,42 @@ export default function App() {
       setChecking(false)
       return
     }
-    const { data, error: verifyError } = await supabase.rpc('is_idea_admin')
-    setAuthorized(data === true && !verifyError)
-    setError(data === true ? '' : '관리자 권한이 등록되지 않은 계정입니다.')
-    setChecking(false)
+    try {
+      const { data, error: verifyError } = await Promise.race([
+        supabase.rpc('is_idea_admin', { check_user_id: nextSession.user.id }),
+        new Promise((_, reject) => window.setTimeout(() => reject(new Error('관리자 권한 API 응답 시간 초과')), 8000)),
+      ])
+      setAuthorized(data === true && !verifyError)
+      setError(
+        verifyError
+          ? `관리자 권한 확인 실패: ${verifyError.message}`
+          : data === true
+            ? ''
+            : '관리자 권한이 등록되지 않은 계정입니다.',
+      )
+    } catch (verifyException) {
+      setAuthorized(false)
+      setError(`${verifyException.message}. 관리자 마이그레이션과 네트워크 상태를 확인해주세요.`)
+    } finally {
+      setChecking(false)
+    }
   }
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => verify(data.session))
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    let initialCheckStarted = false
+    const { data: listener } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      if (event === 'INITIAL_SESSION') initialCheckStarted = true
       window.setTimeout(() => verify(nextSession), 0)
     })
-    return () => listener.subscription.unsubscribe()
+    const fallback = window.setTimeout(() => {
+      if (initialCheckStarted) return
+      setChecking(false)
+      setError('인증 세션을 불러오지 못했습니다. 페이지를 새로고침해주세요.')
+    }, 8000)
+    return () => {
+      window.clearTimeout(fallback)
+      listener.subscription.unsubscribe()
+    }
   }, [])
 
   const loadData = useCallback(async () => {
@@ -248,7 +272,7 @@ export default function App() {
   }, [authorized, loadData])
 
   if (checking) return <main className="center-message">관리자 권한 확인 중…</main>
-  if (!session) return <Login onAuthenticated={verify} />
+  if (!session) return <><Login onAuthenticated={verify} />{error && <div className="auth-diagnostic">{error}</div>}</>
   if (!authorized) return <main className="center-message"><div><h1>접근할 수 없습니다</h1><p>{error}</p><button className="primary" onClick={() => supabase.auth.signOut()}>로그아웃</button></div></main>
 
   const tabs = [

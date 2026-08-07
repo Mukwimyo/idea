@@ -46,6 +46,7 @@ input:focus, select:focus { border-color: #8c7cf0; }
 .search input { border: 0; background: transparent; padding-left: 0; }
 .empty { padding: 34px 10px; color: #777784; text-align: center; font-size: 12px; }
 .global-error { margin: 10px 16px 0; padding: 9px 11px; border-radius: 10px; background: #2b1b1f; }
+.auth-diagnostic { position: fixed; left: 50%; bottom: 18px; width: min(calc(100% - 32px), 420px); transform: translateX(-50%); padding: 10px 12px; border: 1px solid #58353a; border-radius: 11px; background: #2e1d21; color: #ff9299; font-size: 11px; text-align: center; }
 .app-shell > nav { position: fixed; bottom: 0; left: 50%; z-index: 20; width: min(100%, 760px); transform: translateX(-50%); display: grid; grid-template-columns: repeat(3, 1fr); padding: 8px 12px calc(8px + env(safe-area-inset-bottom)); border-top: 1px solid #292930; background: #141419f2; backdrop-filter: blur(18px); }
 .app-shell > nav button { display: grid; justify-items: center; gap: 4px; border: 0; background: none; color: #777784; font-size: 10px; }
 .app-shell > nav button.active { color: #9f91f7; }
