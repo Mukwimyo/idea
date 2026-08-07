@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase, uploadFile, validateImageFile } from '../lib/supabase'
 import { THEMES, getTheme } from '../lib/themes'
-import { ChevronLeft, Settings, Search, Images, ArrowUp, Eye, ArrowDown, ChevronDown, ChevronUp, Quote, RotateCcw, AlertCircle, Minus, Phone, Copy, DoorOpen, Send, Music, Grid2X2, ImagePlus, Pin, Bookmark } from 'lucide-react'
+import { ChevronLeft, Settings, Search, Images, ArrowUp, Eye, ArrowDown, ChevronDown, ChevronUp, Quote, RotateCcw, AlertCircle, Minus, Phone, Copy, DoorOpen, Send, Music, Grid2X2, ImagePlus, Pin, Bookmark, MapPin, StickyNote } from 'lucide-react'
 import ProfileImageModal from '../components/ProfileImageModal'
 import CommunicationSessions from '../components/CommunicationSessions'
 import CommunicationRecord from '../components/CommunicationRecord'
@@ -10,6 +10,7 @@ import Toast, { useToast } from '../components/Toast'
 import LoadingScreen from '../components/LoadingScreen'
 import EntryCharacterPicker from '../components/EntryCharacterPicker'
 import SharedBackgroundAudio from '../components/SharedBackgroundAudio'
+import RoomWorldPanel from '../components/RoomWorldPanel'
 
 const DEFAULT_AVATAR = `${import.meta.env.BASE_URL}default-avatar.png`
 
@@ -181,6 +182,7 @@ export default function Room() {
   const [profilePreview, setProfilePreview] = useState(null)
   const [showCommunication, setShowCommunication] = useState(false)
   const [showBackgroundAudio, setShowBackgroundAudio] = useState(false)
+  const [worldPanelTab, setWorldPanelTab] = useState(null)
   const [showRoleplayMenu, setShowRoleplayMenu] = useState(false)
   const [closingRoleplayMenu, setClosingRoleplayMenu] = useState(false)
   const [quickTool, setQuickTool] = useState(() => localStorage.getItem('idea-room-quick-tool') || 'narration')
@@ -1211,6 +1213,11 @@ export default function Room() {
     if (toolId === 'invite') {
       if (fromQuickButton && !showRoleplayMenu) openRoleplayMenu()
       await loadInvitableRooms()
+      return
+    }
+    if (toolId === 'locations' || toolId === 'notes') {
+      if (showRoleplayMenu) closeRoleplayMenu()
+      setWorldPanelTab(toolId)
     }
   }
 
@@ -1223,6 +1230,8 @@ export default function Room() {
     { id: 'communication', label: '전화·문자', icon: Phone },
     { id: 'audio', label: '공유 배경음', icon: Music },
     { id: 'invite', label: '장소 연결', icon: DoorOpen },
+    { id: 'locations', label: '장소·장면', icon: MapPin },
+    { id: 'notes', label: '공유 메모', icon: StickyNote },
   ]
   const selectedQuickTool = roomTools.find(tool => tool.id === quickTool) || roomTools[1]
 
@@ -1391,6 +1400,7 @@ export default function Room() {
       <ProfileImageModal profile={profilePreview} onClose={() => setProfilePreview(null)} />
       <CommunicationSessions roomId={roomId} userId={userId} myChars={myChars} theme={t} open={showCommunication} onClose={() => setShowCommunication(false)} />
       <SharedBackgroundAudio roomId={roomId} userId={userId} theme={t} open={showBackgroundAudio} onClose={() => setShowBackgroundAudio(false)} />
+      {worldPanelTab && <RoomWorldPanel open initialTab={worldPanelTab} roomId={roomId} userId={userId} activeCharacter={activeChar} theme={t} onClose={() => setWorldPanelTab(null)} />}
       {showSlot && room && showEntering && (
         <SlotEntrance
           roomName={room.name}
@@ -1786,6 +1796,42 @@ export default function Room() {
                 <span style={{ flex: 1, height: 1, background: t.border }} />
               </div>
             )
+
+          if (msg.type === 'scene_transition') {
+            const scene = (() => {
+              try {
+                return JSON.parse(msg.content)
+              } catch {
+                return { name: msg.content, description: '' }
+              }
+            })()
+            return (
+              <div
+                key={msg.id}
+                id={'msg-' + msg.id}
+                onPointerDown={event => startLongPress(event, msg)}
+                onPointerMove={moveLongPress}
+                onPointerUp={cancelLongPress}
+                onPointerCancel={cancelLongPress}
+                onContextMenu={event => event.preventDefault()}
+                onSelectStart={event => event.preventDefault()}
+                style={{ position: 'relative', padding: `${timelineMarkerHeight + 7}px 8px 5px`, userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none' }}>
+                {timelineMarkers}
+                <div style={{ width: 'min(88%, 340px)', margin: '0 auto', overflow: 'hidden', borderRadius: 16, border: `1px solid ${t.border}`, background: `linear-gradient(135deg, ${t.point}22, ${t.panel})`, boxShadow: '0 9px 24px rgba(0,0,0,.16)' }}>
+                  <div style={{ height: 3, background: t.point, opacity: 0.75 }} />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '13px 14px' }}>
+                    <div style={{ width: 38, height: 38, display: 'grid', placeItems: 'center', flexShrink: 0, borderRadius: 12, background: `${t.point}25`, color: t.point }}><MapPin size={19} /></div>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ color: t.subText, fontSize: 9, letterSpacing: 1.4 }}>SCENE CHANGE</div>
+                      <div style={{ marginTop: 2, color: t.theirText, fontSize: 15, fontWeight: 650 }}>{scene?.name || '새로운 장소'}</div>
+                      {scene?.description && <div style={{ marginTop: 4, color: t.subText, fontSize: 10, lineHeight: 1.45 }}>{scene.description}</div>}
+                    </div>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'center' }}>{renderMessageActions(msg, false)}</div>
+              </div>
+            )
+          }
 
           if (msg.type === 'member_joined' || msg.type === 'member_left')
             return (
