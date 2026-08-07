@@ -16,11 +16,12 @@ jobs:
         with:
           node-version: 20
       - run: npm install
-      - run: npm run build
+      - run: npm run build:all
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           VITE_VAPID_PUBLIC_KEY: ${{ secrets.VITE_VAPID_PUBLIC_KEY }}
+      - run: mkdir -p dist/admin && cp -r dist-admin/. dist/admin/
       - uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
