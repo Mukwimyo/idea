@@ -203,6 +203,25 @@ button:disabled {
     animation: ui-collapse-out 190ms cubic-bezier(0.4, 0, 0.8, 0.2) both;
 }
 
+.room-tool-sheet {
+    transform-origin: bottom center;
+    animation: room-tool-sheet-in 240ms cubic-bezier(0.18, 0.82, 0.25, 1) both;
+}
+
+.room-tool-sheet.is-closing {
+    animation: room-tool-sheet-out 190ms cubic-bezier(0.4, 0, 0.8, 0.2) both;
+}
+
+@keyframes room-tool-sheet-in {
+    from { opacity: 0; transform: translateY(28px) scale(0.98); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes room-tool-sheet-out {
+    from { opacity: 1; transform: translateY(0) scale(1); }
+    to { opacity: 0; transform: translateY(24px) scale(0.985); }
+}
+
 .reorder-mode-reveal {
     animation: ui-fade-rise-in 180ms ease-out both;
 }

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase, uploadFile, validateImageFile } from '../lib/supabase'
 import { THEMES, getTheme } from '../lib/themes'
-import { ChevronLeft, Settings, Search, Images, Paperclip, ArrowUp, Eye, ArrowDown, ChevronDown, ChevronUp, Quote, RotateCcw, AlertCircle, Sparkles, Minus, Phone, MessageSquare, Copy, DoorOpen, Send, Music } from 'lucide-react'
+import { ChevronLeft, Settings, Search, Images, ArrowUp, Eye, ArrowDown, ChevronDown, ChevronUp, Quote, RotateCcw, AlertCircle, Minus, Phone, Copy, DoorOpen, Send, Music, Grid2X2, ImagePlus, Pin } from 'lucide-react'
 import ProfileImageModal from '../components/ProfileImageModal'
 import CommunicationSessions from '../components/CommunicationSessions'
 import CommunicationRecord from '../components/CommunicationRecord'
@@ -182,6 +182,8 @@ export default function Room() {
   const [showBackgroundAudio, setShowBackgroundAudio] = useState(false)
   const [showRoleplayMenu, setShowRoleplayMenu] = useState(false)
   const [closingRoleplayMenu, setClosingRoleplayMenu] = useState(false)
+  const [quickTool, setQuickTool] = useState(() => localStorage.getItem('idea-room-quick-tool') || 'narration')
+  const [toolPanel, setToolPanel] = useState(null)
   const [showRoomInvitePicker, setShowRoomInvitePicker] = useState(false)
   const [invitableRooms, setInvitableRooms] = useState([])
   const [joinedRoomIds, setJoinedRoomIds] = useState([])
@@ -292,6 +294,7 @@ export default function Room() {
   }
 
   const openRoleplayMenu = () => {
+    inputRef.current?.blur()
     setClosingRoleplayMenu(false)
     setShowRoleplayMenu(true)
   }
@@ -303,6 +306,7 @@ export default function Room() {
       setShowRoleplayMenu(false)
       setClosingRoleplayMenu(false)
       setShowRoomInvitePicker(false)
+      setToolPanel(null)
     }, 190)
   }
 
@@ -1133,7 +1137,56 @@ export default function Room() {
     URL.revokeObjectURL(url)
   }
 
+  const pinQuickTool = toolId => {
+    setQuickTool(toolId)
+    localStorage.setItem('idea-room-quick-tool', toolId)
+    showToast('빠른 실행 기능을 변경했어요.')
+  }
+
+  const runRoomTool = async (toolId, fromQuickButton = false) => {
+    if (toolId === 'image') {
+      if (showRoleplayMenu) closeRoleplayMenu()
+      window.setTimeout(() => fileInputRef.current?.click(), showRoleplayMenu ? 200 : 0)
+      return
+    }
+    if (toolId === 'narration') {
+      setMode(isNarrActive ? 'chat' : 'narration')
+      if (showRoleplayMenu) closeRoleplayMenu()
+      window.setTimeout(() => inputRef.current?.focus(), 0)
+      return
+    }
+    if (toolId === 'divider') {
+      setToolPanel('divider')
+      if (fromQuickButton && !showRoleplayMenu) openRoleplayMenu()
+      return
+    }
+    if (toolId === 'communication') {
+      if (showRoleplayMenu) closeRoleplayMenu()
+      setShowCommunication(true)
+      return
+    }
+    if (toolId === 'audio') {
+      if (showRoleplayMenu) closeRoleplayMenu()
+      setShowBackgroundAudio(true)
+      return
+    }
+    if (toolId === 'invite') {
+      if (fromQuickButton && !showRoleplayMenu) openRoleplayMenu()
+      await loadInvitableRooms()
+    }
+  }
+
   const t = theme || getTheme('dark-purple')
+
+  const roomTools = [
+    { id: 'image', label: '이미지', icon: ImagePlus },
+    { id: 'narration', label: '나레이션', icon: Quote },
+    { id: 'divider', label: '구분선', icon: Minus },
+    { id: 'communication', label: '전화·문자', icon: Phone },
+    { id: 'audio', label: '공유 배경음', icon: Music },
+    { id: 'invite', label: '장소 연결', icon: DoorOpen },
+  ]
+  const selectedQuickTool = roomTools.find(tool => tool.id === quickTool) || roomTools[1]
 
   const renderMessageActions = (msg, canEdit = true) => {
     if (messageMenuId !== msg.id) return null
@@ -2028,67 +2081,58 @@ export default function Room() {
           </button>
         )}
         {showRoleplayMenu && (
-          <div className={`roleplay-tool-menu${closingRoleplayMenu ? ' is-closing' : ''}`} style={{ display: 'grid', gap: 6, marginBottom: 7, padding: 8, borderRadius: 14, background: `color-mix(in srgb, ${t.panel} 92%, transparent)`, backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)', border: `1px solid ${t.border}`, pointerEvents: closingRoleplayMenu ? 'none' : 'auto' }}>
-            <button
-              onMouseDown={event => event.preventDefault()}
-              onClick={() => {
-                setMode(isNarrActive ? 'chat' : 'narration')
-                closeRoleplayMenu()
-                inputRef.current?.focus()
-              }}
-              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 11px', borderRadius: 10, border: `1px solid ${isNarrActive ? t.point : t.border}`, background: isNarrActive ? `${t.point}22` : 'none', color: isNarrActive ? t.point : t.theirText }}>
-              <Quote size={16} />
-              <span style={{ flex: 1, textAlign: 'left' }}>나레이션</span>
-              <span style={{ fontSize: 10, color: t.subText }}>{isNarrActive ? '사용 중' : '전환'}</span>
-            </button>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-              <Minus size={16} color={t.subText} style={{ flexShrink: 0 }} />
-              <input
-                value={dividerText}
-                onChange={event => setDividerText(event.target.value)}
-                onKeyDown={event => {
-                  if (event.key === 'Enter') {
-                    event.preventDefault()
-                    sendDivider()
-                  }
-                }}
-                placeholder="구분선 문구"
-                style={{ flex: 1, minWidth: 0, padding: '8px 9px', borderRadius: 9, border: `1px solid ${t.border}`, background: t.bg, color: t.inputText, outline: 'none' }}
-              />
-              <button onMouseDown={event => event.preventDefault()} onClick={sendDivider} style={{ flexShrink: 0, padding: '8px 11px', borderRadius: 9, border: 0, background: t.point, color: '#fff' }}>
-                추가
-              </button>
+          <div className={`room-tool-sheet${closingRoleplayMenu ? ' is-closing' : ''}`} style={{ marginBottom: 7, padding: '12px 10px 10px', borderRadius: '20px 20px 14px 14px', background: `color-mix(in srgb, ${t.panel} 94%, transparent)`, backdropFilter: 'blur(22px)', WebkitBackdropFilter: 'blur(22px)', border: `1px solid ${t.border}`, boxShadow: '0 -12px 38px rgba(0,0,0,0.2)', pointerEvents: closingRoleplayMenu ? 'none' : 'auto' }}>
+            <div style={{ width: 34, height: 3, borderRadius: 2, background: t.border, margin: '0 auto 11px' }} />
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8 }}>
+              {roomTools.map(tool => {
+                const ToolIcon = tool.icon
+                const selected = quickTool === tool.id
+                const active = tool.id === 'narration' && isNarrActive
+                return (
+                  <div key={tool.id} style={{ position: 'relative', minWidth: 0 }}>
+                    <button
+                      onMouseDown={event => event.preventDefault()}
+                      onClick={() => runRoomTool(tool.id)}
+                      style={{ width: '100%', minHeight: 72, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '10px 4px', borderRadius: 14, border: `1px solid ${active ? t.point : t.border}`, background: active ? `${t.point}22` : `color-mix(in srgb, ${t.bg} 66%, transparent)`, color: active ? t.point : t.theirText, cursor: 'pointer' }}>
+                      <ToolIcon size={20} />
+                      <span style={{ maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 11 }}>{tool.label}</span>
+                    </button>
+                    <button
+                      onMouseDown={event => event.preventDefault()}
+                      onClick={event => {
+                        event.stopPropagation()
+                        pinQuickTool(tool.id)
+                      }}
+                      aria-label={`${tool.label} 빠른 실행 지정`}
+                      style={{ position: 'absolute', top: 5, right: 5, width: 22, height: 22, display: 'grid', placeItems: 'center', padding: 0, border: 0, borderRadius: '50%', background: selected ? `${t.point}33` : 'transparent', color: selected ? t.point : t.subText, cursor: 'pointer' }}>
+                      <Pin size={11} fill={selected ? 'currentColor' : 'none'} />
+                    </button>
+                  </div>
+                )
+              })}
             </div>
-            <button
-              onMouseDown={event => event.preventDefault()}
-              onClick={() => {
-                closeRoleplayMenu()
-                setShowCommunication(true)
-              }}
-              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 11px', borderRadius: 10, border: `1px solid ${t.border}`, background: 'none', color: t.theirText }}>
-              <Phone size={16} />
-              <MessageSquare size={16} />
-              <span>전화 · 문자</span>
-            </button>
-            <button
-              onMouseDown={event => event.preventDefault()}
-              onClick={() => {
-                closeRoleplayMenu()
-                setShowBackgroundAudio(true)
-              }}
-              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 11px', borderRadius: 10, border: `1px solid ${t.border}`, background: 'none', color: t.theirText }}>
-              <Music size={16} />
-              <span>공유 배경음</span>
-            </button>
-            <button
-              onMouseDown={event => event.preventDefault()}
-              onClick={loadInvitableRooms}
-              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 11px', borderRadius: 10, border: `1px solid ${t.border}`, background: 'none', color: t.theirText }}>
-              <DoorOpen size={16} />
-              <span>다른 방으로 초대</span>
-            </button>
+            {toolPanel === 'divider' && (
+              <div className="inline-panel-reveal" style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 9 }}>
+                <input
+                  autoFocus
+                  value={dividerText}
+                  onChange={event => setDividerText(event.target.value)}
+                  onKeyDown={event => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault()
+                      sendDivider()
+                    }
+                  }}
+                  placeholder="구분선 문구"
+                  style={{ flex: 1, minWidth: 0, padding: '9px 10px', borderRadius: 10, border: `1px solid ${t.border}`, background: t.bg, color: t.inputText, outline: 'none' }}
+                />
+                <button onMouseDown={event => event.preventDefault()} onClick={sendDivider} style={{ flexShrink: 0, padding: '9px 12px', borderRadius: 10, border: 0, background: t.point, color: '#fff' }}>
+                  추가
+                </button>
+              </div>
+            )}
             {showRoomInvitePicker && (
-              <div style={{ display: 'grid', gap: 5, paddingTop: 2 }}>
+              <div className="inline-panel-reveal" style={{ display: 'grid', gap: 5, paddingTop: 9 }}>
                 <div style={{ color: t.subText, fontSize: 10 }}>초대할 방을 선택하세요.</div>
                 {invitableRooms.length === 0 ? (
                   <div style={{ padding: 9, borderRadius: 9, background: t.bg, color: t.subText, fontSize: 11, textAlign: 'center' }}>초대할 수 있는 다른 방이 없어요.</div>
@@ -2105,8 +2149,8 @@ export default function Room() {
           </div>
         )}
         <div style={{ display: 'flex', gap: 4, alignItems: 'center', width: '100%', height: 42, padding: 5, borderRadius: 22, background: `color-mix(in srgb, ${t.panel} 78%, transparent)`, backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)', border: `1px solid ${t.border}`, boxShadow: '0 10px 30px rgba(0,0,0,0.24)', pointerEvents: 'auto' }}>
-          <button onMouseDown={e => e.preventDefault()} onClick={() => fileInputRef.current?.click()} aria-label="이미지 업로드" style={{ width: 32, height: 32, borderRadius: '50%', border: 'none', background: `${t.border}88`, cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Paperclip size={16} color={t.subText} />
+          <button onMouseDown={e => e.preventDefault()} onClick={() => { if (showRoleplayMenu) closeRoleplayMenu(); else openRoleplayMenu() }} aria-label="대화 도구 메뉴" style={{ width: 32, height: 32, borderRadius: '50%', border: `1px solid ${showRoleplayMenu ? t.point : 'transparent'}`, background: showRoleplayMenu ? `${t.point}2f` : `${t.border}88`, cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Grid2X2 size={15} color={showRoleplayMenu ? t.point : t.subText} />
           </button>
           <input type="file" multiple accept="image/jpeg,image/png,image/webp,image/gif" ref={fileInputRef} onChange={e => sendImages(e.target.files)} style={{ display: 'none' }} />
           <textarea
@@ -2138,11 +2182,15 @@ export default function Room() {
               rows={1}
               style={{ flex: 1, minWidth: 0, height: 32, minHeight: 32, maxHeight: 32, overflowY: 'auto', background: 'transparent', border: 'none', borderRadius: 0, padding: '5px 6px', color: isNarrActive ? t.narrColor : t.inputText, fontSize: 'calc(14px * var(--idea-font-scale, 1))', outline: 'none', resize: 'none', lineHeight: 1.55, fontStyle: isNarrActive ? 'italic' : 'normal' }}
             />
-            {myChars.length > 0 && (
-              <button onMouseDown={e => e.preventDefault()} onClick={() => { if (showRoleplayMenu) closeRoleplayMenu(); else openRoleplayMenu() }} aria-label="역극 편의기능 메뉴" style={{ width: 32, height: 32, flexShrink: 0, padding: 0, borderRadius: '50%', cursor: 'pointer', border: `1px solid ${showRoleplayMenu || isNarrActive ? t.point : 'transparent'}`, background: showRoleplayMenu || isNarrActive ? `${t.point}2f` : `${t.border}66`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Sparkles size={16} color={showRoleplayMenu || isNarrActive ? t.narrColor : t.subText} />
-              </button>
-            )}
+            {myChars.length > 0 && selectedQuickTool && (() => {
+              const QuickToolIcon = selectedQuickTool.icon
+              const quickActive = quickTool === 'narration' && isNarrActive
+              return (
+                <button onMouseDown={e => e.preventDefault()} onClick={() => runRoomTool(quickTool, true)} aria-label={`${selectedQuickTool.label} 빠른 실행`} title={selectedQuickTool.label} style={{ width: 32, height: 32, flexShrink: 0, padding: 0, borderRadius: '50%', cursor: 'pointer', border: `1px solid ${quickActive ? t.point : 'transparent'}`, background: quickActive ? `${t.point}2f` : `${t.border}66`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <QuickToolIcon size={16} color={quickActive ? t.narrColor : t.subText} />
+                </button>
+              )
+            })()}
           <button onMouseDown={e => e.preventDefault()} onClick={sendMessage} aria-label="전송" style={{ width: 32, height: 32, borderRadius: '50%', border: 'none', background: t.point, cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <ArrowUp size={18} color="#fff" strokeWidth={2.5} />
           </button>
