@@ -212,6 +212,16 @@ button:disabled {
     animation: room-tool-sheet-out 190ms cubic-bezier(0.4, 0, 0.8, 0.2) both;
 }
 
+.bookmark-jump-highlight {
+    border-radius: 14px;
+    animation: bookmark-jump-pulse 1.45s ease-out both;
+}
+
+@keyframes bookmark-jump-pulse {
+    0%, 100% { background: transparent; box-shadow: 0 0 0 0 transparent; }
+    22% { background: color-mix(in srgb, currentColor 8%, transparent); box-shadow: 0 0 0 2px color-mix(in srgb, currentColor 18%, transparent); }
+}
+
 @keyframes room-tool-sheet-in {
     from { opacity: 0; transform: translateY(28px) scale(0.98); }
     to { opacity: 1; transform: translateY(0) scale(1); }

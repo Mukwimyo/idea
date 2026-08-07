@@ -151,6 +151,8 @@ export default function Room() {
   const [closingTheme, setClosingTheme] = useState(false)
   const [showGallery, setShowGallery] = useState(false)
   const [closingGallery, setClosingGallery] = useState(false)
+  const [showBookmarks, setShowBookmarks] = useState(false)
+  const [closingBookmarks, setClosingBookmarks] = useState(false)
   const [showSearch, setShowSearch] = useState(false)
   const [showCalendar, setShowCalendar] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -288,6 +290,16 @@ export default function Room() {
     window.setTimeout(() => {
       setShowGallery(false)
       setClosingGallery(false)
+    }, 220)
+  }
+
+  const closeBookmarksPanel = callback => {
+    if (closingBookmarks) return
+    setClosingBookmarks(true)
+    window.setTimeout(() => {
+      setShowBookmarks(false)
+      setClosingBookmarks(false)
+      callback?.()
     }, 220)
   }
 
@@ -1327,6 +1339,28 @@ export default function Room() {
     }
   })
   const galleryUrls = galleryItems.map(item => item.url)
+  const bookmarkedMessages = messages.filter(message => bookmarkedMessageIds.has(message.id)).slice().reverse()
+  const bookmarkPreview = message => {
+    if (message.type === 'image') return '이미지'
+    if (message.type === 'image_group') return '여러 장의 이미지'
+    if (message.type === 'scene_transition') {
+      try {
+        return `장면 전환 · ${JSON.parse(message.content).name}`
+      } catch {
+        return '장면 전환'
+      }
+    }
+    if (message.type === 'communication') return '전화·문자 기록'
+    return message.content || '내용 없는 메시지'
+  }
+  const jumpToBookmarkedMessage = messageId => {
+    closeBookmarksPanel(() => {
+      const target = document.getElementById(`msg-${messageId}`)
+      target?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      target?.classList.add('bookmark-jump-highlight')
+      window.setTimeout(() => target?.classList.remove('bookmark-jump-highlight'), 1500)
+    })
+  }
   const galleryPreviewItems = galleryItems.map(item => ({
     url: item.url,
     uploader: item.message.characters?.name || '알 수 없음',
@@ -1455,6 +1489,20 @@ export default function Room() {
           {...iconBtn(() => (showGallery ? closeGalleryPanel() : openPanel('gallery')), null, showGallery)}
           aria-label="대화방 갤러리">
           <Images size={15} color={showGallery ? t.point : t.subText} />
+        </button>
+        <button
+          {...iconBtn(() => {
+            if (showBookmarks) closeBookmarksPanel()
+            else {
+              setShowSearch(false)
+              setShowGallery(false)
+              setShowTheme(false)
+              setClosingBookmarks(false)
+              setShowBookmarks(true)
+            }
+          }, null, showBookmarks)}
+          aria-label="중요 대사 북마크">
+          <Bookmark size={15} color={showBookmarks ? t.point : t.subText} fill={showBookmarks ? 'currentColor' : 'none'} />
         </button>
         <button {...iconBtn(() => (showTheme ? closeThemePanel() : openPanel('theme')), null, showTheme)}>
           <Settings size={15} color={showTheme ? t.point : t.subText} />
@@ -1645,6 +1693,46 @@ export default function Room() {
       )}
 
       {/* 검색 패널 */}
+      {showBookmarks && (
+        <div
+          className={`top-panel-backdrop${closingBookmarks ? ' settings-backdrop-closing' : ''}`}
+          style={{ position: 'fixed', inset: 0, zIndex: 80, display: 'flex', justifyContent: 'flex-end', background: 'rgba(0,0,0,0.24)' }}
+          onClick={() => closeBookmarksPanel()}>
+          <div
+            className={`top-panel-sheet settings-page-drawer${closingBookmarks ? ' is-closing' : ''}`}
+            style={{ background: t.panel, padding: 14, borderLeft: `0.5px solid ${t.border}`, maxWidth: 480, marginLeft: 'auto', width: '100%', height: '100%', overflowY: 'auto' }}
+            onClick={event => event.stopPropagation()}>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 14 }}>
+              <div style={{ flex: 1, fontSize: 15, color: t.theirText }}>중요 대사 북마크</div>
+              <div style={{ marginRight: 10, color: t.subText, fontSize: 11 }}>{bookmarkedMessages.length}개</div>
+              <button onClick={() => closeBookmarksPanel()} style={{ border: 0, borderRadius: 9, background: 'none', color: t.subText, padding: '6px 8px' }}>닫기</button>
+            </div>
+            {bookmarkedMessages.length === 0 ? (
+              <div style={{ padding: '52px 12px', color: t.subText, fontSize: 12, lineHeight: 1.7, textAlign: 'center' }}>
+                아직 북마크한 메시지가 없어요.<br />메시지를 꾹 눌러 중요 대사로 저장할 수 있어요.
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gap: 8 }}>
+                {bookmarkedMessages.map(message => (
+                  <div key={message.id} style={{ display: 'flex', alignItems: 'stretch', overflow: 'hidden', borderRadius: 12, border: `1px solid ${t.border}`, background: t.bg }}>
+                    <button onClick={() => jumpToBookmarkedMessage(message.id)} style={{ flex: 1, minWidth: 0, padding: '11px 12px', border: 0, background: 'transparent', color: t.theirText, textAlign: 'left', cursor: 'pointer' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 5 }}>
+                        <span style={{ color: t.point, fontSize: 10 }}>{message.type === 'narration' ? '나레이션' : message.characters?.name || '기록'}</span>
+                        <span style={{ color: t.subText, fontSize: 9 }}>{new Date(message.created_at).toLocaleDateString('ko-KR')}</span>
+                      </div>
+                      <div style={{ overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', color: t.theirText, fontSize: 12, lineHeight: 1.5 }}>{bookmarkPreview(message)}</div>
+                    </button>
+                    <button onClick={() => toggleMessageBookmark(message)} aria-label="북마크 해제" style={{ width: 44, flexShrink: 0, border: 0, borderLeft: `1px solid ${t.border}`, background: 'transparent', color: t.point, cursor: 'pointer' }}>
+                      <Bookmark size={15} fill="currentColor" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {showGallery && (
         <div
           className={`top-panel-backdrop${closingGallery ? ' settings-backdrop-closing' : ''}`}
