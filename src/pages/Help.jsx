@@ -44,7 +44,9 @@ export default function Help() {
     <div className="settings-page-drawer" style={{ position: 'fixed', inset: 0, zIndex: 100, overflowY: 'auto', background: t.bg }}>
       <div style={{ width: '100%', maxWidth: 480, minHeight: '100dvh', margin: '0 auto', padding: '14px 16px 40px' }}>
         <header style={{ position: 'sticky', top: 0, zIndex: 2, display: 'flex', alignItems: 'center', gap: 8, margin: '-14px -16px 22px', padding: '12px 16px', background: `color-mix(in srgb, ${t.panel} 88%, transparent)`, backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)' }}>
-          <button onClick={() => navigate(-1)} aria-label="뒤로 가기" style={{ width: 36, height: 36, display: 'grid', placeItems: 'center', border: 0, background: 'none', color: t.subText }}><ChevronLeft size={22} /></button>
+          <button onClick={() => navigate(-1)} aria-label="뒤로 가기" style={{ width: 36, height: 36, display: 'grid', placeItems: 'center', border: 0, background: 'none', color: t.subText }}>
+            <ChevronLeft size={22} />
+          </button>
           <div>
             <h1 style={{ color: t.theirText, fontSize: 16 }}>IDEA 사용법</h1>
             <div style={{ marginTop: 2, color: t.subText, fontSize: 10 }}>역극방을 만드는 순간부터 대화를 보관하는 방법까지</div>
@@ -79,7 +81,9 @@ export default function Help() {
           <GuideCard title="검색·정렬·드래그" description="전체 캐릭터와 방별 캐릭터를 이름으로 검색할 수 있습니다. 가나다순 보기는 저장된 순서를 바꾸지 않으며, 기본 보기에서는 카드를 직접 끌어 실제 노출 순서를 변경할 수 있습니다." theme={t} />
           <GuideCard title="대화 중 프로필 변경" description="입력창 왼쪽 위의 화살표를 누르거나, 버튼을 누른 채 위로 밀면 목록이 열립니다. 아래로 밀면 닫힙니다." theme={t}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <button style={{ padding: '4px 14px', borderRadius: 8, border: `1px solid ${t.border}`, background: `${t.panel}cc`, color: t.subText }}><ChevronUp size={14} /></button>
+              <button style={{ padding: '4px 14px', borderRadius: 8, border: `1px solid ${t.border}`, background: `${t.panel}cc`, color: t.subText }}>
+                <ChevronUp size={14} />
+              </button>
               <span style={{ color: t.subText, fontSize: 11 }}>클릭 또는 위로 스와이프</span>
             </div>
           </GuideCard>
@@ -89,10 +93,16 @@ export default function Help() {
         <Section title="3. 메시지 보내기" theme={t}>
           <GuideCard title="채팅 입력창" description="이미지를 첨부하고, 역극 편의기능을 열거나 메시지를 전송할 수 있습니다. 여러 줄을 입력해도 입력창 높이는 유지되며 내부에서 스크롤됩니다." theme={t}>
             <div style={{ height: 42, display: 'flex', alignItems: 'center', gap: 4, padding: 5, borderRadius: 22, border: `1px solid ${t.border}`, background: `${t.panel}cc` }}>
-              <span style={{ width: 32, height: 32, display: 'grid', placeItems: 'center', borderRadius: '50%', background: `${t.border}88`, color: t.subText }}><Paperclip size={15} /></span>
+              <span style={{ width: 32, height: 32, display: 'grid', placeItems: 'center', borderRadius: '50%', background: `${t.border}88`, color: t.subText }}>
+                <Paperclip size={15} />
+              </span>
               <span style={{ flex: 1, color: t.subText, fontSize: 12 }}>메시지 입력…</span>
-              <span style={{ width: 32, height: 32, display: 'grid', placeItems: 'center', borderRadius: '50%', background: `${t.border}66`, color: t.subText }}><Sparkles size={15} /></span>
-              <span style={{ width: 32, height: 32, display: 'grid', placeItems: 'center', borderRadius: '50%', background: t.point, color: '#fff' }}><ArrowUp size={16} /></span>
+              <span style={{ width: 32, height: 32, display: 'grid', placeItems: 'center', borderRadius: '50%', background: `${t.border}66`, color: t.subText }}>
+                <Sparkles size={15} />
+              </span>
+              <span style={{ width: 32, height: 32, display: 'grid', placeItems: 'center', borderRadius: '50%', background: t.point, color: '#fff' }}>
+                <ArrowUp size={16} />
+              </span>
             </div>
           </GuideCard>
           <GuideCard title="수정과 삭제" description="내 메시지를 길게 누르면 수정·삭제 메뉴가 열립니다. 메뉴 바깥을 누르면 닫힙니다." theme={t}>
@@ -114,7 +124,12 @@ export default function Help() {
                 [<Quote size={15} />, '나레이션'],
                 [<MoreHorizontal size={15} />, '문구가 있는 구분선'],
                 [<Phone size={15} />, '전화 · 문자'],
-              ].map(([icon, label]) => <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px', borderRadius: 9, border: `1px solid ${t.border}`, color: t.theirText, fontSize: 11 }}>{icon}{label}</div>)}
+              ].map(([icon, label]) => (
+                <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px', borderRadius: 9, border: `1px solid ${t.border}`, color: t.theirText, fontSize: 11 }}>
+                  {icon}
+                  {label}
+                </div>
+              ))}
             </div>
           </GuideCard>
           <GuideCard title="전화와 문자" description="발신인과 수신인을 고른 뒤 연락합니다. 수신자는 전화는 받기·거절, 문자는 입장·나가기를 선택합니다. 본 채팅으로 잠시 돌아와도 진행 중 기록을 눌러 다시 들어갈 수 있습니다." theme={t}>

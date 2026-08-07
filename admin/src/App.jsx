@@ -218,7 +218,9 @@ export default function App() {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => verify(data.session))
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => verify(nextSession))
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      window.setTimeout(() => verify(nextSession), 0)
+    })
     return () => listener.subscription.unsubscribe()
   }, [])
 
