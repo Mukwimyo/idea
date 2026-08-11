@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase'
 export default function RoomWorldPanel({ open, initialTab = 'locations', roomId, userId, activeCharacter, theme, onClose, onSceneChange }) {
   const [tab, setTab] = useState(initialTab)
   const [locations, setLocations] = useState([])
+  const [playlists, setPlaylists] = useState([])
   const [currentLocationId, setCurrentLocationId] = useState(null)
   const [newName, setNewName] = useState('')
   const [newDescription, setNewDescription] = useState('')
@@ -17,14 +18,16 @@ export default function RoomWorldPanel({ open, initialTab = 'locations', roomId,
     if (!open) return undefined
     let active = true
     const load = async () => {
-      const [{ data: placeRows, error: placeError }, { data: roomRow }, { data: noteRow, error: noteError }] = await Promise.all([
+      const [{ data: placeRows, error: placeError }, { data: roomRow }, { data: noteRow, error: noteError }, { data: playlistRows }] = await Promise.all([
         supabase.from('room_locations').select('*').eq('room_id', roomId).order('sort_order').order('created_at'),
         supabase.from('rooms').select('current_location_id').eq('id', roomId).single(),
         supabase.from('room_shared_notes').select('content').eq('room_id', roomId).maybeSingle(),
+        supabase.from('room_audio_playlists').select('id, name').eq('room_id', roomId).order('created_at'),
       ])
       if (!active) return
       if (placeError || noteError) setError('장소와 메모를 불러오지 못했어요. 마이그레이션 적용 여부를 확인해주세요.')
       setLocations(placeRows || [])
+      setPlaylists(playlistRows || [])
       setCurrentLocationId(roomRow?.current_location_id || null)
       setNote(noteRow?.content || '')
     }
@@ -91,6 +94,12 @@ export default function RoomWorldPanel({ open, initialTab = 'locations', roomId,
     if (deleteError) setError('장소를 삭제하지 못했어요.')
   }
 
+  const connectLocationPlaylist = async (location, playlistId) => {
+    const { error: connectError } = await supabase.from('room_locations').update({ background_audio_playlist_id: playlistId || null }).eq('id', location.id).eq('room_id', roomId)
+    if (connectError) setError('장소의 배경음을 연결하지 못했어요.')
+    else setLocations(current => current.map(item => item.id === location.id ? { ...item, background_audio_playlist_id: playlistId || null } : item))
+  }
+
   const saveNote = async () => {
     setSaving(true)
     setError('')
@@ -124,12 +133,18 @@ export default function RoomWorldPanel({ open, initialTab = 'locations', roomId,
                 {locations.length === 0 && <div style={{ padding: 24, textAlign: 'center', color: t.subText, fontSize: 12 }}>등록된 장소가 없어요.</div>}
                 {locations.map(location => {
                   const current = location.id === currentLocationId
-                  return <div key={location.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 10, borderRadius: 12, border: `1px solid ${current ? t.point : t.border}`, background: current ? `${t.point}18` : t.panel }}>
-                    <button disabled={saving} onClick={() => activateLocation(location)} style={{ flex: 1, minWidth: 0, textAlign: 'left', border: 0, background: 'transparent', color: t.theirText }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 13 }}>{current && <Check size={13} color={t.point} />}{location.name}</div>
-                      {location.description && <div style={{ marginTop: 4, color: t.subText, fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{location.description}</div>}
-                    </button>
-                    <button onClick={() => deleteLocation(location)} aria-label="장소 삭제" style={{ width: 30, height: 30, display: 'grid', placeItems: 'center', border: 0, background: 'transparent', color: t.subText }}><Trash2 size={14} /></button>
+                  return <div key={location.id} style={{ display: 'grid', gap: 7, padding: 10, borderRadius: 12, border: `1px solid ${current ? t.point : t.border}`, background: current ? `${t.point}18` : t.panel }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <button disabled={saving} onClick={() => activateLocation(location)} style={{ flex: 1, minWidth: 0, textAlign: 'left', border: 0, background: 'transparent', color: t.theirText }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 13 }}>{current && <Check size={13} color={t.point} />}{location.name}</div>
+                        {location.description && <div style={{ marginTop: 4, color: t.subText, fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{location.description}</div>}
+                      </button>
+                      <button onClick={() => deleteLocation(location)} aria-label="장소 삭제" style={{ width: 30, height: 30, display: 'grid', placeItems: 'center', border: 0, background: 'transparent', color: t.subText }}><Trash2 size={14} /></button>
+                    </div>
+                    <select value={location.background_audio_playlist_id || ''} onChange={event => connectLocationPlaylist(location, event.target.value)} style={{ width: '100%', padding: 7, borderRadius: 8, border: `1px solid ${t.border}`, background: t.bg, color: t.inputText, fontSize: 10 }}>
+                      <option value="">연결된 배경음 없음</option>
+                      {playlists.map(playlist => <option key={playlist.id} value={playlist.id}>{playlist.name}</option>)}
+                    </select>
                   </div>
                 })}
               </div>
