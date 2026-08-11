@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { getTheme } from '../lib/themes'
-import { Settings, Users, ChevronRight, Trash2, CirclePlus, LogIn, Search, ListRestart, GripVertical, X, Star } from 'lucide-react'
+import { Settings, Users, ChevronRight, Trash2, CirclePlus, LogIn, Search, ListRestart, GripVertical, X, Star, Clock3 } from 'lucide-react'
 import { DndContext, PointerSensor, TouchSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core'
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -19,6 +19,16 @@ function SortableRoomCard({ roomId, disabled, children }) {
   )
 }
 
+function sortRoomList(list, mode) {
+  return [...list].sort((a, b) => {
+    if (a.is_favorite !== b.is_favorite) return a.is_favorite ? -1 : 1
+    if (mode === 'manual') return (a.sort_order ?? 0) - (b.sort_order ?? 0)
+    const aTime = a.lastMsg?.created_at || a.created_at || ''
+    const bTime = b.lastMsg?.created_at || b.created_at || ''
+    return bTime.localeCompare(aTime)
+  })
+}
+
 export default function RoomList() {
   const [rooms, setRooms] = useState([])
   const [showCreate, setShowCreate] = useState(false)
@@ -33,6 +43,7 @@ export default function RoomList() {
   const [userId, setUserId] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [reordering, setReordering] = useState(false)
+  const [sortMode, setSortMode] = useState(() => localStorage.getItem('idea-room-sort-mode') || 'recent')
   const [playInitialRoomAnimation, setPlayInitialRoomAnimation] = useState(() => sessionStorage.getItem('idea-room-list-entered') !== '1')
   const navigate = useNavigate()
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }), useSensor(TouchSensor, { activationConstraint: { delay: 220, tolerance: 6 } }))
@@ -108,26 +119,21 @@ export default function RoomList() {
       })
     )
 
-    const hasCustomOrder = data.some(member => (member.sort_order ?? 0) > 0)
-    setRooms(
-      enriched.sort((a, b) => {
-        if (a.is_favorite !== b.is_favorite) return a.is_favorite ? -1 : 1
-        if (hasCustomOrder) return a.sort_order - b.sort_order
-        const aTime = a.lastMsg?.created_at || a.created_at || ''
-        const bTime = b.lastMsg?.created_at || b.created_at || ''
-        return bTime.localeCompare(aTime)
-      })
-    )
+    const activeSortMode = localStorage.getItem('idea-room-sort-mode') || 'recent'
+    setRooms(sortRoomList(enriched, activeSortMode))
+  }
+
+  const changeSortMode = mode => {
+    setSortMode(mode)
+    setReordering(false)
+    localStorage.setItem('idea-room-sort-mode', mode)
+    setRooms(current => sortRoomList(current, mode))
   }
 
   const toggleFavorite = async (event, room) => {
     event.stopPropagation()
     const next = !room.is_favorite
-    setRooms(current =>
-      current
-        .map(item => (item.id === room.id ? { ...item, is_favorite: next } : item))
-        .sort((a, b) => (a.is_favorite === b.is_favorite ? a.sort_order - b.sort_order : a.is_favorite ? -1 : 1))
-    )
+    setRooms(current => sortRoomList(current.map(item => (item.id === room.id ? { ...item, is_favorite: next } : item)), sortMode))
     const { error } = await supabase.from('room_members').update({ is_favorite: next }).eq('room_id', room.id).eq('user_id', userId)
     if (error) {
       setRooms(current => current.map(item => (item.id === room.id ? { ...item, is_favorite: !next } : item)))
@@ -308,13 +314,15 @@ export default function RoomList() {
             style={{ width: 40, height: 40, background: showJoin ? `${t.point}22` : 'none', border: `1px solid ${showJoin ? t.point : t.border}`, borderRadius: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <LogIn size={17} color={showJoin ? t.point : t.subText} />
           </button>
-          <button
-            onClick={() => setReordering(current => !current)}
-            aria-label={reordering ? '순서 변경 완료' : '채팅방 순서 변경'}
-            title={reordering ? '순서 변경 완료' : '채팅방 순서 변경'}
-            style={{ width: 40, height: 40, background: reordering ? `${t.point}22` : 'none', border: `1px solid ${reordering ? t.point : t.border}`, borderRadius: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <ListRestart size={17} color={reordering ? t.point : t.subText} />
-          </button>
+          {sortMode === 'manual' && (
+            <button
+              onClick={() => setReordering(current => !current)}
+              aria-label={reordering ? '순서 변경 완료' : '채팅방 순서 변경'}
+              title={reordering ? '순서 변경 완료' : '채팅방 순서 변경'}
+              style={{ width: 40, height: 40, background: reordering ? `${t.point}22` : 'none', border: `1px solid ${reordering ? t.point : t.border}`, borderRadius: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <ListRestart size={17} color={reordering ? t.point : t.subText} />
+            </button>
+          )}
           <button
             onClick={() => navigate('/characters')}
             aria-label="캐릭터"
@@ -335,6 +343,19 @@ export default function RoomList() {
           <Search size={15} color={t.subText} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)' }} />
           <input value={searchQuery} onChange={event => setSearchQuery(event.target.value)} placeholder="역극방 이름 검색" aria-label="역극방 이름 검색" style={{ width: '100%', background: t.panel, border: `1px solid ${t.border}`, borderRadius: 10, padding: '9px 34px', color: t.inputText, fontSize: 12, outline: 'none' }} />
           {searchQuery && <button onClick={() => setSearchQuery('')} aria-label="검색어 지우기" style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', border: 0, background: 'none', padding: 4, cursor: 'pointer', display: 'flex' }}><X size={14} color={t.subText} /></button>}
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 12, padding: 4, borderRadius: 11, border: `1px solid ${t.border}`, background: `color-mix(in srgb, ${t.panel} 86%, transparent)` }}>
+          <button
+            onClick={() => changeSortMode('recent')}
+            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '7px 9px', border: 0, borderRadius: 8, background: sortMode === 'recent' ? `${t.point}28` : 'transparent', color: sortMode === 'recent' ? t.point : t.subText, fontSize: 11, cursor: 'pointer' }}>
+            <Clock3 size={13} />최근 대화순
+          </button>
+          <button
+            onClick={() => changeSortMode('manual')}
+            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '7px 9px', border: 0, borderRadius: 8, background: sortMode === 'manual' ? `${t.point}28` : 'transparent', color: sortMode === 'manual' ? t.point : t.subText, fontSize: 11, cursor: 'pointer' }}>
+            <GripVertical size={13} />직접 정렬
+          </button>
         </div>
 
         {/* 방 만들기 폼 */}
