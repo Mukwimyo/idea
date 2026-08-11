@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase, uploadFile, validateImageFile } from '../lib/supabase'
 import { THEMES, getTheme } from '../lib/themes'
-import { ChevronLeft, Settings, Search, Images, ArrowUp, Eye, ArrowDown, ChevronDown, ChevronUp, Quote, RotateCcw, AlertCircle, Minus, Phone, Copy, DoorOpen, Send, Music, Grid2X2, ImagePlus, Pin, Bookmark, MapPin, StickyNote } from 'lucide-react'
+import { ChevronLeft, Settings, Search, Images, ArrowUp, Eye, ArrowDown, ChevronDown, ChevronUp, Quote, RotateCcw, AlertCircle, Minus, Phone, Copy, DoorOpen, Send, Music, Grid2X2, ImagePlus, Pin, Bookmark, MapPin, StickyNote, Dices, Crown, Percent, Shuffle } from 'lucide-react'
 import ProfileImageModal from '../components/ProfileImageModal'
 import CommunicationSessions from '../components/CommunicationSessions'
 import CommunicationRecord from '../components/CommunicationRecord'
@@ -11,6 +11,7 @@ import LoadingScreen from '../components/LoadingScreen'
 import EntryCharacterPicker from '../components/EntryCharacterPicker'
 import SharedBackgroundAudio from '../components/SharedBackgroundAudio'
 import RoomWorldPanel from '../components/RoomWorldPanel'
+import RandomTools from '../components/RandomTools'
 
 const DEFAULT_AVATAR = `${import.meta.env.BASE_URL}default-avatar.png`
 
@@ -185,6 +186,7 @@ export default function Room() {
   const [showCommunication, setShowCommunication] = useState(false)
   const [showBackgroundAudio, setShowBackgroundAudio] = useState(false)
   const [worldPanelTab, setWorldPanelTab] = useState(null)
+  const [showRandomTools, setShowRandomTools] = useState(false)
   const [showRoleplayMenu, setShowRoleplayMenu] = useState(false)
   const [closingRoleplayMenu, setClosingRoleplayMenu] = useState(false)
   const [quickTool, setQuickTool] = useState(() => localStorage.getItem('idea-room-quick-tool') || 'narration')
@@ -1189,6 +1191,35 @@ export default function Room() {
     showToast(isBookmarked ? '북마크를 해제했어요.' : '중요 대사로 북마크했어요.')
   }
 
+  const shareRandomResult = async result => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user || !result) return
+    const tempId = `temp-random-${Date.now()}`
+    const content = JSON.stringify(result)
+    const tempMessage = {
+      id: tempId,
+      room_id: roomId,
+      user_id: user.id,
+      character_id: activeChar?.id || null,
+      characters: activeChar || null,
+      type: 'random_result',
+      content,
+      created_at: new Date().toISOString(),
+      delivery_state: 'sending',
+      entrance_side: 'right',
+    }
+    setMessages(current => [...current, tempMessage])
+    await persistMessage(tempId, {
+      room_id: roomId,
+      user_id: user.id,
+      character_id: activeChar?.id || null,
+      type: 'random_result',
+      content,
+    })
+  }
+
   const pinQuickTool = toolId => {
     setQuickTool(toolId)
     localStorage.setItem('idea-room-quick-tool', toolId)
@@ -1230,6 +1261,11 @@ export default function Room() {
     if (toolId === 'locations' || toolId === 'notes') {
       if (showRoleplayMenu) closeRoleplayMenu()
       setWorldPanelTab(toolId)
+      return
+    }
+    if (toolId === 'random') {
+      if (showRoleplayMenu) closeRoleplayMenu()
+      setShowRandomTools(true)
     }
   }
 
@@ -1244,6 +1280,7 @@ export default function Room() {
     { id: 'invite', label: '장소 연결', icon: DoorOpen },
     { id: 'locations', label: '장소·장면', icon: MapPin },
     { id: 'notes', label: '공유 메모', icon: StickyNote },
+    { id: 'random', label: '랜덤 도구', icon: Dices },
   ]
   const selectedQuickTool = roomTools.find(tool => tool.id === quickTool) || roomTools[1]
 
@@ -1435,6 +1472,7 @@ export default function Room() {
       <CommunicationSessions roomId={roomId} userId={userId} myChars={myChars} theme={t} open={showCommunication} onClose={() => setShowCommunication(false)} />
       <SharedBackgroundAudio roomId={roomId} userId={userId} theme={t} open={showBackgroundAudio} onClose={() => setShowBackgroundAudio(false)} />
       {worldPanelTab && <RoomWorldPanel open initialTab={worldPanelTab} roomId={roomId} userId={userId} activeCharacter={activeChar} theme={t} onClose={() => setWorldPanelTab(null)} />}
+      <RandomTools open={showRandomTools} roomId={roomId} theme={t} onClose={() => setShowRandomTools(false)} onShare={shareRandomResult} />
       {showSlot && room && showEntering && (
         <SlotEntrance
           roomName={room.name}
@@ -1917,6 +1955,38 @@ export default function Room() {
                   </div>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'center' }}>{renderMessageActions(msg, false)}</div>
+              </div>
+            )
+          }
+
+          if (msg.type === 'random_result') {
+            const result = (() => {
+              try { return JSON.parse(msg.content) } catch { return null }
+            })()
+            if (!result) return null
+            const ResultIcon = result.kind === 'king' ? Crown : result.kind === 'chance' ? Percent : result.kind === 'character' ? Shuffle : Dices
+            const title = result.kind === 'king' ? '왕게임' : result.kind === 'chance' ? '성공·실패' : result.kind === 'character' ? '캐릭터 추첨' : `D6 × ${result.diceCount || result.rolls?.length || 1}`
+            return (
+              <div
+                key={msg.id}
+                id={'msg-' + msg.id}
+                onPointerDown={event => startLongPress(event, msg)}
+                onPointerMove={moveLongPress}
+                onPointerUp={cancelLongPress}
+                onPointerCancel={cancelLongPress}
+                onContextMenu={event => event.preventDefault()}
+                onSelectStart={event => event.preventDefault()}
+                style={{ position: 'relative', padding: `${timelineMarkerHeight + 5}px 8px`, userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none' }}>
+                {timelineMarkers}
+                <div style={{ width: 'min(88%, 340px)', margin: '0 auto', padding: 13, borderRadius: 16, border: `1px solid ${t.border}`, background: `linear-gradient(145deg, ${t.point}1b, ${t.panel})`, boxShadow: '0 8px 22px rgba(0,0,0,.14)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: t.point }}><ResultIcon size={17} /><strong style={{ flex: 1, fontSize: 12 }}>{title}</strong><span style={{ color: t.subText, fontSize: 9 }}>{msg.characters?.name || '기록'}</span></div>
+                  {result.kind === 'dice' && <div style={{ marginTop: 10, textAlign: 'center' }}><div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 5 }}>{(result.rolls || []).map((roll, index) => <span key={index} style={{ width: 30, height: 30, display: 'grid', placeItems: 'center', borderRadius: 8, background: t.bg, color: t.theirText, fontWeight: 650 }}>{roll}</span>)}</div><div style={{ marginTop: 7, color: t.subText, fontSize: 10 }}>합계 <strong style={{ color: t.theirText, fontSize: 15 }}>{result.total}</strong></div></div>}
+                  {result.kind === 'chance' && <div style={{ marginTop: 11, textAlign: 'center' }}><strong style={{ color: result.success ? '#6ee7a8' : '#f87171', fontSize: 22 }}>{result.success ? '성공' : '실패'}</strong><div style={{ marginTop: 4, color: t.subText, fontSize: 10 }}>성공 확률 {result.chance}% · 결과값 {result.roll}</div></div>}
+                  {result.kind === 'character' && <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, marginTop: 11 }}><img src={result.character?.image_url || DEFAULT_AVATAR} alt="" className="squircle-media" style={{ width: 42, height: 42, objectFit: 'cover' }} /><strong style={{ color: t.theirText, fontSize: 16 }}>{result.character?.name}</strong></div>}
+                  {result.kind === 'king' && <div style={{ marginTop: 10 }}><div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, color: t.theirText }}><Crown size={17} color={t.point} /><strong>왕 · {result.king?.name}</strong></div><div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 5, marginTop: 8 }}>{(result.assignments || []).map(item => <span key={item.number} style={{ padding: '5px 7px', borderRadius: 8, background: t.bg, color: t.subText, fontSize: 10 }}><b style={{ color: t.point }}>{item.number}번</b> {item.character?.name}</span>)}</div>{result.command && <div style={{ marginTop: 9, padding: 8, borderRadius: 9, background: `${t.point}16`, color: t.theirText, textAlign: 'center', fontSize: 11 }}>{result.command}</div>}</div>}
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'center' }}>{renderMessageActions(msg, false)}</div>
+                {renderDeliveryStatus(msg)}
               </div>
             )
           }

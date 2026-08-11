@@ -548,6 +548,8 @@ export default function RoomList() {
                           ? room.lastMsg.content
                           : room.lastMsg.type === 'image' || room.lastMsg.type === 'image_group'
                             ? '[이미지]'
+                            : room.lastMsg.type === 'random_result'
+                              ? '[랜덤 결과]'
                             : `[${room.lastMsg.type === 'narration' ? '나레이션' : '시스템 메시지'}]`
                     : ''}
                 </div>
