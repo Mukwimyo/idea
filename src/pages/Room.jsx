@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase, uploadFile, validateImageFile } from '../lib/supabase'
 import { THEMES, getTheme } from '../lib/themes'
-import { ChevronLeft, Settings, Search, Images, ArrowUp, Eye, ArrowDown, ChevronDown, ChevronUp, Quote, RotateCcw, AlertCircle, Minus, Phone, Copy, DoorOpen, Send, Music, Grid2X2, ImagePlus, Pin, Bookmark, MapPin, StickyNote, Dices, Crown, Percent, Shuffle } from 'lucide-react'
+import { ChevronLeft, Settings, Search, Images, ArrowUp, Eye, ArrowDown, ChevronDown, ChevronUp, Quote, RotateCcw, AlertCircle, Minus, Phone, Copy, DoorOpen, Send, Music, Grid2X2, ImagePlus, Pin, Bookmark, MapPin, StickyNote, Dices, Crown, Percent, Scissors, Shuffle } from 'lucide-react'
 import ProfileImageModal from '../components/ProfileImageModal'
 import CommunicationSessions from '../components/CommunicationSessions'
 import CommunicationRecord from '../components/CommunicationRecord'
@@ -1964,8 +1964,8 @@ export default function Room() {
               try { return JSON.parse(msg.content) } catch { return null }
             })()
             if (!result) return null
-            const ResultIcon = result.kind === 'king' ? Crown : result.kind === 'chance' ? Percent : result.kind === 'character' ? Shuffle : Dices
-            const title = result.kind === 'king' ? '왕게임' : result.kind === 'chance' ? '성공·실패' : result.kind === 'character' ? '캐릭터 추첨' : `D6 × ${result.diceCount || result.rolls?.length || 1}`
+            const ResultIcon = result.kind === 'king' ? Crown : result.kind === 'chance' ? Percent : result.kind === 'character' ? Shuffle : result.kind === 'rps' ? Scissors : Dices
+            const title = result.kind === 'king' ? '왕게임' : result.kind === 'chance' ? '성공·실패' : result.kind === 'character' ? '캐릭터 추첨' : result.kind === 'rps' ? '가위바위보' : `D6 × ${result.diceCount || result.rolls?.length || 1}`
             return (
               <div
                 key={msg.id}
@@ -1981,9 +1981,10 @@ export default function Room() {
                 <div style={{ width: 'min(88%, 340px)', margin: '0 auto', padding: 13, borderRadius: 16, border: `1px solid ${t.border}`, background: `linear-gradient(145deg, ${t.point}1b, ${t.panel})`, boxShadow: '0 8px 22px rgba(0,0,0,.14)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: t.point }}><ResultIcon size={17} /><strong style={{ flex: 1, fontSize: 12 }}>{title}</strong><span style={{ color: t.subText, fontSize: 9 }}>{msg.characters?.name || '기록'}</span></div>
                   {result.kind === 'dice' && <div style={{ marginTop: 10, textAlign: 'center' }}><div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 5 }}>{(result.rolls || []).map((roll, index) => <span key={index} style={{ width: 30, height: 30, display: 'grid', placeItems: 'center', borderRadius: 8, background: t.bg, color: t.theirText, fontWeight: 650 }}>{roll}</span>)}</div><div style={{ marginTop: 7, color: t.subText, fontSize: 10 }}>합계 <strong style={{ color: t.theirText, fontSize: 15 }}>{result.total}</strong></div></div>}
-                  {result.kind === 'chance' && <div style={{ marginTop: 11, textAlign: 'center' }}><strong style={{ color: result.success ? '#6ee7a8' : '#f87171', fontSize: 22 }}>{result.success ? '성공' : '실패'}</strong><div style={{ marginTop: 4, color: t.subText, fontSize: 10 }}>성공 확률 {result.chance}% · 결과값 {result.roll}</div></div>}
+                  {result.kind === 'chance' && <div style={{ marginTop: 11, textAlign: 'center' }}><strong style={{ color: result.success ? '#6ee7a8' : '#f87171', fontSize: 22 }}>{result.success ? '성공' : '실패'}</strong></div>}
                   {result.kind === 'character' && <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, marginTop: 11 }}><img src={result.character?.image_url || DEFAULT_AVATAR} alt="" className="squircle-media" style={{ width: 42, height: 42, objectFit: 'cover' }} /><strong style={{ color: t.theirText, fontSize: 16 }}>{result.character?.name}</strong></div>}
                   {result.kind === 'king' && <div style={{ marginTop: 10 }}><div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, color: t.theirText }}><Crown size={17} color={t.point} /><strong>왕 · {result.king?.name}</strong></div><div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 5, marginTop: 8 }}>{(result.assignments || []).map(item => <span key={item.number} style={{ padding: '5px 7px', borderRadius: 8, background: t.bg, color: t.subText, fontSize: 10 }}><b style={{ color: t.point }}>{item.number}번</b> {item.character?.name}</span>)}</div>{result.command && <div style={{ marginTop: 9, padding: 8, borderRadius: 9, background: `${t.point}16`, color: t.theirText, textAlign: 'center', fontSize: 11 }}>{result.command}</div>}</div>}
+                  {result.kind === 'rps' && <div style={{ marginTop: 10 }}><div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 6 }}>{(result.plays || []).map(play => <span key={play.character?.id} style={{ padding: '6px 8px', borderRadius: 9, background: t.bg, color: t.subText, fontSize: 10 }}><b style={{ color: t.theirText }}>{play.character?.name}</b> · {play.hand}</span>)}</div><div style={{ marginTop: 9, color: result.winners?.length ? t.point : t.subText, textAlign: 'center', fontSize: 12, fontWeight: 650 }}>{result.winners?.length ? `승자 · ${result.winners.map(character => character.name).join(', ')}` : '무승부'}</div></div>}
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'center' }}>{renderMessageActions(msg, false)}</div>
                 {renderDeliveryStatus(msg)}
