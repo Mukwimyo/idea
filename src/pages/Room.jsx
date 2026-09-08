@@ -217,6 +217,8 @@ export default function Room() {
   const messageListRef = useRef(null)
   const initialScrollDone = useRef(false)
   const channelRef = useRef(null)
+  const realtimeRecoveryTimerRef = useRef(null)
+  const messageSyncPromiseRef = useRef(null)
   const userIdRef = useRef(null)
   const messagesRef = useRef([])
 
@@ -426,26 +428,27 @@ export default function Room() {
               return [...prev, fullMsg]
             })
             if (!isAtBottomRef.current) setNewMsgAlert(true)
-            const {
-              data: { user: currentUser },
-            } = await supabase.auth.getUser()
-            if (newMsg.user_id !== currentUser.id) {
-              await supabase
-                .from('messages')
-                .update({ read_by: [...(newMsg.read_by || []), currentUser.id] })
-                .eq('id', newMsg.id)
-            }
+            if (document.visibilityState === 'visible') await markAsRead([newMsg])
           } else if (payload.eventType === 'UPDATE') {
             setMessages(prev => prev.map(m => (m.id === payload.new.id ? { ...m, read_by: payload.new.read_by, edited: payload.new.edited, content: payload.new.content } : m)))
           } else if (payload.eventType === 'DELETE') {
             setMessages(prev => prev.filter(m => m.id !== payload.old.id))
           }
         })
-        .subscribe()
+        .subscribe(status => {
+          if (status === 'SUBSCRIBED') {
+            window.clearTimeout(realtimeRecoveryTimerRef.current)
+            void fetchMessages()
+          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            window.clearTimeout(realtimeRecoveryTimerRef.current)
+            realtimeRecoveryTimerRef.current = window.setTimeout(() => void fetchMessages(), 1200)
+          }
+        })
     }
     init()
     return () => {
       if (channelRef.current) supabase.removeChannel(channelRef.current)
+      window.clearTimeout(realtimeRecoveryTimerRef.current)
       // 방 나갈 때 타이핑 상태 초기화
       if (userIdRef.current) {
         supabase
@@ -546,10 +549,23 @@ export default function Room() {
   }, [messages])
 
   useEffect(() => {
-    const handleFocus = () => fetchMessages()
-    window.addEventListener('focus', handleFocus)
-    return () => window.removeEventListener('focus', handleFocus)
-  }, [])
+    const refreshVisibleRoom = () => {
+      if (document.visibilityState === 'visible' && navigator.onLine) void fetchMessages()
+    }
+    const handleVisibilityChange = () => refreshVisibleRoom()
+    const fallbackSync = window.setInterval(refreshVisibleRoom, 15000)
+    window.addEventListener('focus', refreshVisibleRoom)
+    window.addEventListener('pageshow', refreshVisibleRoom)
+    window.addEventListener('online', refreshVisibleRoom)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => {
+      window.clearInterval(fallbackSync)
+      window.removeEventListener('focus', refreshVisibleRoom)
+      window.removeEventListener('pageshow', refreshVisibleRoom)
+      window.removeEventListener('online', refreshVisibleRoom)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [roomId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'instant' })
@@ -567,36 +583,61 @@ export default function Room() {
     if (isAtBottomRef.current) setNewMsgAlert(false)
   }
 
-  const fetchMessages = async () => {
-    const { data } = await supabase.from('messages').select('*, characters(name, color, text_color, avatar_letter, image_url)').eq('room_id', roomId).order('created_at', { ascending: true })
-    if (data) {
+  const fetchMessages = () => {
+    if (messageSyncPromiseRef.current) return messageSyncPromiseRef.current
+    const sync = (async () => {
+      const { data, error } = await supabase.from('messages').select('*, characters(name, color, text_color, avatar_letter, image_url)').eq('room_id', roomId).order('created_at', { ascending: true })
+      if (error) {
+        console.error('message sync failed:', error.message)
+        return
+      }
+      if (!data) return
       if (!initialScrollDone.current && userIdRef.current) {
         const firstUnread = data.find(message => message.user_id !== userIdRef.current && !(message.read_by || []).includes(userIdRef.current))
         setInitialUnreadId(firstUnread?.id || null)
       }
       window.clearTimeout(remoteTypingTimerRef.current)
-      setMessages(data)
-      markAsRead(data)
+      setMessages(previous => {
+        const serverIds = new Set(data.map(message => message.id))
+        const pending = previous.filter(message => message.id.toString().startsWith('temp-') && !serverIds.has(message.id))
+        return [...data, ...pending]
+      })
+      await markAsRead(data)
       const dates = [...new Set(data.map(m => new Date(m.created_at).toLocaleDateString('ko-KR')))]
       setAvailableDates(dates)
-    }
+    })()
+    messageSyncPromiseRef.current = sync
+    void sync.finally(() => {
+      if (messageSyncPromiseRef.current === sync) messageSyncPromiseRef.current = null
+    })
+    return sync
   }
 
   const markAsRead = async msgs => {
     const {
       data: { user },
     } = await supabase.auth.getUser()
+    if (!user) return
     const unread = msgs.filter(m => m.user_id !== user.id && !m.read_by?.includes(user.id) && m.type !== 'chapter' && !m.id.toString().startsWith('temp-'))
     if (unread.length === 0) return
+    const savedReadBy = new Map()
     await Promise.all(
-      unread.map(m =>
-        supabase
+      unread.map(async m => {
+        const nextReadBy = [...new Set([...(m.read_by || []), user.id])]
+        const { data, error } = await supabase
           .from('messages')
-          .update({ read_by: [...(m.read_by || []), user.id] })
+          .update({ read_by: nextReadBy })
           .eq('id', m.id)
-      )
+          .select('id, read_by')
+          .maybeSingle()
+        if (error) {
+          console.error('message read receipt update failed:', error.message)
+          return
+        }
+        savedReadBy.set(m.id, data?.read_by || nextReadBy)
+      })
     )
-    setMessages(prev => prev.map(m => (unread.find(u => u.id === m.id) ? { ...m, read_by: [...(m.read_by || []), user.id] } : m)))
+    if (savedReadBy.size > 0) setMessages(prev => prev.map(m => (savedReadBy.has(m.id) ? { ...m, read_by: savedReadBy.get(m.id) } : m)))
   }
 
   const handleTyping = async e => {
