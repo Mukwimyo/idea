@@ -6,7 +6,8 @@ import { ChevronLeft, Settings, Search, Images, ArrowUp, Eye, ArrowDown, Chevron
 import ProfileImageModal from '../components/ProfileImageModal'
 import CommunicationSessions from '../components/CommunicationSessions'
 import CommunicationRecord from '../components/CommunicationRecord'
-import Toast, { useToast } from '../components/Toast'
+import Toast from '../components/Toast'
+import useToast from '../hooks/useToast'
 import LoadingScreen from '../components/LoadingScreen'
 import EntryCharacterPicker from '../components/EntryCharacterPicker'
 import SharedBackgroundAudio from '../components/SharedBackgroundAudio'
@@ -235,7 +236,6 @@ export default function Room() {
 
   useEffect(() => {
     if (!typingInfo?.characterId) {
-      setTalkingFrameIndex(0)
       return undefined
     }
     const frames = talkingFramesByCharacter[typingInfo.characterId] || []
@@ -407,6 +407,7 @@ export default function Room() {
             window.clearTimeout(remoteTypingTimerRef.current)
             if ((payload.new.is_typing ?? true) && payload.new.typing_char_name && remaining > 0) {
               const characterId = payload.new.typing_character_id || null
+              setTalkingFrameIndex(0)
               setTypingInfo({ charName: payload.new.typing_char_name, characterId, expiresAt })
               if (characterId) loadTalkingFrames(characterId)
               remoteTypingTimerRef.current = window.setTimeout(() => setTypingInfo(null), remaining)
@@ -768,7 +769,7 @@ export default function Room() {
       return
     }
 
-    let urls = []
+    let urls
     try {
       urls = JSON.parse(message.content)
     } catch {

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowUp, ChevronLeft, ChevronUp, CirclePlus, Copy, DoorOpen, Download, GalleryHorizontal, GripVertical, Image, Images, LogIn, MessageSquare, MoreHorizontal, Paperclip, Phone, Quote, Search, Settings, Sparkles, Star, UserPlus, WifiOff } from 'lucide-react'
+import { ArrowUp, ChevronLeft, ChevronUp, CirclePlus, Copy, DoorOpen, Download, GalleryHorizontal, GripVertical, Images, LogIn, MessageSquare, MoreHorizontal, Paperclip, Phone, Quote, Search, Settings, Sparkles, Star, UserPlus, WifiOff } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { getTheme } from '../lib/themes'
 

@@ -16,7 +16,6 @@ export default function CommunicationRecord({ message, theme, onOpenSession }) {
 
   useEffect(() => {
     if (!open || !record.sessionId) return
-    setLoadError('')
     supabase
       .from('communication_session_messages')
       .select('id, user_id, content, created_at, characters(name)')
@@ -27,6 +26,7 @@ export default function CommunicationRecord({ message, theme, onOpenSession }) {
           setLoadError('저장된 대화를 불러오지 못했습니다. 다시 접었다 펼쳐주세요.')
           return
         }
+        setLoadError('')
         setItems(data || [])
       })
   }, [open, record.sessionId])
