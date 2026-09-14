@@ -44,3 +44,37 @@ export const removePendingMessage = (storage, userId, clientMessageId, now = Dat
 export const clearPendingMessages = (storage, userId) => {
   if (storage && userId) storage.removeItem(storageKey(userId))
 }
+
+export const migrateLegacyPendingMessages = (storage, userId, now = Date.now()) => {
+  if (!storage || !userId) return 0
+
+  try {
+    const legacy = JSON.parse(storage.getItem('idea-pending-messages') || '[]')
+    if (!Array.isArray(legacy)) {
+      storage.removeItem('idea-pending-messages')
+      return 0
+    }
+
+    const owned = legacy.filter(entry => entry?.message?.user_id === userId)
+    const remaining = legacy.filter(entry => entry?.message?.user_id !== userId)
+    for (const item of owned) {
+      const clientMessageId = item.message.client_message_id || crypto.randomUUID()
+      queuePendingMessage(
+        storage,
+        userId,
+        {
+          ...item,
+          message: { ...item.message, client_message_id: clientMessageId },
+        },
+        now
+      )
+    }
+
+    if (remaining.length > 0) storage.setItem('idea-pending-messages', JSON.stringify(remaining))
+    else storage.removeItem('idea-pending-messages')
+    return owned.length
+  } catch {
+    storage.removeItem('idea-pending-messages')
+    return 0
+  }
+}

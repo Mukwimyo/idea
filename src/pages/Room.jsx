@@ -13,6 +13,21 @@ import EntryCharacterPicker from '../components/EntryCharacterPicker'
 import SharedBackgroundAudio from '../components/SharedBackgroundAudio'
 import RoomWorldPanel from '../components/RoomWorldPanel'
 import RandomTools from '../components/RandomTools'
+import {
+  advanceRoomReadCursor,
+  createClientMessageId,
+  fetchRoomMessages,
+  fetchRoomReadCursors,
+  hydrateMessageCharacter,
+  sendRoomMessage as sendRoomMessageRpc,
+} from '../features/messages/messageApi'
+import { highestReadableMessage, mergeMessages } from '../features/messages/messageState'
+import {
+  queuePendingMessage,
+  readPendingMessages,
+  removePendingMessage,
+  migrateLegacyPendingMessages,
+} from '../features/messages/pendingMessageStore'
 
 const DEFAULT_AVATAR = `${import.meta.env.BASE_URL}default-avatar.png`
 
@@ -200,6 +215,7 @@ export default function Room() {
   const [entryJoining, setEntryJoining] = useState(false)
   const [dividerText, setDividerText] = useState('')
   const [initialUnreadId, setInitialUnreadId] = useState(null)
+  const [readCursors, setReadCursors] = useState([])
   const [viewportHeight, setViewportHeight] = useState(() => window.visualViewport?.height || window.innerHeight)
   const [viewportOffsetTop, setViewportOffsetTop] = useState(() => window.visualViewport?.offsetTop || 0)
   const scrollTimerRef = useRef(null)
@@ -220,6 +236,8 @@ export default function Room() {
   const channelRef = useRef(null)
   const userIdRef = useRef(null)
   const messagesRef = useRef([])
+  const reconcilingMessagesRef = useRef(false)
+  const reconcileRequestedRef = useRef(false)
 
   useEffect(() => {
     messagesRef.current = messages
@@ -343,6 +361,7 @@ export default function Room() {
       } = await supabase.auth.getUser()
       setUserId(user.id)
       userIdRef.current = user.id
+      migrateLegacyPendingMessages(localStorage, user.id)
       const { data: bookmarks } = await supabase.from('message_bookmarks').select('message_id').eq('user_id', user.id).eq('room_id', roomId)
       setBookmarkedMessageIds(new Set((bookmarks || []).map(bookmark => bookmark.message_id)))
       await supabase.from('profiles').update({ email: user.email }).eq('id', user.id)
@@ -390,8 +409,6 @@ export default function Room() {
         setActiveChar(lastChar || roomChars[0])
       }
 
-      await fetchMessages()
-
       channelRef.current = supabase
         .channel('room-' + roomId)
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rooms', filter: `id=eq.${roomId}` }, payload => {
@@ -419,30 +436,36 @@ export default function Room() {
         .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `room_id=eq.${roomId}` }, async payload => {
           if (payload.eventType === 'INSERT') {
             const newMsg = payload.new
-            const { data: char } = await supabase.from('characters').select('name, color, text_color, avatar_letter, image_url').eq('id', newMsg.character_id).single()
-            const fullMsg = { ...newMsg, characters: char || null, entrance_side: newMsg.user_id === userIdRef.current ? 'right' : 'left' }
-            setMessages(prev => {
-              const hastemp = prev.find(m => m.id.toString().startsWith('temp-') && m.content === newMsg.content && m.user_id === newMsg.user_id)
-              if (hastemp) return prev.map(m => (m.id === hastemp.id ? { ...fullMsg, entrance_side: null } : m))
-              return [...prev, fullMsg]
-            })
-            if (!isAtBottomRef.current) setNewMsgAlert(true)
-            const {
-              data: { user: currentUser },
-            } = await supabase.auth.getUser()
-            if (newMsg.user_id !== currentUser.id) {
-              await supabase
-                .from('messages')
-                .update({ read_by: [...(newMsg.read_by || []), currentUser.id] })
-                .eq('id', newMsg.id)
+            let hydrated = newMsg
+            try {
+              hydrated = await hydrateMessageCharacter(supabase, newMsg)
+            } catch (error) {
+              console.warn('message character hydration failed:', error.message)
             }
+            const fullMsg = { ...hydrated, entrance_side: newMsg.user_id === userIdRef.current ? null : 'left' }
+            setMessages(prev => mergeMessages(prev, fullMsg))
+            if (!isAtBottomRef.current) setNewMsgAlert(true)
           } else if (payload.eventType === 'UPDATE') {
-            setMessages(prev => prev.map(m => (m.id === payload.new.id ? { ...m, read_by: payload.new.read_by, edited: payload.new.edited, content: payload.new.content } : m)))
+            setMessages(prev => mergeMessages(prev, payload.new))
           } else if (payload.eventType === 'DELETE') {
             setMessages(prev => prev.filter(m => m.id !== payload.old.id))
           }
         })
-        .subscribe()
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'room_read_cursors', filter: `room_id=eq.${roomId}` }, payload => {
+          if (payload.eventType === 'DELETE') {
+            setReadCursors(current => current.filter(cursor => cursor.user_id !== payload.old.user_id))
+            return
+          }
+          setReadCursors(current => {
+            const withoutUser = current.filter(cursor => cursor.user_id !== payload.new.user_id)
+            return [...withoutUser, payload.new]
+          })
+        })
+        .subscribe(status => {
+          if (status === 'SUBSCRIBED') fetchMessages()
+        })
+
+      await fetchMessages()
     }
     init()
     return () => {
@@ -543,19 +566,30 @@ export default function Room() {
       const behavior = messages.length > 0 && !initialScrollDone.current ? 'instant' : 'smooth'
       messagesEndRef.current?.scrollIntoView({ behavior })
       initialScrollDone.current = true
+      window.requestAnimationFrame(() => markAsRead(messages))
     }
   }, [messages])
 
   useEffect(() => {
     const handleFocus = () => fetchMessages()
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') fetchMessages()
+    }
     window.addEventListener('focus', handleFocus)
-    return () => window.removeEventListener('focus', handleFocus)
+    window.addEventListener('online', handleFocus)
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => {
+      window.removeEventListener('focus', handleFocus)
+      window.removeEventListener('online', handleFocus)
+      document.removeEventListener('visibilitychange', handleVisibility)
+    }
   }, [])
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'instant' })
     setNewMsgAlert(false)
     isAtBottomRef.current = true
+    markAsRead(messagesRef.current)
   }
 
   const handleScroll = () => {
@@ -569,35 +603,66 @@ export default function Room() {
   }
 
   const fetchMessages = async () => {
-    const { data } = await supabase.from('messages').select('*, characters(name, color, text_color, avatar_letter, image_url)').eq('room_id', roomId).order('created_at', { ascending: true })
-    if (data) {
+    if (reconcilingMessagesRef.current) {
+      reconcileRequestedRef.current = true
+      return
+    }
+
+    reconcilingMessagesRef.current = true
+    try {
+      const [data, cursors] = await Promise.all([
+        fetchRoomMessages(supabase, roomId),
+        fetchRoomReadCursors(supabase, roomId),
+      ])
+      const ownCursor = cursors.find(cursor => cursor.user_id === userIdRef.current)
       if (!initialScrollDone.current && userIdRef.current) {
-        const firstUnread = data.find(message => message.user_id !== userIdRef.current && !(message.read_by || []).includes(userIdRef.current))
+        const firstUnread = data.find(
+          message =>
+            message.user_id !== userIdRef.current &&
+            message.type !== 'chapter' &&
+            Number(message.sequence_no) > Number(ownCursor?.last_read_sequence || 0)
+        )
         setInitialUnreadId(firstUnread?.id || null)
       }
       window.clearTimeout(remoteTypingTimerRef.current)
-      setMessages(data)
-      markAsRead(data)
+      setMessages(current => mergeMessages(current, data))
+      setReadCursors(cursors)
       const dates = [...new Set(data.map(m => new Date(m.created_at).toLocaleDateString('ko-KR')))]
       setAvailableDates(dates)
+    } catch (error) {
+      console.error('message reconciliation failed:', error.message)
+    } finally {
+      reconcilingMessagesRef.current = false
+      if (reconcileRequestedRef.current) {
+        reconcileRequestedRef.current = false
+        queueMicrotask(fetchMessages)
+      }
     }
   }
 
   const markAsRead = async msgs => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    const unread = msgs.filter(m => m.user_id !== user.id && !m.read_by?.includes(user.id) && m.type !== 'chapter' && !m.id.toString().startsWith('temp-'))
-    if (unread.length === 0) return
-    await Promise.all(
-      unread.map(m =>
-        supabase
-          .from('messages')
-          .update({ read_by: [...(m.read_by || []), user.id] })
-          .eq('id', m.id)
-      )
-    )
-    setMessages(prev => prev.map(m => (unread.find(u => u.id === m.id) ? { ...m, read_by: [...(m.read_by || []), user.id] } : m)))
+    if (
+      !userIdRef.current ||
+      document.visibilityState !== 'visible' ||
+      !document.hasFocus() ||
+      !isAtBottomRef.current
+    ) return
+
+    const target = highestReadableMessage(msgs, userIdRef.current)
+    if (!target) return
+    const ownCursor = readCursors.find(cursor => cursor.user_id === userIdRef.current)
+    if (Number(ownCursor?.last_read_sequence || 0) >= Number(target.sequence_no)) return
+
+    try {
+      const cursor = await advanceRoomReadCursor(supabase, roomId, target.id)
+      if (!cursor) return
+      setReadCursors(current => {
+        const withoutUser = current.filter(item => item.user_id !== cursor.user_id)
+        return [...withoutUser, cursor]
+      })
+    } catch (error) {
+      console.warn('read cursor update failed:', error.message)
+    }
   }
 
   const handleTyping = async e => {
@@ -632,18 +697,30 @@ export default function Room() {
   }
 
   const persistMessage = async (tempId, message) => {
-    setMessages(prev => prev.map(m => (m.id === tempId ? { ...m, delivery_state: 'sending' } : m)))
-    const { error } = await supabase.from('messages').insert(message)
-    if (error) {
+    const clientMessageId = message.client_message_id || createClientMessageId()
+    const durableMessage = { ...message, client_message_id: clientMessageId }
+    setMessages(prev =>
+      prev.map(m =>
+        m.id === tempId
+          ? { ...m, client_message_id: clientMessageId, delivery_state: 'sending' }
+          : m
+      )
+    )
+    try {
+      const persisted = await sendRoomMessageRpc(supabase, durableMessage)
+      setMessages(prev => mergeMessages(prev, persisted))
+      removePendingMessage(localStorage, userIdRef.current, clientMessageId)
+      return true
+    } catch (error) {
       console.error('message insert failed:', error.message)
       setMessages(prev => prev.map(m => (m.id === tempId ? { ...m, delivery_state: 'failed' } : m)))
-      const queue = JSON.parse(localStorage.getItem('idea-pending-messages') || '[]').filter(item => item.tempId !== tempId)
-      localStorage.setItem('idea-pending-messages', JSON.stringify([...queue, { tempId, message, roomId }]))
+      queuePendingMessage(localStorage, userIdRef.current, {
+        tempId,
+        message: durableMessage,
+        roomId,
+      })
       return false
     }
-    const queue = JSON.parse(localStorage.getItem('idea-pending-messages') || '[]').filter(item => item.tempId !== tempId)
-    localStorage.setItem('idea-pending-messages', JSON.stringify(queue))
-    return true
   }
 
   const retryMessage = msg =>
@@ -653,16 +730,18 @@ export default function Room() {
       character_id: msg.character_id,
       type: msg.type,
       content: msg.content,
+      client_message_id: msg.client_message_id,
     })
 
   useEffect(() => {
     const retryPending = async () => {
       if (!navigator.onLine) return
-      const queue = JSON.parse(localStorage.getItem('idea-pending-messages') || '[]').filter(item => item.roomId === roomId)
+      if (!userId) return
+      const queue = readPendingMessages(localStorage, userId).filter(item => item.roomId === roomId)
       for (const item of queue) {
         const existing = messagesRef.current.find(message => message.id === item.tempId)
         if (!existing) {
-          setMessages(current => [...current, { ...item.message, id: item.tempId, created_at: new Date().toISOString(), delivery_state: 'failed' }])
+          setMessages(current => mergeMessages(current, { ...item.message, id: item.tempId, created_at: new Date(item.queuedAt).toISOString(), delivery_state: 'failed' }))
         }
         await persistMessage(item.tempId, item.message)
       }
@@ -670,7 +749,7 @@ export default function Room() {
     window.addEventListener('online', retryPending)
     retryPending()
     return () => window.removeEventListener('online', retryPending)
-  }, [roomId])
+  }, [roomId, userId])
 
   const sendMessage = async () => {
     if (!input.trim()) return
@@ -1431,7 +1510,24 @@ export default function Room() {
     if (talkingFrameIndex === 0 || frames.length === 0) return message.characters?.image_url || DEFAULT_AVATAR
     return frames[(talkingFrameIndex - 1) % frames.length]
   }
-  const lastReadMessageId = [...filteredMessages].reverse().find(msg => msg.user_id === userId && (msg.read_by || []).some(id => id !== msg.user_id))?.id
+  const lastReadMessage = [...filteredMessages].reverse().find(
+    message =>
+      message.user_id === userId &&
+      Number.isFinite(Number(message.sequence_no)) &&
+      readCursors.some(
+        cursor =>
+          cursor.user_id !== userId &&
+          Number(cursor.last_read_sequence) >= Number(message.sequence_no)
+      )
+  )
+  const lastReadMessageId = lastReadMessage?.id
+  const lastReadCount = lastReadMessage
+    ? readCursors.filter(
+        cursor =>
+          cursor.user_id !== userId &&
+          Number(cursor.last_read_sequence) >= Number(lastReadMessage.sequence_no)
+      ).length
+    : 0
 
   const iconBtn = (onClick, icon, active) => ({
     onClick,
@@ -2216,7 +2312,9 @@ export default function Room() {
                 )}
                 {renderMessageActions(msg)}
                 {showMessageMeta && <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 2 }}>
-                  {showReadReceipt && <Eye size={10} color={t.subText} opacity={0.4} />}
+                  {showReadReceipt && (readReceipt === 'number'
+                    ? <span style={{ fontSize: 10, color: t.subText, opacity: 0.65 }}>{lastReadCount}</span>
+                    : <Eye size={10} color={t.subText} opacity={0.4} />)}
                   {showMessageTimestamp && <div style={{ fontSize: 10, color: t.subText, opacity: 0.72 }}>{searchQuery ? new Date(msg.created_at).toLocaleDateString('ko-KR') + ' ' + new Date(msg.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : new Date(msg.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}</div>}
                   {renderDeliveryStatus(msg)}
                 </div>}

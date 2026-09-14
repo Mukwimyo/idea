@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, LogOut, Users, Bell, BellOff, CircleHelp } f
 import { supabase, subscribePush, unsubscribePush } from '../lib/supabase'
 import Toast from '../components/Toast'
 import useToast from '../hooks/useToast'
+import { clearPendingMessages } from '../features/messages/pendingMessageStore'
 
 const FONTS = [
   { id: 'sans', name: '기본', family: 'sans-serif' },
@@ -243,6 +244,7 @@ export default function Settings() {
       data: { user },
     } = await supabase.auth.getUser()
     if (user) await unsubscribePush(user.id)
+    if (user) clearPendingMessages(localStorage, user.id)
     await supabase.auth.signOut()
   }
 
