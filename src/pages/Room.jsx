@@ -946,13 +946,17 @@ export default function Room() {
     } = await supabase.auth.getUser()
     const leavingCharacter = activeChar || myChars[0]
     const leavingName = leavingCharacter?.name || '사용자'
-    await supabase.from('messages').insert({
-      room_id: roomId,
-      user_id: user.id,
-      character_id: leavingCharacter?.id || null,
-      type: 'member_left',
-      content: `${leavingName}님이 대화방에서 나갔어요.`,
-    })
+    try {
+      await sendRoomMessageRpc(supabase, {
+        room_id: roomId,
+        client_message_id: createClientMessageId(),
+        character_id: leavingCharacter?.id || null,
+        type: 'member_left',
+        content: `${leavingName}님이 대화방에서 나갔어요.`,
+      })
+    } catch (messageError) {
+      console.warn('leave message could not be recorded:', messageError.message)
+    }
     const { error } = await supabase.from('room_members').delete().eq('room_id', roomId).eq('user_id', user.id)
     if (error) {
       showToast('대화방에서 나가지 못했어요.', 'error')
@@ -1144,13 +1148,17 @@ export default function Room() {
       character_id: character.id,
       sort_order: 0,
     })
-    await supabase.from('messages').insert({
-      room_id: pendingInviteEntry.roomId,
-      user_id: user.id,
-      character_id: character.id,
-      type: 'member_joined',
-      content: `${character.name}님이 대화방에 들어왔어요.`,
-    })
+    try {
+      await sendRoomMessageRpc(supabase, {
+        room_id: pendingInviteEntry.roomId,
+        client_message_id: createClientMessageId(),
+        character_id: character.id,
+        type: 'member_joined',
+        content: `${character.name}님이 대화방에 들어왔어요.`,
+      })
+    } catch (messageError) {
+      console.warn('join message could not be recorded:', messageError.message)
+    }
     const targetRoomId = pendingInviteEntry.roomId
     setJoinedRoomIds(current => [...new Set([...current, targetRoomId])])
     setEntryJoining(false)
