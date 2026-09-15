@@ -168,6 +168,8 @@ having count(*) > 1;
 ```text
 TEST_SUPABASE_URL
 TEST_SUPABASE_ANON_KEY
+TEST_SUPABASE_SERVICE_ROLE_KEY (운영 전용 픽스처를 실행 ID로 찾을 때)
+TEST_GOAL_A_RUN_ID (서비스 역할 키와 함께 사용)
 TEST_SENDER_EMAIL
 TEST_SENDER_PASSWORD
 TEST_READER_EMAIL
@@ -177,6 +179,8 @@ TEST_PRIVATE_ROOM_ID
 TEST_SENDER_CHARACTER_ID (선택)
 TEST_MESSAGE_COUNT (기본 100)
 ```
+
+운영 전용 픽스처 검증에서는 서비스 역할 키와 실행 ID를 함께 제공하면 이메일·비밀번호 환경 변수 대신 메타데이터로 두 계정을 찾고, 임시 비밀번호를 프로세스 메모리에서만 생성해 로그인한다. 두 값 중 하나만 제공되면 검사를 중단한다.
 
 실행 명령은 `npm run test:two-account`와 `npm run test:rls`다. RLS 검사는 발신자만 가입된 `TEST_PRIVATE_ROOM_ID`에 추적 가능한 테스트 메시지 한 건을 남기며 자동 삭제하지 않는다. 통과 조건은 다음과 같다.
 

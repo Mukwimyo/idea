@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { randomUUID } from 'node:crypto'
+import { randomBytes, randomUUID } from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
 
 const required = name => {
@@ -9,8 +9,18 @@ const required = name => {
 }
 
 const options = { auth: { persistSession: false, autoRefreshToken: false } }
-const sender = createClient(required('TEST_SUPABASE_URL'), required('TEST_SUPABASE_ANON_KEY'), options)
-const outsider = createClient(required('TEST_SUPABASE_URL'), required('TEST_SUPABASE_ANON_KEY'), options)
+const url = required('TEST_SUPABASE_URL')
+const anonKey = required('TEST_SUPABASE_ANON_KEY')
+const serviceRoleKey = process.env.TEST_SUPABASE_SERVICE_ROLE_KEY
+const runId = process.env.TEST_GOAL_A_RUN_ID
+assert.equal(
+  Boolean(serviceRoleKey),
+  Boolean(runId),
+  'TEST_SUPABASE_SERVICE_ROLE_KEY and TEST_GOAL_A_RUN_ID must be provided together'
+)
+const sender = createClient(url, anonKey, options)
+const outsider = createClient(url, anonKey, options)
+const admin = serviceRoleKey ? createClient(url, serviceRoleKey, options) : null
 const sharedRoomId = required('TEST_ROOM_ID')
 const privateRoomId = required('TEST_PRIVATE_ROOM_ID')
 
@@ -23,11 +33,46 @@ const signIn = async (client, prefix) => {
   return data.user
 }
 
-try {
-  const [senderUser, outsiderUser] = await Promise.all([
-    signIn(sender, 'TEST_SENDER'),
-    signIn(outsider, 'TEST_READER'),
+const temporaryPassword = () => `${randomBytes(32).toString('base64url')}Aa1!`
+
+const updateAndSignIn = async (client, user) => {
+  const password = temporaryPassword()
+  const { error: updateError } = await admin.auth.admin.updateUserById(user.id, {
+    password,
+    email_confirm: true,
+  })
+  if (updateError) throw updateError
+  const { data, error } = await client.auth.signInWithPassword({ email: user.email, password })
+  if (error) throw error
+  return data.user
+}
+
+const signInTestUsers = async () => {
+  if (!admin) {
+    return Promise.all([
+      signIn(sender, 'TEST_SENDER'),
+      signIn(outsider, 'TEST_READER'),
+    ])
+  }
+
+  const { data, error } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 })
+  if (error) throw error
+  const fixtureUsers = data.users.filter(
+    user =>
+      user.user_metadata?.purpose === 'goal-a-production-realtime-test' &&
+      user.user_metadata?.goal_a_run_id === runId
+  )
+  const senderUser = fixtureUsers.find(user => user.user_metadata?.goal_a_role === 'sender')
+  const readerUser = fixtureUsers.find(user => user.user_metadata?.goal_a_role === 'reader')
+  assert(senderUser && readerUser, 'the requested Goal A fixture users were not found')
+  return Promise.all([
+    updateAndSignIn(sender, senderUser),
+    updateAndSignIn(outsider, readerUser),
   ])
+}
+
+try {
+  const [senderUser, outsiderUser] = await signInTestUsers()
   assert.notEqual(senderUser.id, outsiderUser.id, 'test accounts must be different')
 
   const [{ data: senderMembership }, { data: outsiderShared }, { data: outsiderPrivate }] = await Promise.all([
@@ -116,6 +161,7 @@ try {
     forgedReadDenied: true,
     adminRpcDenied: true,
     invalidStoragePrefixDenied: true,
+    fixtureMode: admin ? 'run-id' : 'credentials',
   }, null, 2))
 } finally {
   await Promise.allSettled([sender.auth.signOut(), outsider.auth.signOut()])
