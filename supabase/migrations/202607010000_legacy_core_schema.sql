@@ -77,7 +77,7 @@ create table if not exists public.groups (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references auth.users(id) on delete cascade,
   name text not null,
-  type text not null check (type in ('character', 'room')),
+  type text not null check (type in ('personal', 'room')),
   room_id uuid references public.rooms(id) on delete cascade
 );
 
