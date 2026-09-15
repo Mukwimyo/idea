@@ -61,3 +61,21 @@ export const advanceRoomReadCursor = async (supabase, roomId, messageId) => {
   if (error) throw error
   return Array.isArray(data) ? data[0] : data
 }
+
+export const findRoomByInviteCode = async (supabase, inviteCode) => {
+  const { data, error } = await supabase.rpc('find_room_by_invite_code', {
+    p_invite_code: inviteCode.trim(),
+  })
+  if (error) throw error
+  return Array.isArray(data) ? data[0] || null : data || null
+}
+
+export const joinRoomWithInvite = async (supabase, inviteCode, characterId, clientMessageId) => {
+  const { data, error } = await supabase.rpc('join_room_with_invite', {
+    p_invite_code: inviteCode.trim(),
+    p_character_id: characterId,
+    p_client_message_id: clientMessageId,
+  })
+  if (error) throw error
+  return Array.isArray(data) ? data[0] || null : data || null
+}

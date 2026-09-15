@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { advanceRoomReadCursor, sendRoomMessage } from './messageApi'
+import { advanceRoomReadCursor, joinRoomWithInvite, sendRoomMessage } from './messageApi'
 
 describe('message RPC API', () => {
   it('never sends a caller-controlled user id', async () => {
@@ -53,5 +53,21 @@ describe('message RPC API', () => {
         }
       )
     ).rejects.toBe(error)
+  })
+
+  it('joins through the guarded invite RPC without a caller user id', async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: [{ id: 'room-1' }], error: null })
+    const room = await joinRoomWithInvite(
+      { rpc },
+      ' abc123 ',
+      'character-1',
+      'client-1'
+    )
+    expect(room.id).toBe('room-1')
+    expect(rpc).toHaveBeenCalledWith('join_room_with_invite', {
+      p_invite_code: 'abc123',
+      p_character_id: 'character-1',
+      p_client_message_id: 'client-1',
+    })
   })
 })

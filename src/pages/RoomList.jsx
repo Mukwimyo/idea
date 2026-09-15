@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { getTheme } from '../lib/themes'
@@ -10,7 +10,7 @@ import { IconButton } from '../components/ui'
 import LoadingScreen from '../components/LoadingScreen'
 import EntryCharacterPicker from '../components/EntryCharacterPicker'
 import { normalizeRoomSummaries, sortRoomList } from '../features/rooms/roomSummary'
-import { createClientMessageId, sendRoomMessage } from '../features/messages/messageApi'
+import { createClientMessageId, findRoomByInviteCode, joinRoomWithInvite } from '../features/messages/messageApi'
 
 function SortableRoomCard({ roomId, disabled, children }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: roomId, disabled })
@@ -42,6 +42,7 @@ export default function RoomList() {
 
   const channelRef = useRef(null)
   const refreshTimerRef = useRef(null)
+  const fetchRoomsRef = useRef(null)
   const initialRoomAnimationRef = useRef(false)
 
   useEffect(() => {
@@ -55,11 +56,11 @@ export default function RoomList() {
     localStorage.setItem('idea-theme-id', data?.theme_id || 'dark-purple')
       setTheme(resolvedTheme)
       document.querySelector('meta[name="theme-color"]')?.setAttribute('content', resolvedTheme.panel)
-      fetchRooms(user.id)
+      fetchRoomsRef.current?.(user.id)
 
       const scheduleRefresh = () => {
         window.clearTimeout(refreshTimerRef.current)
-        refreshTimerRef.current = window.setTimeout(() => fetchRooms(user.id), 120)
+        refreshTimerRef.current = window.setTimeout(() => fetchRoomsRef.current?.(user.id), 120)
       }
 
       channelRef.current = supabase
@@ -132,6 +133,10 @@ export default function RoomList() {
     setRooms(sortRoomList(enriched, activeSortMode))
   }
 
+  useLayoutEffect(() => {
+    fetchRoomsRef.current = fetchRooms
+  })
+
   const changeSortMode = mode => {
     setSortMode(mode)
     setReordering(false)
@@ -180,7 +185,12 @@ export default function RoomList() {
     const {
       data: { user },
     } = await supabase.auth.getUser()
-    const { data: room } = await supabase.from('rooms').select().eq('invite_code', inviteCode.trim()).single()
+    let room = null
+    try {
+      room = await findRoomByInviteCode(supabase, inviteCode)
+    } catch (error) {
+      console.warn('invite lookup failed:', error.message)
+    }
     if (room) {
       await supabase.from('profiles').upsert({ id: user.id, email: user.email })
       const { data: existingMember } = await supabase.from('room_members').select('room_id').eq('room_id', room.id).eq('user_id', user.id).maybeSingle()
@@ -202,36 +212,13 @@ export default function RoomList() {
   const completeJoinRoom = async character => {
     if (!pendingJoinRoom || !character) return
     setEntryJoining(true)
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    const { error } = await supabase.from('room_members').insert({
-      room_id: pendingJoinRoom.id,
-      user_id: user.id,
-      sort_order: rooms.length,
-      last_char_id: character.id,
-    })
-    if (error) {
+    try {
+      await joinRoomWithInvite(supabase, inviteCode, character.id, createClientMessageId())
+    } catch (error) {
+      console.warn('room join failed:', error.message)
       setEntryJoining(false)
       alert('대화방에 입장하지 못했어요.')
       return
-    }
-    await supabase.from('room_characters').upsert({
-      room_id: pendingJoinRoom.id,
-      user_id: user.id,
-      character_id: character.id,
-      sort_order: 0,
-    })
-    try {
-      await sendRoomMessage(supabase, {
-        room_id: pendingJoinRoom.id,
-        client_message_id: createClientMessageId(),
-        character_id: character.id,
-        type: 'member_joined',
-        content: `${character.name}님이 대화방에 들어왔어요.`,
-      })
-    } catch (messageError) {
-      console.warn('join message could not be recorded:', messageError.message)
     }
     setEntryJoining(false)
     setPendingJoinRoom(null)

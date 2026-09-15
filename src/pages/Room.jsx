@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase, uploadFile, validateImageFile } from '../lib/supabase'
 import { THEMES, getTheme } from '../lib/themes'
@@ -19,6 +19,7 @@ import {
   fetchRoomMessages,
   fetchRoomReadCursors,
   hydrateMessageCharacter,
+  joinRoomWithInvite,
   sendRoomMessage as sendRoomMessageRpc,
 } from '../features/messages/messageApi'
 import { highestReadableMessage, mergeMessages } from '../features/messages/messageState'
@@ -238,6 +239,10 @@ export default function Room() {
   const messagesRef = useRef([])
   const reconcilingMessagesRef = useRef(false)
   const reconcileRequestedRef = useRef(false)
+  const fetchMessagesRef = useRef(null)
+  const markAsReadRef = useRef(null)
+  const loadTalkingFramesRef = useRef(null)
+  const persistMessageRef = useRef(null)
 
   useEffect(() => {
     messagesRef.current = messages
@@ -426,7 +431,7 @@ export default function Room() {
               const characterId = payload.new.typing_character_id || null
               setTalkingFrameIndex(0)
               setTypingInfo({ charName: payload.new.typing_char_name, characterId, expiresAt })
-              if (characterId) loadTalkingFrames(characterId)
+              if (characterId) loadTalkingFramesRef.current?.(characterId)
               remoteTypingTimerRef.current = window.setTimeout(() => setTypingInfo(null), remaining)
             } else {
               setTypingInfo(null)
@@ -462,10 +467,10 @@ export default function Room() {
           })
         })
         .subscribe(status => {
-          if (status === 'SUBSCRIBED') fetchMessages()
+          if (status === 'SUBSCRIBED') fetchMessagesRef.current?.()
         })
 
-      await fetchMessages()
+      await fetchMessagesRef.current?.()
     }
     init()
     return () => {
@@ -566,14 +571,14 @@ export default function Room() {
       const behavior = messages.length > 0 && !initialScrollDone.current ? 'instant' : 'smooth'
       messagesEndRef.current?.scrollIntoView({ behavior })
       initialScrollDone.current = true
-      window.requestAnimationFrame(() => markAsRead(messages))
+      window.requestAnimationFrame(() => markAsReadRef.current?.(messages))
     }
   }, [messages])
 
   useEffect(() => {
-    const handleFocus = () => fetchMessages()
+    const handleFocus = () => fetchMessagesRef.current?.()
     const handleVisibility = () => {
-      if (document.visibilityState === 'visible') fetchMessages()
+      if (document.visibilityState === 'visible') fetchMessagesRef.current?.()
     }
     window.addEventListener('focus', handleFocus)
     window.addEventListener('online', handleFocus)
@@ -743,13 +748,20 @@ export default function Room() {
         if (!existing) {
           setMessages(current => mergeMessages(current, { ...item.message, id: item.tempId, created_at: new Date(item.queuedAt).toISOString(), delivery_state: 'failed' }))
         }
-        await persistMessage(item.tempId, item.message)
+        await persistMessageRef.current?.(item.tempId, item.message)
       }
     }
     window.addEventListener('online', retryPending)
     retryPending()
     return () => window.removeEventListener('online', retryPending)
   }, [roomId, userId])
+
+  useLayoutEffect(() => {
+    fetchMessagesRef.current = fetchMessages
+    markAsReadRef.current = markAsRead
+    loadTalkingFramesRef.current = loadTalkingFrames
+    persistMessageRef.current = persistMessage
+  })
 
   const sendMessage = async () => {
     if (!input.trim()) return
@@ -1070,7 +1082,7 @@ export default function Room() {
     const {
       data: { user },
     } = await supabase.auth.getUser()
-    const { data, error } = await supabase.from('room_members').select('room_id, rooms(id, name)').eq('user_id', user.id)
+    const { data, error } = await supabase.from('room_members').select('room_id, rooms(id, name, invite_code)').eq('user_id', user.id)
     if (error) {
       showToast('초대할 방 목록을 불러오지 못했어요.', 'error')
       return
@@ -1084,7 +1096,7 @@ export default function Room() {
       data: { user },
     } = await supabase.auth.getUser()
     const tempId = `temp-room-invite-${Date.now()}`
-    const content = JSON.stringify({ roomId: targetRoom.id, roomName: targetRoom.name })
+    const content = JSON.stringify({ roomId: targetRoom.id, roomName: targetRoom.name, inviteCode: targetRoom.invite_code })
     const tempMessage = {
       id: tempId,
       room_id: roomId,
@@ -1126,38 +1138,23 @@ export default function Room() {
 
   const completeInvitedRoomEntry = async character => {
     if (!pendingInviteEntry || !character) return
+    if (!pendingInviteEntry.inviteCode) {
+      showToast('이전 방식의 초대예요. 방 초대 코드를 받아 입장해주세요.', 'error')
+      return
+    }
     setEntryJoining(true)
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    const { count } = await supabase.from('room_members').select('*', { count: 'exact', head: true }).eq('user_id', user.id)
-    const { error } = await supabase.from('room_members').insert({
-      room_id: pendingInviteEntry.roomId,
-      user_id: user.id,
-      sort_order: count || 0,
-      last_char_id: character.id,
-    })
-    if (error) {
+    try {
+      await joinRoomWithInvite(
+        supabase,
+        pendingInviteEntry.inviteCode,
+        character.id,
+        createClientMessageId()
+      )
+    } catch (error) {
+      console.warn('invited room join failed:', error.message)
       setEntryJoining(false)
       showToast('방 초대를 수락하지 못했어요.', 'error')
       return
-    }
-    await supabase.from('room_characters').upsert({
-      room_id: pendingInviteEntry.roomId,
-      user_id: user.id,
-      character_id: character.id,
-      sort_order: 0,
-    })
-    try {
-      await sendRoomMessageRpc(supabase, {
-        room_id: pendingInviteEntry.roomId,
-        client_message_id: createClientMessageId(),
-        character_id: character.id,
-        type: 'member_joined',
-        content: `${character.name}님이 대화방에 들어왔어요.`,
-      })
-    } catch (messageError) {
-      console.warn('join message could not be recorded:', messageError.message)
     }
     const targetRoomId = pendingInviteEntry.roomId
     setJoinedRoomIds(current => [...new Set([...current, targetRoomId])])
