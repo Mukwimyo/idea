@@ -10,6 +10,7 @@ declare
   first_message public.messages%rowtype;
   retry_message public.messages%rowtype;
   first_cursor public.room_read_cursors%rowtype;
+  legacy_cursor public.room_read_cursors%rowtype;
   retry_cursor public.room_read_cursors%rowtype;
   older_message_id uuid;
 begin
@@ -67,6 +68,19 @@ begin
   end if;
 
   perform set_config('request.jwt.claim.sub', reader_id::text, true);
+
+  update public.messages
+  set read_by = array[reader_id::text]
+  where messages.id = first_message.id;
+
+  select * into legacy_cursor
+  from public.room_read_cursors
+  where room_read_cursors.room_id = shared_room_id
+    and room_read_cursors.user_id = reader_id;
+
+  if legacy_cursor.last_read_sequence <> first_message.sequence_no then
+    raise exception 'legacy read_by bridge did not advance the read cursor';
+  end if;
 
   select * into first_cursor
   from public.advance_room_read_cursor(shared_room_id, first_message.id);

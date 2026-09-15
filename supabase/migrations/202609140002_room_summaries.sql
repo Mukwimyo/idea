@@ -57,3 +57,72 @@ grant execute on function public.get_my_room_summaries() to authenticated;
 
 comment on function public.get_my_room_summaries() is
   'Returns authorized room cards, latest messages, and cursor-based unread counts in one query.';
+
+create or replace function public.sync_legacy_message_read_cursors()
+returns trigger
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+begin
+  if tg_op = 'UPDATE' and new.read_by is not distinct from old.read_by then
+    return new;
+  end if;
+
+  insert into public.room_read_cursors (
+    room_id,
+    user_id,
+    last_read_sequence,
+    last_read_message_id,
+    updated_at
+  )
+  select distinct
+    new.room_id,
+    room_members.user_id,
+    new.sequence_no,
+    new.id,
+    now()
+  from unnest(coalesce(new.read_by, '{}'::text[])) as readers(user_id)
+  join public.room_members
+    on room_members.room_id = new.room_id
+   and room_members.user_id::text = readers.user_id
+   and room_members.user_id = auth.uid()
+  on conflict (room_id, user_id) do update
+  set
+    last_read_sequence = greatest(
+      room_read_cursors.last_read_sequence,
+      excluded.last_read_sequence
+    ),
+    last_read_message_id = case
+      when excluded.last_read_sequence > room_read_cursors.last_read_sequence
+        then excluded.last_read_message_id
+      else room_read_cursors.last_read_message_id
+    end,
+    updated_at = case
+      when excluded.last_read_sequence > room_read_cursors.last_read_sequence
+        then excluded.updated_at
+      else room_read_cursors.updated_at
+    end;
+
+  return new;
+end;
+$$;
+
+revoke all on function public.sync_legacy_message_read_cursors() from public, anon, authenticated;
+
+drop trigger if exists sync_legacy_message_read_cursors on public.messages;
+create trigger sync_legacy_message_read_cursors
+after insert or update of read_by on public.messages
+for each row
+execute function public.sync_legacy_message_read_cursors();
+
+do $$
+begin
+  alter publication supabase_realtime add table public.room_read_cursors;
+exception when duplicate_object then null;
+end $$;
+
+alter table public.room_read_cursors replica identity full;
+
+comment on function public.sync_legacy_message_read_cursors() is
+  'Bridges the authenticated reader''s monotonic position from the currently deployed read_by client during rollout.';

@@ -13,6 +13,7 @@
     "test:run": "vitest run",
     "test:two-account": "node scripts/verify-two-account-messaging.mjs",
     "test:production-realtime": "node scripts/verify-goal-a-production-realtime.mjs",
+    "test:cursor-realtime": "node scripts/verify-goal-a-cursor-realtime.mjs",
     "test:rls": "node scripts/verify-goal-a-rls.mjs",
     "check": "npm run lint && npm run test:run && npm run build:all",
     "preview": "vite preview"

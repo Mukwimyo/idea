@@ -2,13 +2,18 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(28);
+select plan(29);
 
 select has_column('public', 'messages', 'client_message_id', 'messages has an idempotency key');
 select has_column('public', 'messages', 'sequence_no', 'messages has a stable server sequence');
 select has_table('public', 'room_read_cursors', 'read cursor table exists');
 
 select ok((select relrowsecurity from pg_class where oid = 'public.room_read_cursors'::regclass), 'read cursors use RLS');
+select is(
+  (select relreplident::text from pg_class where oid = 'public.room_read_cursors'::regclass),
+  'f',
+  'read cursors publish complete UPDATE rows'
+);
 select ok((select relrowsecurity from pg_class where oid = 'public.messages'::regclass), 'messages use RLS');
 select ok((select relrowsecurity from pg_class where oid = 'public.rooms'::regclass), 'rooms use RLS');
 select ok((select relrowsecurity from pg_class where oid = 'public.room_members'::regclass), 'room members use RLS');
