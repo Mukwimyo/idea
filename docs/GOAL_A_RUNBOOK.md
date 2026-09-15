@@ -9,6 +9,19 @@
 - 운영 DB와 GitHub Pages에는 목표 A 변경을 아직 적용하지 않았다.
 - 로컬 구현 브랜치: `codex/hardening-a`
 
+## 배포 및 되돌림 기준선
+
+2026-09-15에 GitHub API를 읽기 전용으로 확인했다.
+
+- 저장소 `Mukwimyo/idea`는 공개 저장소이며 기본 브랜치는 `main`이다.
+- 원격 `main` 기준 커밋: `233924682805b9c7803ab3a4cc3aea60b68e0890`
+- 마지막 성공한 GitHub Pages 실행도 위 `main` 커밋을 사용했다.
+- 현재 `gh-pages` 기준 커밋: `972fec833aa370cc684c1ef1560140c02b1bfb86`
+- Pages 주소는 `https://mukwimyo.github.io/idea/`이고 `gh-pages` 루트에서 제공된다.
+- Actions에는 `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_VAPID_PUBLIC_KEY` 이름의 비밀값이 모두 등록되어 있다. 값 자체는 조회하지 않았다.
+
+앱 되돌림은 위 운영 `main` 커밋을 기준으로 새 Pages 배포를 실행하는 방식으로 한다. `gh-pages` 커밋을 직접 수정하거나 강제 푸시하지 않는다.
+
 ## 운영 DB 기준선
 
 Supabase 대시보드에서 시스템 카탈로그를 읽기 전용으로 조회했다. 사용자 메시지 본문이나 계정 정보는 조회하지 않았다.
@@ -72,7 +85,7 @@ Supabase 대시보드에서 시스템 카탈로그를 읽기 전용으로 조회
 
 다음 항목이 하나라도 충족되지 않으면 적용하지 않는다.
 
-- Supabase의 수동 백업 또는 논리 덤프를 확보한다. Free 플랜 대시보드는 예약 백업이 없으므로 별도 덤프가 필요하다.
+- Supabase의 수동 백업 또는 논리 덤프를 확보한다. Free 플랜 대시보드는 예약 백업이 없으므로 별도 덤프가 필요하다. 운영 메시지가 포함된 덤프를 OneDrive에 평문 저장하지 않는다.
 - 2026-09-15 사전 점검에서 아래 쿼리는 0행이었다. 적용 직전에도 다시 확인한다.
 
 ```sql
