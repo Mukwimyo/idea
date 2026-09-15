@@ -15,6 +15,7 @@
     "test:production-realtime": "node scripts/verify-goal-a-production-realtime.mjs",
     "test:cursor-realtime": "node scripts/verify-goal-a-cursor-realtime.mjs",
     "test:rls": "node scripts/verify-goal-a-rls.mjs",
+    "prepare:rls-fixture": "node scripts/prepare-goal-a-rls-fixture.mjs",
     "check": "npm run lint && npm run test:run && npm run build:all",
     "preview": "vite preview"
   },

@@ -184,6 +184,8 @@ TEST_MESSAGE_COUNT (기본 100)
 
 실행 명령은 `npm run test:two-account`와 `npm run test:rls`다. RLS 검사는 발신자만 가입된 `TEST_PRIVATE_ROOM_ID`에 추적 가능한 테스트 메시지 한 건을 남기며 자동 삭제하지 않는다. 통과 조건은 다음과 같다.
 
+운영용 비공개 경계 방은 사용자 승인 후에만 `TEST_ALLOW_FIXTURE_WRITE=1 npm run prepare:rls-fixture`로 준비한다. 스크립트는 실행 ID와 발신자가 같은 기존 `[TEST] Goal A RLS` 방을 재사용하고, 중복 방이 있거나 수신자가 이미 가입되어 있으면 중단한다. 출력된 `privateRoomId`를 `TEST_PRIVATE_ROOM_ID`로 전달한다.
+
 - 같은 클라이언트 ID를 동시에 두 번 보내도 서버 행은 하나다.
 - 100개 클라이언트 ID마다 서로 다른 서버 ID와 순번이 하나씩 존재한다.
 - Realtime 이벤트가 일부 누락되어도 최종 조회에는 100개가 모두 존재한다.
