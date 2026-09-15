@@ -28,4 +28,11 @@ export default defineConfig([
       globals: globals.serviceworker,
     },
   },
+  {
+    files: ['scripts/**/*.mjs'],
+    extends: [js.configs.recommended],
+    languageOptions: {
+      globals: globals.node,
+    },
+  },
 ])

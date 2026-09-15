@@ -61,6 +61,8 @@ npm run dev
 npm run dev      # 개발 서버 실행
 npm run build    # 프로덕션 빌드
 npm run lint     # ESLint 검사
+npm run test:run # 단위 테스트 1회 실행
+npm run check    # 린트, 테스트, 앱·관리자 빌드 전체 검사
 npm run preview  # 빌드 결과 미리보기
 ```
 
@@ -88,7 +90,7 @@ PUSH_WEBHOOK_SECRET=...
 
 `send-push`를 호출하는 Supabase Database Webhook에는 `x-webhook-secret` 헤더를 추가하고, 값은 `PUSH_WEBHOOK_SECRET`과 동일하게 설정해야 합니다. 이 값은 클라이언트 환경 변수에 넣거나 저장소에 커밋하지 마세요.
 
-데이터베이스 스키마와 RLS 정책은 저장소에 마이그레이션 파일로 포함되어 있지 않습니다. 새 Supabase 프로젝트에 배포할 때는 위 리소스와 접근 정책을 별도로 구성해야 합니다.
+데이터베이스 기준 스키마와 후속 변경은 `supabase/migrations/`에 있습니다. 운영 적용 순서와 검증·복구 절차는 `docs/GOAL_A_RUNBOOK.md`를 따릅니다. 운영 프로젝트에는 과거 migration history가 등록되어 있지 않으므로 전체 마이그레이션을 한 번에 푸시하지 않습니다.
 
 ## 프로젝트 구조
 
