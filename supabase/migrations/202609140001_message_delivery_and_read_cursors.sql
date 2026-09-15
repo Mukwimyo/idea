@@ -87,18 +87,18 @@ insert into public.room_read_cursors (
   last_read_message_id,
   updated_at
 )
-select distinct on (messages.room_id, readers.user_id)
+select distinct on (messages.room_id, room_members.user_id)
   messages.room_id,
-  readers.user_id,
+  room_members.user_id,
   messages.sequence_no,
   messages.id,
   now()
 from public.messages as messages
-cross join lateral unnest(coalesce(messages.read_by, '{}'::uuid[])) as readers(user_id)
+cross join lateral unnest(coalesce(messages.read_by, '{}'::text[])) as readers(user_id)
 join public.room_members
   on room_members.room_id = messages.room_id
- and room_members.user_id = readers.user_id
-order by messages.room_id, readers.user_id, messages.sequence_no desc
+ and room_members.user_id::text = readers.user_id
+order by messages.room_id, room_members.user_id, messages.sequence_no desc
 on conflict (room_id, user_id) do update
 set
   last_read_sequence = greatest(
@@ -306,6 +306,128 @@ $$;
 
 revoke all on function public.advance_room_read_cursor(uuid, uuid) from public, anon;
 grant execute on function public.advance_room_read_cursor(uuid, uuid) to authenticated;
+
+do $$
+begin
+  if exists (
+    select 1
+    from public.room_members
+    group by room_id, user_id
+    having count(*) > 1
+  ) then
+    raise exception 'duplicate room memberships must be resolved before Goal A migration';
+  end if;
+end $$;
+
+create unique index if not exists room_members_room_user_uidx
+  on public.room_members(room_id, user_id);
+
+create or replace function public.find_room_by_invite_code(p_invite_code text)
+returns setof public.rooms
+language sql
+stable
+security definer
+set search_path = pg_catalog, public
+as $$
+  select rooms.*
+  from public.rooms
+  where auth.uid() is not null
+    and rooms.invite_code = trim(p_invite_code);
+$$;
+
+revoke all on function public.find_room_by_invite_code(text) from public, anon;
+grant execute on function public.find_room_by_invite_code(text) to authenticated;
+
+create or replace function public.join_room_with_invite(
+  p_invite_code text,
+  p_character_id uuid,
+  p_client_message_id uuid
+)
+returns setof public.rooms
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  caller_id uuid := auth.uid();
+  selected_room public.rooms%rowtype;
+  character_name text;
+begin
+  if caller_id is null then
+    raise exception 'authentication required' using errcode = '42501';
+  end if;
+
+  select rooms.* into selected_room
+  from public.rooms
+  where rooms.invite_code = trim(p_invite_code)
+  for update;
+
+  if selected_room.id is null then
+    raise exception 'invalid invite code' using errcode = '22023';
+  end if;
+
+  select characters.name into character_name
+  from public.characters
+  where characters.id = p_character_id
+    and characters.user_id = caller_id
+    and characters.is_archived = false;
+
+  if character_name is null then
+    raise exception 'active owned character required' using errcode = '42501';
+  end if;
+
+  insert into public.room_members (
+    room_id,
+    user_id,
+    sort_order,
+    last_char_id
+  )
+  values (
+    selected_room.id,
+    caller_id,
+    (select count(*) from public.room_members where user_id = caller_id),
+    p_character_id
+  )
+  on conflict (room_id, user_id) do update
+  set last_char_id = excluded.last_char_id;
+
+  insert into public.room_characters (
+    room_id,
+    user_id,
+    character_id,
+    sort_order
+  )
+  values (selected_room.id, caller_id, p_character_id, 0)
+  on conflict (room_id, user_id, character_id) do nothing;
+
+  if p_client_message_id is not null then
+    insert into public.messages (
+      room_id,
+      user_id,
+      character_id,
+      type,
+      content,
+      client_message_id
+    )
+    values (
+      selected_room.id,
+      caller_id,
+      p_character_id,
+      'member_joined',
+      character_name || '님이 대화방에 들어왔어요.',
+      p_client_message_id
+    )
+    on conflict (user_id, client_message_id)
+      where client_message_id is not null
+      do nothing;
+  end if;
+
+  return next selected_room;
+end;
+$$;
+
+revoke all on function public.join_room_with_invite(text, uuid, uuid) from public, anon;
+grant execute on function public.join_room_with_invite(text, uuid, uuid) to authenticated;
 
 comment on column public.messages.client_message_id is
   'Client-generated idempotency key, unique per sender.';
