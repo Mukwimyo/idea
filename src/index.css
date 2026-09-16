@@ -117,43 +117,37 @@ body {
 .composer-identity {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     max-width: calc(100% - 24px);
-    min-height: 38px;
-    margin: 0 0 7px 4px;
-    padding: 4px 10px 4px 5px;
+    min-height: 32px;
+    margin: 0 0 5px 4px;
+    padding: 3px 9px 3px 4px;
     border: 1px solid;
-    border-radius: 20px;
+    border-radius: 17px;
     cursor: pointer;
     pointer-events: auto;
 }
 
 .composer-identity__avatar {
-    width: 28px;
-    height: 28px;
-    flex: 0 0 28px;
+    width: 24px;
+    height: 24px;
+    flex: 0 0 24px;
     overflow: hidden;
-    border-radius: 9px;
+    border-radius: 8px;
 }
 
 .composer-identity__text {
     min-width: 0;
-    display: grid;
-    gap: 1px;
+    display: block;
     text-align: left;
 }
 
 .composer-identity__text strong {
     overflow: hidden;
     font-size: 12px;
-    line-height: 1.2;
+    line-height: 1.3;
     text-overflow: ellipsis;
     white-space: nowrap;
-}
-
-.composer-identity__text span {
-    font-size: 10px;
-    line-height: 1.2;
 }
 
 .settings-page-drawer {
