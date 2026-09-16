@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { MessageEffectBubble, MessageEffectPicker } from './MessageEffects'
 
@@ -33,13 +33,31 @@ describe('MessageEffectPicker', () => {
 })
 
 describe('MessageEffectBubble', () => {
+  it('waits for the message entrance before playing the selected effect', () => {
+    vi.useFakeTimers()
+    const onEffectPlay = vi.fn()
+    const { container } = render(
+      <MessageEffectBubble effectKey="impact" animateOnMount onEffectPlay={onEffectPlay}>
+        순서대로 재생
+      </MessageEffectBubble>
+    )
+
+    expect(container.firstChild).not.toHaveClass('message-effect--playing')
+    act(() => vi.advanceTimersByTime(259))
+    expect(onEffectPlay).not.toHaveBeenCalled()
+    act(() => vi.advanceTimersByTime(1))
+    expect(container.firstChild).toHaveClass('message-effect--playing')
+    expect(onEffectPlay).toHaveBeenCalledWith('impact')
+    vi.useRealTimers()
+  })
+
   it('restarts a stored effect when the message is clicked', () => {
     const { container } = render(
       <MessageEffectBubble effectKey="impact">다시 재생</MessageEffectBubble>
     )
     const initialBubble = container.firstChild
 
-    fireEvent.click(screen.getByRole('button', { name: '충격 효과 다시 보기' }))
+    fireEvent.click(within(container).getByRole('button', { name: '충격 효과 다시 보기' }))
 
     const replayedBubble = container.firstChild
     expect(replayedBubble).not.toBe(initialBubble)
