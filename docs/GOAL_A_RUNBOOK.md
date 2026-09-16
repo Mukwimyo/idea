@@ -7,7 +7,7 @@
 - 앱 Supabase 프로젝트: `IDEA` (`tngszaqvvcjdxntrtlvv`)
 - 위키 Supabase 프로젝트 `IDEA WIKI` (`hdeisnyeefpkvgtieaoo`)와 혼동하지 않는다.
 - 운영 DB에는 `202609140001`~`202609140003`을 모두 적용했다.
-- 목표 A 앱은 GitHub Pages에 배포했으며, 배포 후 읽음 커서 보정은 `codex/hardening-a-post-deploy`에서 후속 배포를 준비한다.
+- 목표 A 앱과 배포 후 읽음 커서 보정을 GitHub Pages에 배포했다.
 
 ## 배포 및 되돌림 기준선
 
@@ -110,6 +110,8 @@ Supabase 대시보드에서 시스템 카탈로그를 읽기 전용으로 조회
 
 - PR #4를 병합한 `main` 커밋 `5e21f03c07bcecad9505f0dd467485ada556c99f`을 배포했다.
 - GitHub Actions 실행 `35040213895`의 품질 검사와 Pages 배포가 모두 성공했다.
+- 읽음 커서 수렴 보정 PR #5를 병합한 `main` 커밋 `47221b073a81e70d561a6b6f4559ae616a283326`을 후속 배포했다.
+- 후속 GitHub Actions 실행 `35041999031`의 품질 검사와 Pages 배포가 모두 성공했고, 운영 번들에서 읽음 커서 보정 코드 포함을 확인했다.
 - `202609140003_enable_core_rls.sql`을 단일 트랜잭션으로 운영 DB에 적용했고 SQL 편집기에서 성공을 확인했다.
 - pgTAP 운영 DB 계약 검사 29개가 모두 통과했다.
 - 전용 두 계정 RLS 경계 검사에서 다음을 확인했다.
