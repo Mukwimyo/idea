@@ -2030,7 +2030,7 @@ export default function Room() {
       )}
 
       {/* 메시지 목록 */}
-      <div ref={messageListRef} onScroll={handleScroll} className={`chat-scroll${hideScroll ? ' hide-scroll' : ''}`} style={{ position: 'relative', flex: 1, minHeight: 0, padding: `58px 10px ${showCharList && myChars.length > 0 ? 164 : 114}px`, scrollPaddingTop: 58, display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto', background: t.bg, transition: 'padding-bottom 210ms cubic-bezier(0.2, 0.8, 0.2, 1)' }}>
+      <div ref={messageListRef} onScroll={handleScroll} className={`chat-scroll${hideScroll ? ' hide-scroll' : ''}`} style={{ position: 'relative', flex: 1, minHeight: 0, padding: `58px 10px ${showCharList && myChars.length > 0 ? 156 : 106}px`, scrollPaddingTop: 58, display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto', background: t.bg, transition: 'padding-bottom 210ms cubic-bezier(0.2, 0.8, 0.2, 1)' }}>
         {filteredMessages.map((msg, messageIndex) => {
           const isMine = msg.user_id === userId
           const messageEntranceClass = msg.entrance_side === 'right' ? 'message-enter-right' : msg.entrance_side === 'left' ? 'message-enter-left' : ''
@@ -2468,7 +2468,6 @@ export default function Room() {
             </span>
             <span className="composer-identity__text">
               <strong>{isNarrActive ? '나레이션' : activeChar?.name || '캐릭터 선택'}</strong>
-              <span style={{ color: t.subText }}>{isNarrActive ? '장면을 서술하는 중' : '이 캐릭터로 말하는 중'}</span>
             </span>
             {showCharList ? <ChevronDown size={15} color={t.subText} /> : <ChevronUp size={15} color={t.subText} />}
           </button>
