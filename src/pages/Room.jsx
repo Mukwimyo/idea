@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase, uploadFile, validateImageFile } from '../lib/supabase'
 import { THEMES, getTheme } from '../lib/themes'
@@ -6,12 +6,29 @@ import { ChevronLeft, Settings, Search, Images, ArrowUp, Eye, ArrowDown, Chevron
 import ProfileImageModal from '../components/ProfileImageModal'
 import CommunicationSessions from '../components/CommunicationSessions'
 import CommunicationRecord from '../components/CommunicationRecord'
-import Toast, { useToast } from '../components/Toast'
+import Toast from '../components/Toast'
+import useToast from '../hooks/useToast'
 import LoadingScreen from '../components/LoadingScreen'
 import EntryCharacterPicker from '../components/EntryCharacterPicker'
 import SharedBackgroundAudio from '../components/SharedBackgroundAudio'
 import RoomWorldPanel from '../components/RoomWorldPanel'
 import RandomTools from '../components/RandomTools'
+import {
+  advanceRoomReadCursor,
+  createClientMessageId,
+  fetchRoomMessages,
+  fetchRoomReadCursors,
+  hydrateMessageCharacter,
+  joinRoomWithInvite,
+  sendRoomMessage as sendRoomMessageRpc,
+} from '../features/messages/messageApi'
+import { highestReadableMessage, mergeMessages } from '../features/messages/messageState'
+import {
+  queuePendingMessage,
+  readPendingMessages,
+  removePendingMessage,
+  migrateLegacyPendingMessages,
+} from '../features/messages/pendingMessageStore'
 
 const DEFAULT_AVATAR = `${import.meta.env.BASE_URL}default-avatar.png`
 
@@ -199,6 +216,7 @@ export default function Room() {
   const [entryJoining, setEntryJoining] = useState(false)
   const [dividerText, setDividerText] = useState('')
   const [initialUnreadId, setInitialUnreadId] = useState(null)
+  const [readCursors, setReadCursors] = useState([])
   const [viewportHeight, setViewportHeight] = useState(() => window.visualViewport?.height || window.innerHeight)
   const [viewportOffsetTop, setViewportOffsetTop] = useState(() => window.visualViewport?.offsetTop || 0)
   const scrollTimerRef = useRef(null)
@@ -217,10 +235,14 @@ export default function Room() {
   const messageListRef = useRef(null)
   const initialScrollDone = useRef(false)
   const channelRef = useRef(null)
-  const realtimeRecoveryTimerRef = useRef(null)
-  const messageSyncPromiseRef = useRef(null)
   const userIdRef = useRef(null)
   const messagesRef = useRef([])
+  const reconcilingMessagesRef = useRef(false)
+  const reconcileRequestedRef = useRef(false)
+  const fetchMessagesRef = useRef(null)
+  const markAsReadRef = useRef(null)
+  const loadTalkingFramesRef = useRef(null)
+  const persistMessageRef = useRef(null)
 
   useEffect(() => {
     messagesRef.current = messages
@@ -237,7 +259,6 @@ export default function Room() {
 
   useEffect(() => {
     if (!typingInfo?.characterId) {
-      setTalkingFrameIndex(0)
       return undefined
     }
     const frames = talkingFramesByCharacter[typingInfo.characterId] || []
@@ -345,6 +366,7 @@ export default function Room() {
       } = await supabase.auth.getUser()
       setUserId(user.id)
       userIdRef.current = user.id
+      migrateLegacyPendingMessages(localStorage, user.id)
       const { data: bookmarks } = await supabase.from('message_bookmarks').select('message_id').eq('user_id', user.id).eq('room_id', roomId)
       setBookmarkedMessageIds(new Set((bookmarks || []).map(bookmark => bookmark.message_id)))
       await supabase.from('profiles').update({ email: user.email }).eq('id', user.id)
@@ -392,8 +414,6 @@ export default function Room() {
         setActiveChar(lastChar || roomChars[0])
       }
 
-      await fetchMessages()
-
       channelRef.current = supabase
         .channel('room-' + roomId)
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rooms', filter: `id=eq.${roomId}` }, payload => {
@@ -409,8 +429,9 @@ export default function Room() {
             window.clearTimeout(remoteTypingTimerRef.current)
             if ((payload.new.is_typing ?? true) && payload.new.typing_char_name && remaining > 0) {
               const characterId = payload.new.typing_character_id || null
+              setTalkingFrameIndex(0)
               setTypingInfo({ charName: payload.new.typing_char_name, characterId, expiresAt })
-              if (characterId) loadTalkingFrames(characterId)
+              if (characterId) loadTalkingFramesRef.current?.(characterId)
               remoteTypingTimerRef.current = window.setTimeout(() => setTypingInfo(null), remaining)
             } else {
               setTypingInfo(null)
@@ -420,35 +441,40 @@ export default function Room() {
         .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `room_id=eq.${roomId}` }, async payload => {
           if (payload.eventType === 'INSERT') {
             const newMsg = payload.new
-            const { data: char } = await supabase.from('characters').select('name, color, text_color, avatar_letter, image_url').eq('id', newMsg.character_id).single()
-            const fullMsg = { ...newMsg, characters: char || null, entrance_side: newMsg.user_id === userIdRef.current ? 'right' : 'left' }
-            setMessages(prev => {
-              const hastemp = prev.find(m => m.id.toString().startsWith('temp-') && m.content === newMsg.content && m.user_id === newMsg.user_id)
-              if (hastemp) return prev.map(m => (m.id === hastemp.id ? { ...fullMsg, entrance_side: null } : m))
-              return [...prev, fullMsg]
-            })
+            let hydrated = newMsg
+            try {
+              hydrated = await hydrateMessageCharacter(supabase, newMsg)
+            } catch (error) {
+              console.warn('message character hydration failed:', error.message)
+            }
+            const fullMsg = { ...hydrated, entrance_side: newMsg.user_id === userIdRef.current ? null : 'left' }
+            setMessages(prev => mergeMessages(prev, fullMsg))
             if (!isAtBottomRef.current) setNewMsgAlert(true)
-            if (document.visibilityState === 'visible') await markAsRead([newMsg])
           } else if (payload.eventType === 'UPDATE') {
-            setMessages(prev => prev.map(m => (m.id === payload.new.id ? { ...m, read_by: payload.new.read_by, edited: payload.new.edited, content: payload.new.content } : m)))
+            setMessages(prev => mergeMessages(prev, payload.new))
           } else if (payload.eventType === 'DELETE') {
             setMessages(prev => prev.filter(m => m.id !== payload.old.id))
           }
         })
-        .subscribe(status => {
-          if (status === 'SUBSCRIBED') {
-            window.clearTimeout(realtimeRecoveryTimerRef.current)
-            void fetchMessages()
-          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-            window.clearTimeout(realtimeRecoveryTimerRef.current)
-            realtimeRecoveryTimerRef.current = window.setTimeout(() => void fetchMessages(), 1200)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'room_read_cursors', filter: `room_id=eq.${roomId}` }, payload => {
+          if (payload.eventType === 'DELETE') {
+            setReadCursors(current => current.filter(cursor => cursor.user_id !== payload.old.user_id))
+            return
           }
+          setReadCursors(current => {
+            const withoutUser = current.filter(cursor => cursor.user_id !== payload.new.user_id)
+            return [...withoutUser, payload.new]
+          })
         })
+        .subscribe(status => {
+          if (status === 'SUBSCRIBED') fetchMessagesRef.current?.()
+        })
+
+      await fetchMessagesRef.current?.()
     }
     init()
     return () => {
       if (channelRef.current) supabase.removeChannel(channelRef.current)
-      window.clearTimeout(realtimeRecoveryTimerRef.current)
       // 방 나갈 때 타이핑 상태 초기화
       if (userIdRef.current) {
         supabase
@@ -545,32 +571,30 @@ export default function Room() {
       const behavior = messages.length > 0 && !initialScrollDone.current ? 'instant' : 'smooth'
       messagesEndRef.current?.scrollIntoView({ behavior })
       initialScrollDone.current = true
+      window.requestAnimationFrame(() => markAsReadRef.current?.(messages))
     }
   }, [messages])
 
   useEffect(() => {
-    const refreshVisibleRoom = () => {
-      if (document.visibilityState === 'visible' && navigator.onLine) void fetchMessages()
+    const handleFocus = () => fetchMessagesRef.current?.()
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') fetchMessagesRef.current?.()
     }
-    const handleVisibilityChange = () => refreshVisibleRoom()
-    const fallbackSync = window.setInterval(refreshVisibleRoom, 15000)
-    window.addEventListener('focus', refreshVisibleRoom)
-    window.addEventListener('pageshow', refreshVisibleRoom)
-    window.addEventListener('online', refreshVisibleRoom)
-    document.addEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('focus', handleFocus)
+    window.addEventListener('online', handleFocus)
+    document.addEventListener('visibilitychange', handleVisibility)
     return () => {
-      window.clearInterval(fallbackSync)
-      window.removeEventListener('focus', refreshVisibleRoom)
-      window.removeEventListener('pageshow', refreshVisibleRoom)
-      window.removeEventListener('online', refreshVisibleRoom)
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('focus', handleFocus)
+      window.removeEventListener('online', handleFocus)
+      document.removeEventListener('visibilitychange', handleVisibility)
     }
-  }, [roomId]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [])
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'instant' })
     setNewMsgAlert(false)
     isAtBottomRef.current = true
+    markAsRead(messagesRef.current)
   }
 
   const handleScroll = () => {
@@ -583,61 +607,67 @@ export default function Room() {
     if (isAtBottomRef.current) setNewMsgAlert(false)
   }
 
-  const fetchMessages = () => {
-    if (messageSyncPromiseRef.current) return messageSyncPromiseRef.current
-    const sync = (async () => {
-      const { data, error } = await supabase.from('messages').select('*, characters(name, color, text_color, avatar_letter, image_url)').eq('room_id', roomId).order('created_at', { ascending: true })
-      if (error) {
-        console.error('message sync failed:', error.message)
-        return
-      }
-      if (!data) return
+  const fetchMessages = async () => {
+    if (reconcilingMessagesRef.current) {
+      reconcileRequestedRef.current = true
+      return
+    }
+
+    reconcilingMessagesRef.current = true
+    try {
+      const [data, cursors] = await Promise.all([
+        fetchRoomMessages(supabase, roomId),
+        fetchRoomReadCursors(supabase, roomId),
+      ])
+      const ownCursor = cursors.find(cursor => cursor.user_id === userIdRef.current)
       if (!initialScrollDone.current && userIdRef.current) {
-        const firstUnread = data.find(message => message.user_id !== userIdRef.current && !(message.read_by || []).includes(userIdRef.current))
+        const firstUnread = data.find(
+          message =>
+            message.user_id !== userIdRef.current &&
+            message.type !== 'chapter' &&
+            Number(message.sequence_no) > Number(ownCursor?.last_read_sequence || 0)
+        )
         setInitialUnreadId(firstUnread?.id || null)
       }
       window.clearTimeout(remoteTypingTimerRef.current)
-      setMessages(previous => {
-        const serverIds = new Set(data.map(message => message.id))
-        const pending = previous.filter(message => message.id.toString().startsWith('temp-') && !serverIds.has(message.id))
-        return [...data, ...pending]
-      })
-      await markAsRead(data)
+      setMessages(current => mergeMessages(current, data))
+      setReadCursors(cursors)
       const dates = [...new Set(data.map(m => new Date(m.created_at).toLocaleDateString('ko-KR')))]
       setAvailableDates(dates)
-    })()
-    messageSyncPromiseRef.current = sync
-    void sync.finally(() => {
-      if (messageSyncPromiseRef.current === sync) messageSyncPromiseRef.current = null
-    })
-    return sync
+    } catch (error) {
+      console.error('message reconciliation failed:', error.message)
+    } finally {
+      reconcilingMessagesRef.current = false
+      if (reconcileRequestedRef.current) {
+        reconcileRequestedRef.current = false
+        queueMicrotask(fetchMessages)
+      }
+    }
   }
 
   const markAsRead = async msgs => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) return
-    const unread = msgs.filter(m => m.user_id !== user.id && !m.read_by?.includes(user.id) && m.type !== 'chapter' && !m.id.toString().startsWith('temp-'))
-    if (unread.length === 0) return
-    const savedReadBy = new Map()
-    await Promise.all(
-      unread.map(async m => {
-        const nextReadBy = [...new Set([...(m.read_by || []), user.id])]
-        const { data, error } = await supabase
-          .from('messages')
-          .update({ read_by: nextReadBy })
-          .eq('id', m.id)
-          .select('id, read_by')
-          .maybeSingle()
-        if (error) {
-          console.error('message read receipt update failed:', error.message)
-          return
-        }
-        savedReadBy.set(m.id, data?.read_by || nextReadBy)
+    if (
+      !userIdRef.current ||
+      document.visibilityState !== 'visible' ||
+      !document.hasFocus() ||
+      !isAtBottomRef.current
+    ) return
+
+    const target = highestReadableMessage(msgs, userIdRef.current)
+    if (!target) return
+    const ownCursor = readCursors.find(cursor => cursor.user_id === userIdRef.current)
+    if (Number(ownCursor?.last_read_sequence || 0) >= Number(target.sequence_no)) return
+
+    try {
+      const cursor = await advanceRoomReadCursor(supabase, roomId, target.id)
+      if (!cursor) return
+      setReadCursors(current => {
+        const withoutUser = current.filter(item => item.user_id !== cursor.user_id)
+        return [...withoutUser, cursor]
       })
-    )
-    if (savedReadBy.size > 0) setMessages(prev => prev.map(m => (savedReadBy.has(m.id) ? { ...m, read_by: savedReadBy.get(m.id) } : m)))
+    } catch (error) {
+      console.warn('read cursor update failed:', error.message)
+    }
   }
 
   const handleTyping = async e => {
@@ -672,18 +702,30 @@ export default function Room() {
   }
 
   const persistMessage = async (tempId, message) => {
-    setMessages(prev => prev.map(m => (m.id === tempId ? { ...m, delivery_state: 'sending' } : m)))
-    const { error } = await supabase.from('messages').insert(message)
-    if (error) {
+    const clientMessageId = message.client_message_id || createClientMessageId()
+    const durableMessage = { ...message, client_message_id: clientMessageId }
+    setMessages(prev =>
+      prev.map(m =>
+        m.id === tempId
+          ? { ...m, client_message_id: clientMessageId, delivery_state: 'sending' }
+          : m
+      )
+    )
+    try {
+      const persisted = await sendRoomMessageRpc(supabase, durableMessage)
+      setMessages(prev => mergeMessages(prev, persisted))
+      removePendingMessage(localStorage, userIdRef.current, clientMessageId)
+      return true
+    } catch (error) {
       console.error('message insert failed:', error.message)
       setMessages(prev => prev.map(m => (m.id === tempId ? { ...m, delivery_state: 'failed' } : m)))
-      const queue = JSON.parse(localStorage.getItem('idea-pending-messages') || '[]').filter(item => item.tempId !== tempId)
-      localStorage.setItem('idea-pending-messages', JSON.stringify([...queue, { tempId, message, roomId }]))
+      queuePendingMessage(localStorage, userIdRef.current, {
+        tempId,
+        message: durableMessage,
+        roomId,
+      })
       return false
     }
-    const queue = JSON.parse(localStorage.getItem('idea-pending-messages') || '[]').filter(item => item.tempId !== tempId)
-    localStorage.setItem('idea-pending-messages', JSON.stringify(queue))
-    return true
   }
 
   const retryMessage = msg =>
@@ -693,24 +735,33 @@ export default function Room() {
       character_id: msg.character_id,
       type: msg.type,
       content: msg.content,
+      client_message_id: msg.client_message_id,
     })
 
   useEffect(() => {
     const retryPending = async () => {
       if (!navigator.onLine) return
-      const queue = JSON.parse(localStorage.getItem('idea-pending-messages') || '[]').filter(item => item.roomId === roomId)
+      if (!userId) return
+      const queue = readPendingMessages(localStorage, userId).filter(item => item.roomId === roomId)
       for (const item of queue) {
         const existing = messagesRef.current.find(message => message.id === item.tempId)
         if (!existing) {
-          setMessages(current => [...current, { ...item.message, id: item.tempId, created_at: new Date().toISOString(), delivery_state: 'failed' }])
+          setMessages(current => mergeMessages(current, { ...item.message, id: item.tempId, created_at: new Date(item.queuedAt).toISOString(), delivery_state: 'failed' }))
         }
-        await persistMessage(item.tempId, item.message)
+        await persistMessageRef.current?.(item.tempId, item.message)
       }
     }
     window.addEventListener('online', retryPending)
     retryPending()
     return () => window.removeEventListener('online', retryPending)
-  }, [roomId])
+  }, [roomId, userId])
+
+  useLayoutEffect(() => {
+    fetchMessagesRef.current = fetchMessages
+    markAsReadRef.current = markAsRead
+    loadTalkingFramesRef.current = loadTalkingFrames
+    persistMessageRef.current = persistMessage
+  })
 
   const sendMessage = async () => {
     if (!input.trim()) return
@@ -809,7 +860,7 @@ export default function Room() {
       return
     }
 
-    let urls = []
+    let urls
     try {
       urls = JSON.parse(message.content)
     } catch {
@@ -907,13 +958,17 @@ export default function Room() {
     } = await supabase.auth.getUser()
     const leavingCharacter = activeChar || myChars[0]
     const leavingName = leavingCharacter?.name || '사용자'
-    await supabase.from('messages').insert({
-      room_id: roomId,
-      user_id: user.id,
-      character_id: leavingCharacter?.id || null,
-      type: 'member_left',
-      content: `${leavingName}님이 대화방에서 나갔어요.`,
-    })
+    try {
+      await sendRoomMessageRpc(supabase, {
+        room_id: roomId,
+        client_message_id: createClientMessageId(),
+        character_id: leavingCharacter?.id || null,
+        type: 'member_left',
+        content: `${leavingName}님이 대화방에서 나갔어요.`,
+      })
+    } catch (messageError) {
+      console.warn('leave message could not be recorded:', messageError.message)
+    }
     const { error } = await supabase.from('room_members').delete().eq('room_id', roomId).eq('user_id', user.id)
     if (error) {
       showToast('대화방에서 나가지 못했어요.', 'error')
@@ -1027,7 +1082,7 @@ export default function Room() {
     const {
       data: { user },
     } = await supabase.auth.getUser()
-    const { data, error } = await supabase.from('room_members').select('room_id, rooms(id, name)').eq('user_id', user.id)
+    const { data, error } = await supabase.from('room_members').select('room_id, rooms(id, name, invite_code)').eq('user_id', user.id)
     if (error) {
       showToast('초대할 방 목록을 불러오지 못했어요.', 'error')
       return
@@ -1041,7 +1096,7 @@ export default function Room() {
       data: { user },
     } = await supabase.auth.getUser()
     const tempId = `temp-room-invite-${Date.now()}`
-    const content = JSON.stringify({ roomId: targetRoom.id, roomName: targetRoom.name })
+    const content = JSON.stringify({ roomId: targetRoom.id, roomName: targetRoom.name, inviteCode: targetRoom.invite_code })
     const tempMessage = {
       id: tempId,
       room_id: roomId,
@@ -1083,35 +1138,24 @@ export default function Room() {
 
   const completeInvitedRoomEntry = async character => {
     if (!pendingInviteEntry || !character) return
+    if (!pendingInviteEntry.inviteCode) {
+      showToast('이전 방식의 초대예요. 방 초대 코드를 받아 입장해주세요.', 'error')
+      return
+    }
     setEntryJoining(true)
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    const { count } = await supabase.from('room_members').select('*', { count: 'exact', head: true }).eq('user_id', user.id)
-    const { error } = await supabase.from('room_members').insert({
-      room_id: pendingInviteEntry.roomId,
-      user_id: user.id,
-      sort_order: count || 0,
-      last_char_id: character.id,
-    })
-    if (error) {
+    try {
+      await joinRoomWithInvite(
+        supabase,
+        pendingInviteEntry.inviteCode,
+        character.id,
+        createClientMessageId()
+      )
+    } catch (error) {
+      console.warn('invited room join failed:', error.message)
       setEntryJoining(false)
       showToast('방 초대를 수락하지 못했어요.', 'error')
       return
     }
-    await supabase.from('room_characters').upsert({
-      room_id: pendingInviteEntry.roomId,
-      user_id: user.id,
-      character_id: character.id,
-      sort_order: 0,
-    })
-    await supabase.from('messages').insert({
-      room_id: pendingInviteEntry.roomId,
-      user_id: user.id,
-      character_id: character.id,
-      type: 'member_joined',
-      content: `${character.name}님이 대화방에 들어왔어요.`,
-    })
     const targetRoomId = pendingInviteEntry.roomId
     setJoinedRoomIds(current => [...new Set([...current, targetRoomId])])
     setEntryJoining(false)
@@ -1471,7 +1515,24 @@ export default function Room() {
     if (talkingFrameIndex === 0 || frames.length === 0) return message.characters?.image_url || DEFAULT_AVATAR
     return frames[(talkingFrameIndex - 1) % frames.length]
   }
-  const lastReadMessageId = [...filteredMessages].reverse().find(msg => msg.user_id === userId && (msg.read_by || []).some(id => id !== msg.user_id))?.id
+  const lastReadMessage = [...filteredMessages].reverse().find(
+    message =>
+      message.user_id === userId &&
+      Number.isFinite(Number(message.sequence_no)) &&
+      readCursors.some(
+        cursor =>
+          cursor.user_id !== userId &&
+          Number(cursor.last_read_sequence) >= Number(message.sequence_no)
+      )
+  )
+  const lastReadMessageId = lastReadMessage?.id
+  const lastReadCount = lastReadMessage
+    ? readCursors.filter(
+        cursor =>
+          cursor.user_id !== userId &&
+          Number(cursor.last_read_sequence) >= Number(lastReadMessage.sequence_no)
+      ).length
+    : 0
 
   const iconBtn = (onClick, icon, active) => ({
     onClick,
@@ -2256,7 +2317,9 @@ export default function Room() {
                 )}
                 {renderMessageActions(msg)}
                 {showMessageMeta && <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 2 }}>
-                  {showReadReceipt && <Eye size={10} color={t.subText} opacity={0.4} />}
+                  {showReadReceipt && (readReceipt === 'number'
+                    ? <span style={{ fontSize: 10, color: t.subText, opacity: 0.65 }}>{lastReadCount}</span>
+                    : <Eye size={10} color={t.subText} opacity={0.4} />)}
                   {showMessageTimestamp && <div style={{ fontSize: 10, color: t.subText, opacity: 0.72 }}>{searchQuery ? new Date(msg.created_at).toLocaleDateString('ko-KR') + ' ' + new Date(msg.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : new Date(msg.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}</div>}
                   {renderDeliveryStatus(msg)}
                 </div>}

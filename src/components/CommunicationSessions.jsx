@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { MessageSquare, Phone, PhoneOff, Send, X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { createClientMessageId, sendRoomMessage } from '../features/messages/messageApi'
 
 const DEFAULT_AVATAR = `${import.meta.env.BASE_URL}default-avatar.png`
 
@@ -164,19 +165,24 @@ export default function CommunicationSessions({ roomId, userId, myChars, theme, 
     }).select().single()
     if (error || !created) return
 
-    const { data: recordMessage } = await supabase.from('messages').insert({
-      room_id: roomId,
-      user_id: userId,
-      character_id: null,
-      type: 'communication',
-      content: JSON.stringify({
-        sessionId: created.id,
-        kind,
-        status: 'ringing',
-        title: `${sender.name} → ${receiver.name}`,
-        statusLabel: kind === 'call' ? '음성 통화' : '문자',
-      }),
-    }).select('id').single()
+    let recordMessage = null
+    try {
+      recordMessage = await sendRoomMessage(supabase, {
+        room_id: roomId,
+        client_message_id: createClientMessageId(),
+        character_id: null,
+        type: 'communication',
+        content: JSON.stringify({
+          sessionId: created.id,
+          kind,
+          status: 'ringing',
+          title: `${sender.name} → ${receiver.name}`,
+          statusLabel: kind === 'call' ? '음성 통화' : '문자',
+        }),
+      })
+    } catch (messageError) {
+      setSendError(`연락 기록을 남기지 못했습니다: ${messageError.message}`)
+    }
 
     if (recordMessage) {
       await supabase.from('communication_sessions').update({ record_message_id: recordMessage.id }).eq('id', created.id)
@@ -220,13 +226,18 @@ export default function CommunicationSessions({ roomId, userId, myChars, theme, 
     if (updated.record_message_id) {
       await supabase.from('messages').update({ content: recordContent }).eq('id', updated.record_message_id)
     } else {
-      const { data: recordMessage } = await supabase.from('messages').insert({
-        room_id: roomId,
-        user_id: userId,
-        character_id: null,
-        type: 'communication',
-        content: recordContent,
-      }).select('id').single()
+      let recordMessage = null
+      try {
+        recordMessage = await sendRoomMessage(supabase, {
+          room_id: roomId,
+          client_message_id: createClientMessageId(),
+          character_id: null,
+          type: 'communication',
+          content: recordContent,
+        })
+      } catch (messageError) {
+        setSendError(`연락 기록을 남기지 못했습니다: ${messageError.message}`)
+      }
       if (recordMessage) await supabase.from('communication_sessions').update({ record_message_id: recordMessage.id }).eq('id', session.id)
     }
   }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Check, MapPin, Plus, Save, StickyNote, Trash2, X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { createClientMessageId, sendRoomMessage } from '../features/messages/messageApi'
 
 export default function RoomWorldPanel({ open, initialTab = 'locations', roomId, userId, activeCharacter, theme, onClose, onSceneChange }) {
   const [tab, setTab] = useState(initialTab)
@@ -74,13 +75,18 @@ export default function RoomWorldPanel({ open, initialTab = 'locations', roomId,
       return setError('현재 장소를 변경하지 못했어요.')
     }
     const content = JSON.stringify({ locationId: location.id, name: location.name, description: location.description || '' })
-    const { error: messageError } = await supabase.from('messages').insert({
-      room_id: roomId,
-      user_id: userId,
-      character_id: activeCharacter?.id || null,
-      type: 'scene_transition',
-      content,
-    })
+    let messageError = null
+    try {
+      await sendRoomMessage(supabase, {
+        room_id: roomId,
+        client_message_id: createClientMessageId(),
+        character_id: activeCharacter?.id || null,
+        type: 'scene_transition',
+        content,
+      })
+    } catch (error) {
+      messageError = error
+    }
     setSaving(false)
     if (messageError) return setError('장면 전환 기록을 남기지 못했어요.')
     setCurrentLocationId(location.id)

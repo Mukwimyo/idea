@@ -3,7 +3,9 @@ import { useNavigate } from 'react-router-dom'
 import { THEMES, getTheme } from '../lib/themes'
 import { ChevronLeft, ChevronRight, LogOut, Users, Bell, BellOff, CircleHelp } from 'lucide-react'
 import { supabase, subscribePush, unsubscribePush } from '../lib/supabase'
-import Toast, { useToast } from '../components/Toast'
+import Toast from '../components/Toast'
+import useToast from '../hooks/useToast'
+import { clearPendingMessages } from '../features/messages/pendingMessageStore'
 
 const FONTS = [
   { id: 'sans', name: '기본', family: 'sans-serif' },
@@ -242,6 +244,7 @@ export default function Settings() {
       data: { user },
     } = await supabase.auth.getUser()
     if (user) await unsubscribePush(user.id)
+    if (user) clearPendingMessages(localStorage, user.id)
     await supabase.auth.signOut()
   }
 

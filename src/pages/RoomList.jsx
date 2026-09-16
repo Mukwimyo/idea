@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { getTheme } from '../lib/themes'
@@ -9,6 +9,8 @@ import { CSS } from '@dnd-kit/utilities'
 import { IconButton } from '../components/ui'
 import LoadingScreen from '../components/LoadingScreen'
 import EntryCharacterPicker from '../components/EntryCharacterPicker'
+import { normalizeRoomSummaries, sortRoomList } from '../features/rooms/roomSummary'
+import { createClientMessageId, findRoomByInviteCode, joinRoomWithInvite } from '../features/messages/messageApi'
 
 function SortableRoomCard({ roomId, disabled, children }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: roomId, disabled })
@@ -17,16 +19,6 @@ function SortableRoomCard({ roomId, disabled, children }) {
       {children({ listeners })}
     </div>
   )
-}
-
-function sortRoomList(list, mode) {
-  return [...list].sort((a, b) => {
-    if (a.is_favorite !== b.is_favorite) return a.is_favorite ? -1 : 1
-    if (mode === 'manual') return (a.sort_order ?? 0) - (b.sort_order ?? 0)
-    const aTime = a.lastMsg?.created_at || a.created_at || ''
-    const bTime = b.lastMsg?.created_at || b.created_at || ''
-    return bTime.localeCompare(aTime)
-  })
 }
 
 export default function RoomList() {
@@ -49,6 +41,8 @@ export default function RoomList() {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }), useSensor(TouchSensor, { activationConstraint: { delay: 220, tolerance: 6 } }))
 
   const channelRef = useRef(null)
+  const refreshTimerRef = useRef(null)
+  const fetchRoomsRef = useRef(null)
   const initialRoomAnimationRef = useRef(false)
 
   useEffect(() => {
@@ -62,7 +56,12 @@ export default function RoomList() {
     localStorage.setItem('idea-theme-id', data?.theme_id || 'dark-purple')
       setTheme(resolvedTheme)
       document.querySelector('meta[name="theme-color"]')?.setAttribute('content', resolvedTheme.panel)
-      fetchRooms(user.id)
+      fetchRoomsRef.current?.(user.id)
+
+      const scheduleRefresh = () => {
+        window.clearTimeout(refreshTimerRef.current)
+        refreshTimerRef.current = window.setTimeout(() => fetchRoomsRef.current?.(user.id), 120)
+      }
 
       channelRef.current = supabase
         .channel('roomlist-messages')
@@ -73,16 +72,18 @@ export default function RoomList() {
             schema: 'public',
             table: 'messages',
           },
-          payload => {
-            console.log('roomlist event:', payload.eventType)
-            fetchRooms(user.id)
-          }
+          scheduleRefresh
         )
-        .subscribe()
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'room_read_cursors' }, scheduleRefresh)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'room_members', filter: `user_id=eq.${user.id}` }, scheduleRefresh)
+        .subscribe(status => {
+          if (status === 'SUBSCRIBED') scheduleRefresh()
+        })
     }
     init()
     return () => {
       if (channelRef.current) supabase.removeChannel(channelRef.current)
+      window.clearTimeout(refreshTimerRef.current)
     }
   }, [])
 
@@ -95,6 +96,15 @@ export default function RoomList() {
   }, [playInitialRoomAnimation, rooms.length])
   const fetchRooms = async uid => {
     const id = uid || userId
+    const { data: summaryRows, error: summaryError } = await supabase.rpc('get_my_room_summaries')
+    if (!summaryError && summaryRows) {
+      const summarizedRooms = normalizeRoomSummaries(summaryRows)
+      const activeSortMode = localStorage.getItem('idea-room-sort-mode') || 'recent'
+      setRooms(sortRoomList(summarizedRooms, activeSortMode))
+      return
+    }
+
+    console.warn('room summary RPC unavailable; using legacy queries:', summaryError?.message)
     let { data, error } = await supabase.from('room_members').select('room_id, sort_order, is_favorite, rooms(*)').eq('user_id', id)
     if (error) {
       const fallback = await supabase.from('room_members').select('room_id, sort_order, rooms(*)').eq('user_id', id)
@@ -122,6 +132,10 @@ export default function RoomList() {
     const activeSortMode = localStorage.getItem('idea-room-sort-mode') || 'recent'
     setRooms(sortRoomList(enriched, activeSortMode))
   }
+
+  useLayoutEffect(() => {
+    fetchRoomsRef.current = fetchRooms
+  })
 
   const changeSortMode = mode => {
     setSortMode(mode)
@@ -171,7 +185,12 @@ export default function RoomList() {
     const {
       data: { user },
     } = await supabase.auth.getUser()
-    const { data: room } = await supabase.from('rooms').select().eq('invite_code', inviteCode.trim()).single()
+    let room = null
+    try {
+      room = await findRoomByInviteCode(supabase, inviteCode)
+    } catch (error) {
+      console.warn('invite lookup failed:', error.message)
+    }
     if (room) {
       await supabase.from('profiles').upsert({ id: user.id, email: user.email })
       const { data: existingMember } = await supabase.from('room_members').select('room_id').eq('room_id', room.id).eq('user_id', user.id).maybeSingle()
@@ -193,33 +212,14 @@ export default function RoomList() {
   const completeJoinRoom = async character => {
     if (!pendingJoinRoom || !character) return
     setEntryJoining(true)
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    const { error } = await supabase.from('room_members').insert({
-      room_id: pendingJoinRoom.id,
-      user_id: user.id,
-      sort_order: rooms.length,
-      last_char_id: character.id,
-    })
-    if (error) {
+    try {
+      await joinRoomWithInvite(supabase, inviteCode, character.id, createClientMessageId())
+    } catch (error) {
+      console.warn('room join failed:', error.message)
       setEntryJoining(false)
       alert('대화방에 입장하지 못했어요.')
       return
     }
-    await supabase.from('room_characters').upsert({
-      room_id: pendingJoinRoom.id,
-      user_id: user.id,
-      character_id: character.id,
-      sort_order: 0,
-    })
-    await supabase.from('messages').insert({
-      room_id: pendingJoinRoom.id,
-      user_id: user.id,
-      character_id: character.id,
-      type: 'member_joined',
-      content: `${character.name}님이 대화방에 들어왔어요.`,
-    })
     setEntryJoining(false)
     setPendingJoinRoom(null)
     setInviteCode('')

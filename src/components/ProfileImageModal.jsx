@@ -2,19 +2,18 @@ import { useEffect, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight, X } from 'lucide-react'
 
 export default function ProfileImageModal({ profile, onClose }) {
-  const [currentIndex, setCurrentIndex] = useState(0)
+  if (!profile) return null
+  const urls = profile.urls?.length ? profile.urls : profile.url ? [profile.url] : []
+  const modalKey = `${urls.join('|')}::${profile.index || 0}`
+  return <ProfileImageViewer key={modalKey} profile={profile} urls={urls} onClose={onClose} />
+}
+
+function ProfileImageViewer({ profile, urls, onClose }) {
+  const [currentIndex, setCurrentIndex] = useState(() => Math.max(0, Math.min(profile.index || 0, urls.length - 1)))
   const [dragOffset, setDragOffset] = useState(0)
   const [isDragging, setIsDragging] = useState(false)
   const swipeStartXRef = useRef(null)
   const swipeStartTimeRef = useRef(0)
-  const urls = profile?.urls?.length ? profile.urls : profile?.url ? [profile.url] : []
-
-  useEffect(() => {
-    if (!profile) return
-    setCurrentIndex(Math.max(0, Math.min(profile.index || 0, urls.length - 1)))
-    setDragOffset(0)
-    setIsDragging(false)
-  }, [profile])
 
   const moveTo = nextIndex => {
     setIsDragging(false)
@@ -49,7 +48,6 @@ export default function ProfileImageModal({ profile, onClose }) {
     return () => window.removeEventListener('keydown', closeOnEscape)
   }, [profile, onClose])
 
-  if (!profile) return null
   const currentItem = profile.items?.[currentIndex]
   const uploadedAt = currentItem?.createdAt
     ? new Date(currentItem.createdAt).toLocaleString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })
