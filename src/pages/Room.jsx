@@ -2,7 +2,7 @@ import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase, uploadFile, validateImageFile } from '../lib/supabase'
 import { THEMES, getTheme } from '../lib/themes'
-import { ChevronLeft, Settings, Search, Images, ArrowUp, Eye, ArrowDown, ChevronDown, ChevronUp, Quote, RotateCcw, AlertCircle, Minus, Phone, Copy, DoorOpen, Send, Music, Grid2X2, ImagePlus, Pin, Bookmark, MapPin, StickyNote, Dices, Crown, Percent, Scissors, Shuffle } from 'lucide-react'
+import { ChevronLeft, Settings, Search, Images, ArrowUp, Eye, ArrowDown, ChevronDown, ChevronUp, Quote, RotateCcw, AlertCircle, Minus, Phone, Copy, DoorOpen, Send, Music, Grid2X2, ImagePlus, Pin, Bookmark, MapPin, StickyNote, Dices, Crown, Percent, Scissors, Shuffle, Sparkles } from 'lucide-react'
 import ProfileImageModal from '../components/ProfileImageModal'
 import CommunicationSessions from '../components/CommunicationSessions'
 import CommunicationRecord from '../components/CommunicationRecord'
@@ -14,6 +14,7 @@ import SharedBackgroundAudio from '../components/SharedBackgroundAudio'
 import RoomWorldPanel from '../components/RoomWorldPanel'
 import RandomTools from '../components/RandomTools'
 import ConfirmDialog from '../components/ConfirmDialog'
+import { MessageEffectBubble, MessageEffectChip, MessageEffectPicker } from '../components/MessageEffects'
 import useConfirmDialog from '../hooks/useConfirmDialog'
 import {
   advanceRoomReadCursor,
@@ -217,6 +218,7 @@ export default function Room() {
   const [draggingToolSheet, setDraggingToolSheet] = useState(false)
   const [quickTool, setQuickTool] = useState(() => localStorage.getItem('idea-room-quick-tool') || 'narration')
   const [toolPanel, setToolPanel] = useState(null)
+  const [selectedMessageEffect, setSelectedMessageEffect] = useState(null)
   const [showRoomInvitePicker, setShowRoomInvitePicker] = useState(false)
   const [invitableRooms, setInvitableRooms] = useState([])
   const [joinedRoomIds, setJoinedRoomIds] = useState([])
@@ -786,6 +788,7 @@ export default function Room() {
       character_id: msg.character_id,
       type: msg.type,
       content: msg.content,
+      effect_key: msg.effect_key || null,
       client_message_id: msg.client_message_id,
     })
 
@@ -835,9 +838,10 @@ export default function Room() {
       data: { user },
     } = await supabase.auth.getUser()
     const isNarr = mode === 'narration'
+    const effectKey = selectedMessageEffect
     if (isNarr && messages.length > 0) {
       const last = messages[messages.length - 1]
-      if (last.type === 'narration' && last.user_id === user.id) {
+      if (!effectKey && !last.effect_key && last.type === 'narration' && last.user_id === user.id) {
         const merged = last.content + '\n' + content
         setMessages(prev => prev.map(m => (m.id === last.id ? { ...m, content: merged } : m)))
         inputRef.current?.focus()
@@ -854,6 +858,7 @@ export default function Room() {
       characters: activeChar ? { name: activeChar.name, color: activeChar.color, text_color: activeChar.text_color, avatar_letter: activeChar.avatar_letter, image_url: activeChar.image_url } : null,
       type: isNarr ? 'narration' : 'chat',
       content,
+      effect_key: effectKey,
       edited: false,
       created_at: new Date().toISOString(),
       delivery_state: 'sending',
@@ -861,6 +866,7 @@ export default function Room() {
     }
     isAtBottomRef.current = true
     setMessages(prev => [...prev, tempMsg])
+    setSelectedMessageEffect(null)
     if (mode === 'narration') setMode('chat')
     inputRef.current?.focus()
     await persistMessage(tempMsg.id, {
@@ -869,6 +875,7 @@ export default function Room() {
       character_id: isNarr ? null : activeChar?.id,
       type: isNarr ? 'narration' : 'chat',
       content,
+      effect_key: effectKey,
     })
   }
 
@@ -971,6 +978,12 @@ export default function Room() {
       return
     }
     setProfilePreview({ url, urls, index, name: '' })
+  }
+
+  const allowMessageEffectReplay = () => {
+    if (!longPressTriggeredRef.current) return true
+    longPressTriggeredRef.current = false
+    return false
   }
 
   const saveRoomName = async () => {
@@ -1380,6 +1393,11 @@ export default function Room() {
       if (fromQuickButton && !showRoleplayMenu) openRoleplayMenu()
       return
     }
+    if (toolId === 'effects') {
+      setToolPanel('effects')
+      if (fromQuickButton && !showRoleplayMenu) openRoleplayMenu()
+      return
+    }
     if (toolId === 'communication') {
       if (showRoleplayMenu) closeRoleplayMenu()
       setShowCommunication(true)
@@ -1412,6 +1430,7 @@ export default function Room() {
     { id: 'image', label: '이미지', icon: ImagePlus },
     { id: 'narration', label: '나레이션', icon: Quote },
     { id: 'divider', label: '구분선', icon: Minus },
+    { id: 'effects', label: '대사 연출', icon: Sparkles },
     { id: 'communication', label: '전화·문자', icon: Phone },
     { id: 'audio', label: '공유 배경음', icon: Music },
     { id: 'invite', label: '다른 방 초대', icon: DoorOpen },
@@ -1421,7 +1440,7 @@ export default function Room() {
   ]
   const roomToolGroups = [
     { id: 'conversation', label: '대화', tools: ['image', 'narration', 'divider', 'communication'] },
-    { id: 'direction', label: '연출', tools: ['audio', 'locations', 'random'] },
+    { id: 'direction', label: '연출', tools: ['effects', 'audio', 'locations', 'random'] },
     { id: 'room', label: '방 관리', tools: ['invite', 'notes'] },
   ]
   const selectedQuickTool = roomTools.find(tool => tool.id === quickTool) || roomTools[1]
@@ -2211,7 +2230,7 @@ export default function Room() {
             return (
               <div
                 className={messageEntranceClass}
-                onAnimationEnd={() => messageEntranceClass && finishMessageEntrance(msg.id)}
+                onAnimationEnd={event => event.currentTarget === event.target && messageEntranceClass && finishMessageEntrance(msg.id)}
                 key={msg.id}
                 id={'msg-' + msg.id}
                 onPointerDown={event => startLongPress(event, msg)}
@@ -2238,11 +2257,15 @@ export default function Room() {
                     </div>
                   </div>
                 ) : (
-                  msg.content.split('\n').map((line, i) => (
-                    <div key={i} style={{ fontSize: 11, color: t.narrColor, fontStyle: 'italic', textAlign: 'center', padding: '0 16px', lineHeight: 1.6 }}>
-                      {line}
-                    </div>
-                  ))
+                  <MessageEffectBubble
+                    effectKey={msg.effect_key}
+                    animateOnMount={Boolean(messageEntranceClass)}
+                    canReplay={allowMessageEffectReplay}
+                    style={{ color: t.narrColor, fontStyle: 'italic', textAlign: 'center', padding: '1px 16px', lineHeight: 1.6, cursor: msg.effect_key ? 'pointer' : 'default' }}>
+                    {msg.content.split('\n').map((line, i) => (
+                      <div key={i} style={{ fontSize: 11 }}>{line}</div>
+                    ))}
+                  </MessageEffectBubble>
                 )}
                 <div style={{ display: 'flex', gap: 3 }}>
                   {[0, 1, 2].map(i => (
@@ -2344,7 +2367,7 @@ export default function Room() {
           return (
               <div
               className={messageEntranceClass}
-              onAnimationEnd={() => messageEntranceClass && finishMessageEntrance(msg.id)}
+              onAnimationEnd={event => event.currentTarget === event.target && messageEntranceClass && finishMessageEntrance(msg.id)}
               key={msg.id}
               id={'msg-' + msg.id}
               onPointerDown={event => startLongPress(event, msg)}
@@ -2371,12 +2394,14 @@ export default function Room() {
                     </div>
                   </div>
                 ) : (
-                  <div
-                    data-message-bubble
-                    style={{ background: bubbleBg, color: bubbleColor, padding: '8px 12px', borderRadius: 13, fontSize: 'calc(14px * var(--idea-font-scale, 1))', lineHeight: 1.55, border: 'none', cursor: isMine ? 'pointer' : 'default' }}>
+                  <MessageEffectBubble
+                    effectKey={msg.effect_key}
+                    animateOnMount={Boolean(messageEntranceClass)}
+                    canReplay={allowMessageEffectReplay}
+                    style={{ background: bubbleBg, color: bubbleColor, padding: '8px 12px', borderRadius: 13, fontSize: 'calc(14px * var(--idea-font-scale, 1))', lineHeight: 1.55, border: 'none', cursor: msg.effect_key || isMine ? 'pointer' : 'default' }}>
                     {parseContent(msg.content, actionSize)}
                     {msg.edited && showEditedLabel && <span style={{ fontSize: 9, opacity: 0.5, marginLeft: 4 }}>수정됨</span>}
-                  </div>
+                  </MessageEffectBubble>
                 )}
                 {renderMessageActions(msg)}
                 {showMessageMeta && <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 2 }}>
@@ -2424,8 +2449,9 @@ export default function Room() {
             pointerEvents: 'none',
           }}
         />
-        {myChars.length > 0 && (
-          <button
+        {(myChars.length > 0 || selectedMessageEffect) && (
+          <div className="composer-context-row">
+          {myChars.length > 0 && <button
             className="composer-identity"
             onMouseDown={e => e.preventDefault()}
             onPointerDown={event => {
@@ -2470,7 +2496,9 @@ export default function Room() {
               <strong>{isNarrActive ? '나레이션' : activeChar?.name || '캐릭터 선택'}</strong>
             </span>
             {showCharList ? <ChevronDown size={15} color={t.subText} /> : <ChevronUp size={15} color={t.subText} />}
-          </button>
+          </button>}
+          <MessageEffectChip effectKey={selectedMessageEffect} onClear={() => setSelectedMessageEffect(null)} theme={t} />
+          </div>
         )}
         {myChars.length > 0 && showCharList && (
           <div className={`profile-picker-reveal${closingCharList ? ' is-closing' : ''}`} style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, marginBottom: 7, padding: '7px 9px', borderRadius: 14, background: `color-mix(in srgb, ${t.panel} 76%, transparent)`, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: `1px solid ${t.border}`, boxShadow: '0 8px 24px rgba(0,0,0,0.16)', pointerEvents: closingCharList ? 'none' : 'auto' }}>
@@ -2527,7 +2555,7 @@ export default function Room() {
                   {group.tools.map(toolId => roomTools.find(tool => tool.id === toolId)).filter(Boolean).map(tool => {
                     const ToolIcon = tool.icon
                     const selected = quickTool === tool.id
-                    const active = tool.id === 'narration' && isNarrActive
+                    const active = (tool.id === 'narration' && isNarrActive) || (tool.id === 'effects' && Boolean(selectedMessageEffect))
                     return (
                       <div key={tool.id} style={{ position: 'relative', minWidth: 0 }}>
                         <button
@@ -2572,6 +2600,17 @@ export default function Room() {
                   추가
                 </button>
               </div>
+            )}
+            {toolPanel === 'effects' && (
+              <MessageEffectPicker
+                selectedEffect={selectedMessageEffect}
+                theme={t}
+                onSelect={effectKey => {
+                  setSelectedMessageEffect(effectKey)
+                  closeRoleplayMenu()
+                  window.setTimeout(() => inputRef.current?.focus(), 210)
+                }}
+              />
             )}
             {showRoomInvitePicker && (
               <div className="inline-panel-reveal" style={{ display: 'grid', gap: 5, paddingTop: 9 }}>
