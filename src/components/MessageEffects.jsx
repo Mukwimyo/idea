@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import {
+  ChevronLeft,
   CloudMoon,
   Megaphone,
   Sparkles,
@@ -22,10 +23,20 @@ const EFFECT_ICONS = {
   monologue: CloudMoon,
 }
 
-export function MessageEffectPicker({ selectedEffect, onSelect, theme }) {
+export function MessageEffectPicker({ selectedEffect, onSelect, onBack, theme }) {
   return (
     <div className="message-effect-picker inline-panel-reveal">
       <div className="message-effect-picker__heading">
+        {onBack && (
+          <button
+            type="button"
+            aria-label="대화 도구로 돌아가기"
+            onMouseDown={event => event.preventDefault()}
+            onClick={onBack}
+            style={{ color: theme.subText }}>
+            <ChevronLeft size={16} />
+          </button>
+        )}
         <Sparkles size={14} />
         다음 메시지 연출
       </div>
