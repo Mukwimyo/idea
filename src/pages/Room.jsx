@@ -135,7 +135,11 @@ function SlotEntrance({ roomName, bgColor, pointColor, onDone }) {
   )
 }
 
-function parseContent(text, actColor, actionStyle) {
+function normalizeActionSize(value) {
+  return value === 'large' ? 'large' : 'small'
+}
+
+function parseContent(text, actionSize) {
   const parts = []
   const re = /(\([^)]*\)?)/g
   let last = 0,
@@ -143,7 +147,7 @@ function parseContent(text, actColor, actionStyle) {
   while ((m = re.exec(text)) !== null) {
     if (m.index > last) parts.push(<span key={last}>{text.slice(last, m.index)}</span>)
     parts.push(
-      <span key={m.index} style={{ fontSize: '0.85em', color: actionStyle === 'dim' ? actColor : 'inherit', opacity: actionStyle === 'dim' ? 0.6 : 1 }}>
+      <span key={m.index} style={{ fontSize: actionSize === 'large' ? '1em' : '0.85em', color: 'inherit', opacity: 1 }}>
         {m[0]}
       </span>
     )
@@ -179,7 +183,7 @@ export default function Room() {
   const [searchQuery, setSearchQuery] = useState('')
   const [availableDates, setAvailableDates] = useState([])
   const [readReceipt, setReadReceipt] = useState('text')
-  const [actionStyle, setActionStyle] = useState('dim')
+  const [actionSize, setActionSize] = useState('small')
   const [theme, setTheme] = useState(null)
   const [sharedThemeId, setSharedThemeId] = useState('dark-purple')
   const [followShared, setFollowShared] = useState(true)
@@ -209,6 +213,8 @@ export default function Room() {
   const [showRandomTools, setShowRandomTools] = useState(false)
   const [showRoleplayMenu, setShowRoleplayMenu] = useState(false)
   const [closingRoleplayMenu, setClosingRoleplayMenu] = useState(false)
+  const [toolSheetOffset, setToolSheetOffset] = useState(0)
+  const [draggingToolSheet, setDraggingToolSheet] = useState(false)
   const [quickTool, setQuickTool] = useState(() => localStorage.getItem('idea-room-quick-tool') || 'narration')
   const [toolPanel, setToolPanel] = useState(null)
   const [showRoomInvitePicker, setShowRoomInvitePicker] = useState(false)
@@ -247,6 +253,7 @@ export default function Room() {
   const markAsReadRef = useRef(null)
   const loadTalkingFramesRef = useRef(null)
   const persistMessageRef = useRef(null)
+  const toolSheetDragRef = useRef({ pointerId: null, startY: 0, lastY: 0, startedAt: 0 })
 
   useEffect(() => {
     messagesRef.current = messages
@@ -348,12 +355,15 @@ export default function Room() {
 
   const openRoleplayMenu = () => {
     inputRef.current?.blur()
+    setToolSheetOffset(0)
     setClosingRoleplayMenu(false)
     setShowRoleplayMenu(true)
   }
 
   const closeRoleplayMenu = () => {
     if (!showRoleplayMenu || closingRoleplayMenu) return
+    setDraggingToolSheet(false)
+    setToolSheetOffset(0)
     setClosingRoleplayMenu(true)
     window.setTimeout(() => {
       setShowRoleplayMenu(false)
@@ -361,6 +371,30 @@ export default function Room() {
       setShowRoomInvitePicker(false)
       setToolPanel(null)
     }, 190)
+  }
+
+  const startToolSheetDrag = event => {
+    toolSheetDragRef.current = { pointerId: event.pointerId, startY: event.clientY, lastY: event.clientY, startedAt: performance.now() }
+    setDraggingToolSheet(true)
+    event.currentTarget.setPointerCapture?.(event.pointerId)
+  }
+
+  const moveToolSheetDrag = event => {
+    if (toolSheetDragRef.current.pointerId !== event.pointerId) return
+    toolSheetDragRef.current.lastY = event.clientY
+    setToolSheetOffset(Math.max(0, event.clientY - toolSheetDragRef.current.startY))
+  }
+
+  const finishToolSheetDrag = event => {
+    if (toolSheetDragRef.current.pointerId !== event.pointerId) return
+    const distance = Math.max(0, toolSheetDragRef.current.lastY - toolSheetDragRef.current.startY)
+    const elapsed = Math.max(1, performance.now() - toolSheetDragRef.current.startedAt)
+    const fastDownwardFlick = distance > 28 && distance / elapsed > 0.45
+    toolSheetDragRef.current.pointerId = null
+    setDraggingToolSheet(false)
+    if (distance >= 72 || fastDownwardFlick) closeRoleplayMenu()
+    else setToolSheetOffset(0)
+    event.currentTarget.releasePointerCapture?.(event.pointerId)
   }
 
   useEffect(() => {
@@ -380,7 +414,7 @@ export default function Room() {
       const { data: roomData } = await supabase.from('rooms').select().eq('id', roomId).single()
       setRoom(roomData)
       setReadReceipt(roomData?.read_receipt_style || 'text')
-      setActionStyle(roomData?.action_style || 'dim')
+      setActionSize(normalizeActionSize(roomData?.action_style))
       setShowTypingIndicator(roomData?.show_typing_indicator ?? true)
       setIsOwner(roomData?.created_by === user.id)
 
@@ -1771,20 +1805,20 @@ export default function Room() {
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10 }}>
-              <div style={{ fontSize: 12, color: t.subText, width: 70 }}>지문 스타일</div>
+              <div style={{ fontSize: 12, color: t.subText, width: 70 }}>지문 크기</div>
               <div style={{ display: 'flex', gap: 6 }}>
                 {[
-                  { val: 'dim', label: '흐리게' },
-                  { val: 'bright', label: '밝게' },
+                  { val: 'small', label: '작게' },
+                  { val: 'large', label: '크게' },
                 ].map(s => (
                   <button
                     key={s.val}
                     onClick={async () => {
-                      setActionStyle(s.val)
+                      setActionSize(s.val)
                       const { error } = await supabase.from('rooms').update({ action_style: s.val }).eq('id', roomId)
-                      showToast(error ? '지문 스타일을 저장하지 못했어요.' : '지문 스타일이 저장됐어요.', error ? 'error' : 'success')
+                      showToast(error ? '지문 크기를 저장하지 못했어요.' : '지문 크기가 저장됐어요.', error ? 'error' : 'success')
                     }}
-                    style={{ padding: '3px 9px', borderRadius: 10, fontSize: 11, cursor: 'pointer', border: actionStyle === s.val ? `1.5px solid ${t.point}` : `0.5px solid ${t.border}`, background: actionStyle === s.val ? t.point + '22' : 'none', color: actionStyle === s.val ? t.point : t.subText }}>
+                    style={{ minHeight: 36, padding: '3px 12px', borderRadius: 10, fontSize: 11, cursor: 'pointer', border: actionSize === s.val ? `1.5px solid ${t.point}` : `0.5px solid ${t.border}`, background: actionSize === s.val ? t.point + '22' : 'none', color: actionSize === s.val ? t.point : t.subText }}>
                     {s.label}
                   </button>
                 ))}
@@ -2307,8 +2341,6 @@ export default function Room() {
 
           const bubbleBg = isMine ? t.myBubble : t.theirBubble
           const bubbleColor = isMine ? t.myText : t.theirText
-          const actColor = isMine ? t.myAct : t.subText
-
           return (
               <div
               className={messageEntranceClass}
@@ -2342,7 +2374,7 @@ export default function Room() {
                   <div
                     data-message-bubble
                     style={{ background: bubbleBg, color: bubbleColor, padding: '8px 12px', borderRadius: 13, fontSize: 'calc(14px * var(--idea-font-scale, 1))', lineHeight: 1.55, border: 'none', cursor: isMine ? 'pointer' : 'default' }}>
-                    {parseContent(msg.content, actColor, actionStyle)}
+                    {parseContent(msg.content, actionSize)}
                     {msg.edited && showEditedLabel && <span style={{ fontSize: 9, opacity: 0.5, marginLeft: 4 }}>수정됨</span>}
                   </div>
                 )}
@@ -2477,8 +2509,18 @@ export default function Room() {
           </button>
         )}
         {showRoleplayMenu && (
-          <div className={`room-tool-sheet${closingRoleplayMenu ? ' is-closing' : ''}`} style={{ maxHeight: '58vh', overflowY: 'auto', marginBottom: 7, padding: '12px 10px 10px', borderRadius: '20px 20px 14px 14px', background: `color-mix(in srgb, ${t.panel} 94%, transparent)`, backdropFilter: 'blur(22px)', WebkitBackdropFilter: 'blur(22px)', border: `1px solid ${t.border}`, boxShadow: '0 -12px 38px rgba(0,0,0,0.2)', pointerEvents: closingRoleplayMenu ? 'none' : 'auto' }}>
-            <div style={{ width: 34, height: 3, borderRadius: 2, background: t.border, margin: '0 auto 11px' }} />
+          <div style={{ transform: `translateY(${toolSheetOffset}px)`, transition: draggingToolSheet ? 'none' : 'transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1)', pointerEvents: 'auto', willChange: 'transform' }}>
+          <div className={`room-tool-sheet${closingRoleplayMenu ? ' is-closing' : ''}`} style={{ maxHeight: '58vh', overflowY: 'auto', marginBottom: 7, padding: '4px 10px 10px', borderRadius: '20px 20px 14px 14px', background: `color-mix(in srgb, ${t.panel} 94%, transparent)`, backdropFilter: 'blur(22px)', WebkitBackdropFilter: 'blur(22px)', border: `1px solid ${t.border}`, boxShadow: '0 -12px 38px rgba(0,0,0,0.2)', pointerEvents: closingRoleplayMenu ? 'none' : 'auto' }}>
+            <button
+              aria-label="아래로 끌어 도구 메뉴 닫기"
+              onPointerDown={startToolSheetDrag}
+              onPointerMove={moveToolSheetDrag}
+              onPointerUp={finishToolSheetDrag}
+              onPointerCancel={finishToolSheetDrag}
+              onKeyDown={event => (event.key === 'Escape' || event.key === 'ArrowDown') && closeRoleplayMenu()}
+              style={{ width: '100%', height: 28, display: 'grid', placeItems: 'center', border: 0, background: 'transparent', cursor: 'grab', touchAction: 'none' }}>
+              <span style={{ width: 38, height: 4, borderRadius: 2, background: t.border }} />
+            </button>
             {roomToolGroups.map((group, groupIndex) => (
               <section key={group.id} style={{ marginTop: groupIndex === 0 ? 0 : 12 }}>
                 <div style={{ margin: '0 3px 6px', color: t.subText, fontSize: 11, fontWeight: 600 }}>{group.label}</div>
@@ -2547,6 +2589,7 @@ export default function Room() {
                 )}
               </div>
             )}
+          </div>
           </div>
         )}
         <div style={{ display: 'flex', gap: 4, alignItems: 'center', width: '100%', minHeight: 54, padding: 5, borderRadius: 27, background: `color-mix(in srgb, ${t.panel} 86%, transparent)`, backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)', border: `1px solid ${t.border}`, boxShadow: '0 10px 30px rgba(0,0,0,0.24)', pointerEvents: 'auto' }}>
