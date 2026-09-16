@@ -2030,7 +2030,7 @@ export default function Room() {
       )}
 
       {/* 메시지 목록 */}
-      <div ref={messageListRef} onScroll={handleScroll} className={`chat-scroll${hideScroll ? ' hide-scroll' : ''}`} style={{ position: 'relative', flex: 1, minHeight: 0, padding: `58px 10px ${showCharList && myChars.length > 0 ? 176 : 126}px`, scrollPaddingTop: 58, display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto', background: t.bg, transition: 'padding-bottom 210ms cubic-bezier(0.2, 0.8, 0.2, 1)' }}>
+      <div ref={messageListRef} onScroll={handleScroll} className={`chat-scroll${hideScroll ? ' hide-scroll' : ''}`} style={{ position: 'relative', flex: 1, minHeight: 0, padding: `58px 10px ${showCharList && myChars.length > 0 ? 164 : 114}px`, scrollPaddingTop: 58, display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto', background: t.bg, transition: 'padding-bottom 210ms cubic-bezier(0.2, 0.8, 0.2, 1)' }}>
         {filteredMessages.map((msg, messageIndex) => {
           const isMine = msg.user_id === userId
           const messageEntranceClass = msg.entrance_side === 'right' ? 'message-enter-right' : msg.entrance_side === 'left' ? 'message-enter-left' : ''
@@ -2592,9 +2592,9 @@ export default function Room() {
           </div>
           </div>
         )}
-        <div style={{ display: 'flex', gap: 4, alignItems: 'center', width: '100%', minHeight: 54, padding: 5, borderRadius: 27, background: `color-mix(in srgb, ${t.panel} 86%, transparent)`, backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)', border: `1px solid ${t.border}`, boxShadow: '0 10px 30px rgba(0,0,0,0.24)', pointerEvents: 'auto' }}>
-          <button className="ui-touch-target" onMouseDown={e => e.preventDefault()} onClick={() => { if (showRoleplayMenu) closeRoleplayMenu(); else openRoleplayMenu() }} aria-label="대화 도구 메뉴" aria-expanded={showRoleplayMenu} style={{ width: 44, height: 44, borderRadius: '50%', border: `1px solid ${showRoleplayMenu ? t.point : 'transparent'}`, background: showRoleplayMenu ? `${t.point}2f` : `${t.border}66`, cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Grid2X2 size={18} color={showRoleplayMenu ? t.point : t.subText} />
+        <div style={{ display: 'flex', gap: 2, alignItems: 'center', width: '100%', height: 42, minHeight: 42, padding: '0 2px', borderRadius: 22, background: `color-mix(in srgb, ${t.panel} 86%, transparent)`, backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)', border: `1px solid ${t.border}`, boxShadow: '0 8px 24px rgba(0,0,0,0.22)', pointerEvents: 'auto' }}>
+          <button className="ui-touch-target" onMouseDown={e => e.preventDefault()} onClick={() => { if (showRoleplayMenu) closeRoleplayMenu(); else openRoleplayMenu() }} aria-label="대화 도구 메뉴" aria-expanded={showRoleplayMenu} style={{ width: 44, height: 44, padding: 0, border: 0, background: 'transparent', cursor: 'pointer', flexShrink: 0, display: 'grid', placeItems: 'center' }}>
+            <span style={{ width: 34, height: 34, display: 'grid', placeItems: 'center', borderRadius: '50%', border: `1px solid ${showRoleplayMenu ? t.point : 'transparent'}`, background: showRoleplayMenu ? `${t.point}2f` : `${t.border}66` }}><Grid2X2 size={16} color={showRoleplayMenu ? t.point : t.subText} /></span>
           </button>
           <input type="file" multiple accept="image/jpeg,image/png,image/webp,image/gif" ref={fileInputRef} onChange={e => sendImages(e.target.files)} style={{ display: 'none' }} />
           <textarea
@@ -2624,19 +2624,19 @@ export default function Room() {
               placeholder={isNarrActive ? '나레이션 입력...' : activeChar ? `${activeChar.name}${instrumentalParticle(activeChar.name)} 입력...` : '캐릭터를 먼저 추가해주세요'}
               enterKeyHint="enter"
               rows={1}
-              style={{ flex: 1, minWidth: 0, height: 44, minHeight: 44, maxHeight: 44, overflowY: 'auto', background: 'transparent', border: 'none', borderRadius: 0, padding: '10px 6px', color: isNarrActive ? t.narrColor : t.inputText, fontSize: 'calc(14px * var(--idea-font-scale, 1))', outline: 'none', resize: 'none', lineHeight: 1.55, fontStyle: isNarrActive ? 'italic' : 'normal' }}
+              style={{ flex: 1, minWidth: 0, height: 34, minHeight: 34, maxHeight: 34, overflowY: 'auto', background: 'transparent', border: 'none', borderRadius: 0, padding: '6px 5px', color: isNarrActive ? t.narrColor : t.inputText, fontSize: 'calc(14px * var(--idea-font-scale, 1))', outline: 'none', resize: 'none', lineHeight: 1.55, fontStyle: isNarrActive ? 'italic' : 'normal' }}
             />
             {myChars.length > 0 && selectedQuickTool && (() => {
               const QuickToolIcon = selectedQuickTool.icon
               const quickActive = quickTool === 'narration' && isNarrActive
               return (
-                <button className="ui-touch-target" onMouseDown={e => e.preventDefault()} onClick={() => runRoomTool(quickTool, true)} aria-label={`${selectedQuickTool.label} 빠른 실행`} title={selectedQuickTool.label} style={{ width: 44, height: 44, flexShrink: 0, padding: 0, borderRadius: '50%', cursor: 'pointer', border: `1px solid ${quickActive ? t.point : 'transparent'}`, background: quickActive ? `${t.point}2f` : `${t.border}55`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <QuickToolIcon size={18} color={quickActive ? t.narrColor : t.subText} />
+                <button className="ui-touch-target" onMouseDown={e => e.preventDefault()} onClick={() => runRoomTool(quickTool, true)} aria-label={`${selectedQuickTool.label} 빠른 실행`} title={selectedQuickTool.label} style={{ width: 44, height: 44, flexShrink: 0, padding: 0, border: 0, background: 'transparent', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>
+                  <span style={{ width: 34, height: 34, display: 'grid', placeItems: 'center', borderRadius: '50%', border: `1px solid ${quickActive ? t.point : 'transparent'}`, background: quickActive ? `${t.point}2f` : `${t.border}55` }}><QuickToolIcon size={16} color={quickActive ? t.narrColor : t.subText} /></span>
                 </button>
               )
             })()}
-          <button className="ui-touch-target" disabled={!input.trim() || (!activeChar && !isNarrActive)} onMouseDown={e => e.preventDefault()} onClick={sendMessage} aria-label="전송" style={{ width: 44, height: 44, borderRadius: '50%', border: 'none', background: t.point, cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <ArrowUp size={20} color="#fff" strokeWidth={2.5} />
+          <button className="ui-touch-target" disabled={!input.trim() || (!activeChar && !isNarrActive)} onMouseDown={e => e.preventDefault()} onClick={sendMessage} aria-label="전송" style={{ width: 44, height: 44, padding: 0, border: 'none', background: 'transparent', cursor: 'pointer', flexShrink: 0, display: 'grid', placeItems: 'center' }}>
+            <span style={{ width: 34, height: 34, display: 'grid', placeItems: 'center', borderRadius: '50%', background: t.point }}><ArrowUp size={18} color="#fff" strokeWidth={2.5} /></span>
           </button>
         </div>
       </div>
