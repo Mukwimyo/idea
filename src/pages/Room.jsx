@@ -240,6 +240,7 @@ export default function Room() {
   const reconcilingMessagesRef = useRef(false)
   const reconcileRequestedRef = useRef(false)
   const fetchMessagesRef = useRef(null)
+  const refreshReadCursorsRef = useRef(null)
   const markAsReadRef = useRef(null)
   const loadTalkingFramesRef = useRef(null)
   const persistMessageRef = useRef(null)
@@ -580,10 +581,14 @@ export default function Room() {
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') fetchMessagesRef.current?.()
     }
+    const cursorHeartbeat = window.setInterval(() => {
+      if (document.visibilityState === 'visible') refreshReadCursorsRef.current?.()
+    }, 15_000)
     window.addEventListener('focus', handleFocus)
     window.addEventListener('online', handleFocus)
     document.addEventListener('visibilitychange', handleVisibility)
     return () => {
+      window.clearInterval(cursorHeartbeat)
       window.removeEventListener('focus', handleFocus)
       window.removeEventListener('online', handleFocus)
       document.removeEventListener('visibilitychange', handleVisibility)
@@ -605,6 +610,15 @@ export default function Room() {
     clearTimeout(scrollTimerRef.current)
     scrollTimerRef.current = setTimeout(() => setHideScroll(true), 1500)
     if (isAtBottomRef.current) setNewMsgAlert(false)
+  }
+
+  const refreshReadCursors = async () => {
+    try {
+      const cursors = await fetchRoomReadCursors(supabase, roomId)
+      setReadCursors(cursors)
+    } catch (error) {
+      console.warn('read cursor reconciliation failed:', error.message)
+    }
   }
 
   const fetchMessages = async () => {
@@ -757,7 +771,8 @@ export default function Room() {
   }, [roomId, userId])
 
   useLayoutEffect(() => {
-    fetchMessagesRef.current = fetchMessages
+  fetchMessagesRef.current = fetchMessages
+  refreshReadCursorsRef.current = refreshReadCursors
     markAsReadRef.current = markAsRead
     loadTalkingFramesRef.current = loadTalkingFrames
     persistMessageRef.current = persistMessage
