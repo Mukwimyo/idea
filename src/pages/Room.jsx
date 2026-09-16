@@ -13,6 +13,8 @@ import EntryCharacterPicker from '../components/EntryCharacterPicker'
 import SharedBackgroundAudio from '../components/SharedBackgroundAudio'
 import RoomWorldPanel from '../components/RoomWorldPanel'
 import RandomTools from '../components/RandomTools'
+import ConfirmDialog from '../components/ConfirmDialog'
+import useConfirmDialog from '../hooks/useConfirmDialog'
 import {
   advanceRoomReadCursor,
   createClientMessageId,
@@ -155,6 +157,7 @@ export default function Room() {
   const { roomId } = useParams()
   const navigate = useNavigate()
   const { toast, showToast } = useToast()
+  const { confirmation, confirm, closeConfirmation } = useConfirmDialog()
   const [room, setRoom] = useState(null)
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState(() => localStorage.getItem(`idea-room-draft:${roomId}`) || '')
@@ -839,7 +842,7 @@ export default function Room() {
     if (!editText.trim()) return
     const { error } = await supabase.from('messages').update({ content: editText.trim(), edited: true }).eq('id', id).eq('user_id', userId)
     if (error) {
-      alert('메시지를 수정하지 못했어요.')
+      showToast('메시지를 수정하지 못했어요.', 'error')
       return
     }
     setEditingId(null)
@@ -853,13 +856,13 @@ export default function Room() {
   }
 
   const deleteMessage = async msg => {
-    if (!confirm('이 메시지를 삭제할까요?')) return
+    if (!(await confirm({ title: '메시지를 삭제할까요?', description: '삭제한 메시지는 되돌릴 수 없어요.', confirmLabel: '삭제', danger: true }))) return
     setMessageMenuId(null)
     setDeletingMessageId(msg.id)
     const { error } = await supabase.from('messages').delete().eq('id', msg.id).eq('user_id', userId)
     setDeletingMessageId(null)
     if (error) {
-      alert('메시지를 삭제하지 못했어요.')
+      showToast('메시지를 삭제하지 못했어요.', 'error')
       return
     }
     setMessages(prev => prev.filter(m => m.id !== msg.id))
@@ -881,7 +884,7 @@ export default function Room() {
     } catch {
       return
     }
-    if (!confirm('이 이미지를 삭제할까요?')) return
+    if (!(await confirm({ title: '이미지를 삭제할까요?', description: '대화에서 이미지가 영구적으로 제거돼요.', confirmLabel: '삭제', danger: true }))) return
     const nextUrls = urls.filter((_, index) => index !== item.imageIndex)
     if (nextUrls.length === 0) {
       await deleteMessage(message)
@@ -895,7 +898,7 @@ export default function Room() {
       .eq('id', message.id)
       .eq('user_id', userId)
     if (error) {
-      alert('이미지를 삭제하지 못했어요.')
+      showToast('이미지를 삭제하지 못했어요.', 'error')
       return
     }
     setMessages(prev => prev.map(entry => (entry.id === message.id ? { ...entry, content: nextContent, edited: true } : entry)))
@@ -967,7 +970,7 @@ export default function Room() {
       showToast('방장은 대화방을 나갈 수 없어요.', 'error')
       return
     }
-    if (!confirm('이 대화방에서 나갈까요?')) return
+    if (!(await confirm({ title: '대화방에서 나갈까요?', description: '다시 참여하려면 초대 코드가 필요해요.', confirmLabel: '나가기', danger: true }))) return
     const {
       data: { user },
     } = await supabase.auth.getUser()
@@ -996,7 +999,7 @@ export default function Room() {
     if (!file) return
     const validationError = validateImageFile(file)
     if (validationError) {
-      alert(validationError)
+      showToast(validationError, 'error')
       return
     }
     const {
@@ -1183,7 +1186,7 @@ export default function Room() {
     if (files.length === 0) return
     const invalid = files.map(validateImageFile).find(Boolean)
     if (invalid) {
-      alert(invalid)
+      showToast(invalid, 'error')
       return
     }
     if (files.length === 1) {
@@ -1377,10 +1380,15 @@ export default function Room() {
     { id: 'divider', label: '구분선', icon: Minus },
     { id: 'communication', label: '전화·문자', icon: Phone },
     { id: 'audio', label: '공유 배경음', icon: Music },
-    { id: 'invite', label: '장소 연결', icon: DoorOpen },
+    { id: 'invite', label: '다른 방 초대', icon: DoorOpen },
     { id: 'locations', label: '장소·장면', icon: MapPin },
     { id: 'notes', label: '공유 메모', icon: StickyNote },
     { id: 'random', label: '랜덤 도구', icon: Dices },
+  ]
+  const roomToolGroups = [
+    { id: 'conversation', label: '대화', tools: ['image', 'narration', 'divider', 'communication'] },
+    { id: 'direction', label: '연출', tools: ['audio', 'locations', 'random'] },
+    { id: 'room', label: '방 관리', tools: ['invite', 'notes'] },
   ]
   const selectedQuickTool = roomTools.find(tool => tool.id === quickTool) || roomTools[1]
 
@@ -1551,7 +1559,8 @@ export default function Room() {
 
   const iconBtn = (onClick, icon, active) => ({
     onClick,
-    style: { width: 36, height: 36, background: active ? t.point + '1f' : 'none', border: 'none', borderRadius: 10, padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+    className: 'ui-touch-target',
+    style: { width: 44, height: 44, background: active ? t.point + '1f' : 'none', border: 'none', borderRadius: 11, padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   })
 
   if (!theme)
@@ -1576,6 +1585,13 @@ export default function Room() {
         animation: !showEntering ? 'slide-in-right 0.3s ease' : 'none',
       }}>
       <Toast toast={toast} />
+      <ConfirmDialog
+        open={Boolean(confirmation)}
+        theme={t}
+        {...confirmation}
+        onConfirm={() => closeConfirmation(true)}
+        onCancel={() => closeConfirmation(false)}
+      />
       <EntryCharacterPicker
         open={Boolean(pendingInviteEntry)}
         roomName={pendingInviteEntry?.roomName}
@@ -1631,7 +1647,7 @@ export default function Room() {
             WebkitMaskImage: 'linear-gradient(to bottom, #000 0%, #000 46%, rgba(0,0,0,0.72) 68%, transparent 100%)',
           }}
         />
-        <button onClick={() => navigate('/')} style={{ width: 32, height: 36, flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <button className="ui-touch-target" aria-label="채팅방 목록으로 돌아가기" onClick={() => navigate('/')} style={{ width: 44, height: 44, flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <ChevronLeft size={22} color={t.subText} />
         </button>
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -1980,7 +1996,7 @@ export default function Room() {
       )}
 
       {/* 메시지 목록 */}
-      <div ref={messageListRef} onScroll={handleScroll} className={`chat-scroll${hideScroll ? ' hide-scroll' : ''}`} style={{ position: 'relative', flex: 1, minHeight: 0, padding: `58px 10px ${showCharList && myChars.length > 0 ? 126 : 82}px`, scrollPaddingTop: 58, display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto', background: t.bg, transition: 'padding-bottom 210ms cubic-bezier(0.2, 0.8, 0.2, 1)' }}>
+      <div ref={messageListRef} onScroll={handleScroll} className={`chat-scroll${hideScroll ? ' hide-scroll' : ''}`} style={{ position: 'relative', flex: 1, minHeight: 0, padding: `58px 10px ${showCharList && myChars.length > 0 ? 176 : 126}px`, scrollPaddingTop: 58, display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto', background: t.bg, transition: 'padding-bottom 210ms cubic-bezier(0.2, 0.8, 0.2, 1)' }}>
         {filteredMessages.map((msg, messageIndex) => {
           const isMine = msg.user_id === userId
           const messageEntranceClass = msg.entrance_side === 'right' ? 'message-enter-right' : msg.entrance_side === 'left' ? 'message-enter-left' : ''
@@ -2333,8 +2349,8 @@ export default function Room() {
                 {renderMessageActions(msg)}
                 {showMessageMeta && <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 2 }}>
                   {showReadReceipt && (readReceipt === 'number'
-                    ? <span style={{ fontSize: 10, color: t.subText, opacity: 0.65 }}>{lastReadCount}</span>
-                    : <Eye size={10} color={t.subText} opacity={0.4} />)}
+                    ? <span aria-label={`${lastReadCount}명 읽음`} style={{ fontSize: 10, color: t.subText, opacity: 0.75 }}>{lastReadCount}명 읽음</span>
+                    : <span aria-label="읽음" style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10, color: t.subText, opacity: 0.75 }}><Eye size={11} />읽음</span>)}
                   {showMessageTimestamp && <div style={{ fontSize: 10, color: t.subText, opacity: 0.72 }}>{searchQuery ? new Date(msg.created_at).toLocaleDateString('ko-KR') + ' ' + new Date(msg.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : new Date(msg.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}</div>}
                   {renderDeliveryStatus(msg)}
                 </div>}
@@ -2378,6 +2394,7 @@ export default function Room() {
         />
         {myChars.length > 0 && (
           <button
+            className="composer-identity"
             onMouseDown={e => e.preventDefault()}
             onPointerDown={event => {
               profileGestureStartRef.current = event.clientY
@@ -2411,9 +2428,17 @@ export default function Room() {
               if (showCharList) closeCharList()
               else openCharList()
             }}
-            aria-label="프로필 변경 메뉴"
-            style={{ position: 'absolute', top: -18, left: 14, background: `color-mix(in srgb, ${t.panel} 78%, transparent)`, backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)', border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '3px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'auto', touchAction: 'none' }}>
-            {showCharList ? <ChevronDown size={13} color={t.subText} /> : <ChevronUp size={13} color={t.subText} />}
+            aria-label={`현재 화자 ${isNarrActive ? '나레이션' : activeChar?.name || '미선택'}. 눌러서 변경`}
+            aria-expanded={showCharList}
+            style={{ background: `color-mix(in srgb, ${t.panel} 88%, transparent)`, backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)', borderColor: isNarrActive ? t.narrColor : activeChar?.color || t.border, color: t.theirText, touchAction: 'none' }}>
+            <span className="composer-identity__avatar" style={{ background: activeChar?.color || t.point }}>
+              <img src={activeChar?.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            </span>
+            <span className="composer-identity__text">
+              <strong>{isNarrActive ? '나레이션' : activeChar?.name || '캐릭터 선택'}</strong>
+              <span style={{ color: t.subText }}>{isNarrActive ? '장면을 서술하는 중' : '이 캐릭터로 말하는 중'}</span>
+            </span>
+            {showCharList ? <ChevronDown size={15} color={t.subText} /> : <ChevronUp size={15} color={t.subText} />}
           </button>
         )}
         {myChars.length > 0 && showCharList && (
@@ -2452,36 +2477,41 @@ export default function Room() {
           </button>
         )}
         {showRoleplayMenu && (
-          <div className={`room-tool-sheet${closingRoleplayMenu ? ' is-closing' : ''}`} style={{ marginBottom: 7, padding: '12px 10px 10px', borderRadius: '20px 20px 14px 14px', background: `color-mix(in srgb, ${t.panel} 94%, transparent)`, backdropFilter: 'blur(22px)', WebkitBackdropFilter: 'blur(22px)', border: `1px solid ${t.border}`, boxShadow: '0 -12px 38px rgba(0,0,0,0.2)', pointerEvents: closingRoleplayMenu ? 'none' : 'auto' }}>
+          <div className={`room-tool-sheet${closingRoleplayMenu ? ' is-closing' : ''}`} style={{ maxHeight: '58vh', overflowY: 'auto', marginBottom: 7, padding: '12px 10px 10px', borderRadius: '20px 20px 14px 14px', background: `color-mix(in srgb, ${t.panel} 94%, transparent)`, backdropFilter: 'blur(22px)', WebkitBackdropFilter: 'blur(22px)', border: `1px solid ${t.border}`, boxShadow: '0 -12px 38px rgba(0,0,0,0.2)', pointerEvents: closingRoleplayMenu ? 'none' : 'auto' }}>
             <div style={{ width: 34, height: 3, borderRadius: 2, background: t.border, margin: '0 auto 11px' }} />
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8 }}>
-              {roomTools.map(tool => {
-                const ToolIcon = tool.icon
-                const selected = quickTool === tool.id
-                const active = tool.id === 'narration' && isNarrActive
-                return (
-                  <div key={tool.id} style={{ position: 'relative', minWidth: 0 }}>
-                    <button
-                      onMouseDown={event => event.preventDefault()}
-                      onClick={() => runRoomTool(tool.id)}
-                      style={{ width: '100%', minHeight: 72, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '10px 4px', borderRadius: 14, border: `1px solid ${active ? t.point : t.border}`, background: active ? `${t.point}22` : `color-mix(in srgb, ${t.bg} 66%, transparent)`, color: active ? t.point : t.theirText, cursor: 'pointer' }}>
-                      <ToolIcon size={20} />
-                      <span style={{ maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 11 }}>{tool.label}</span>
-                    </button>
-                    <button
-                      onMouseDown={event => event.preventDefault()}
-                      onClick={event => {
-                        event.stopPropagation()
-                        pinQuickTool(tool.id)
-                      }}
-                      aria-label={`${tool.label} 빠른 실행 지정`}
-                      style={{ position: 'absolute', top: 5, right: 5, width: 22, height: 22, display: 'grid', placeItems: 'center', padding: 0, border: 0, borderRadius: '50%', background: selected ? `${t.point}33` : 'transparent', color: selected ? t.point : t.subText, cursor: 'pointer' }}>
-                      <Pin size={11} fill={selected ? 'currentColor' : 'none'} />
-                    </button>
-                  </div>
-                )
-              })}
-            </div>
+            {roomToolGroups.map((group, groupIndex) => (
+              <section key={group.id} style={{ marginTop: groupIndex === 0 ? 0 : 12 }}>
+                <div style={{ margin: '0 3px 6px', color: t.subText, fontSize: 11, fontWeight: 600 }}>{group.label}</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8 }}>
+                  {group.tools.map(toolId => roomTools.find(tool => tool.id === toolId)).filter(Boolean).map(tool => {
+                    const ToolIcon = tool.icon
+                    const selected = quickTool === tool.id
+                    const active = tool.id === 'narration' && isNarrActive
+                    return (
+                      <div key={tool.id} style={{ position: 'relative', minWidth: 0 }}>
+                        <button
+                          onMouseDown={event => event.preventDefault()}
+                          onClick={() => runRoomTool(tool.id)}
+                          style={{ width: '100%', minHeight: 72, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '10px 4px', borderRadius: 14, border: `1px solid ${active ? t.point : t.border}`, background: active ? `${t.point}22` : `color-mix(in srgb, ${t.bg} 66%, transparent)`, color: active ? t.point : t.theirText, cursor: 'pointer' }}>
+                          <ToolIcon size={20} />
+                          <span style={{ maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 12 }}>{tool.label}</span>
+                        </button>
+                        <button
+                          onMouseDown={event => event.preventDefault()}
+                          onClick={event => {
+                            event.stopPropagation()
+                            pinQuickTool(tool.id)
+                          }}
+                          aria-label={`${tool.label} 빠른 실행 지정`}
+                          style={{ position: 'absolute', top: 4, right: 4, width: 28, height: 28, display: 'grid', placeItems: 'center', padding: 0, border: 0, borderRadius: '50%', background: selected ? `${t.point}33` : 'transparent', color: selected ? t.point : t.subText, cursor: 'pointer' }}>
+                          <Pin size={13} fill={selected ? 'currentColor' : 'none'} />
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+              </section>
+            ))}
             {toolPanel === 'divider' && (
               <div className="inline-panel-reveal" style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 9 }}>
                 <input
@@ -2519,9 +2549,9 @@ export default function Room() {
             )}
           </div>
         )}
-        <div style={{ display: 'flex', gap: 4, alignItems: 'center', width: '100%', height: 42, padding: 5, borderRadius: 22, background: `color-mix(in srgb, ${t.panel} 78%, transparent)`, backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)', border: `1px solid ${t.border}`, boxShadow: '0 10px 30px rgba(0,0,0,0.24)', pointerEvents: 'auto' }}>
-          <button onMouseDown={e => e.preventDefault()} onClick={() => { if (showRoleplayMenu) closeRoleplayMenu(); else openRoleplayMenu() }} aria-label="대화 도구 메뉴" style={{ width: 32, height: 32, borderRadius: '50%', border: `1px solid ${showRoleplayMenu ? t.point : 'transparent'}`, background: showRoleplayMenu ? `${t.point}2f` : `${t.border}88`, cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Grid2X2 size={15} color={showRoleplayMenu ? t.point : t.subText} />
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center', width: '100%', minHeight: 54, padding: 5, borderRadius: 27, background: `color-mix(in srgb, ${t.panel} 86%, transparent)`, backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)', border: `1px solid ${t.border}`, boxShadow: '0 10px 30px rgba(0,0,0,0.24)', pointerEvents: 'auto' }}>
+          <button className="ui-touch-target" onMouseDown={e => e.preventDefault()} onClick={() => { if (showRoleplayMenu) closeRoleplayMenu(); else openRoleplayMenu() }} aria-label="대화 도구 메뉴" aria-expanded={showRoleplayMenu} style={{ width: 44, height: 44, borderRadius: '50%', border: `1px solid ${showRoleplayMenu ? t.point : 'transparent'}`, background: showRoleplayMenu ? `${t.point}2f` : `${t.border}66`, cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Grid2X2 size={18} color={showRoleplayMenu ? t.point : t.subText} />
           </button>
           <input type="file" multiple accept="image/jpeg,image/png,image/webp,image/gif" ref={fileInputRef} onChange={e => sendImages(e.target.files)} style={{ display: 'none' }} />
           <textarea
@@ -2551,19 +2581,19 @@ export default function Room() {
               placeholder={isNarrActive ? '나레이션 입력...' : activeChar ? `${activeChar.name}${instrumentalParticle(activeChar.name)} 입력...` : '캐릭터를 먼저 추가해주세요'}
               enterKeyHint="enter"
               rows={1}
-              style={{ flex: 1, minWidth: 0, height: 32, minHeight: 32, maxHeight: 32, overflowY: 'auto', background: 'transparent', border: 'none', borderRadius: 0, padding: '5px 6px', color: isNarrActive ? t.narrColor : t.inputText, fontSize: 'calc(14px * var(--idea-font-scale, 1))', outline: 'none', resize: 'none', lineHeight: 1.55, fontStyle: isNarrActive ? 'italic' : 'normal' }}
+              style={{ flex: 1, minWidth: 0, height: 44, minHeight: 44, maxHeight: 44, overflowY: 'auto', background: 'transparent', border: 'none', borderRadius: 0, padding: '10px 6px', color: isNarrActive ? t.narrColor : t.inputText, fontSize: 'calc(14px * var(--idea-font-scale, 1))', outline: 'none', resize: 'none', lineHeight: 1.55, fontStyle: isNarrActive ? 'italic' : 'normal' }}
             />
             {myChars.length > 0 && selectedQuickTool && (() => {
               const QuickToolIcon = selectedQuickTool.icon
               const quickActive = quickTool === 'narration' && isNarrActive
               return (
-                <button onMouseDown={e => e.preventDefault()} onClick={() => runRoomTool(quickTool, true)} aria-label={`${selectedQuickTool.label} 빠른 실행`} title={selectedQuickTool.label} style={{ width: 32, height: 32, flexShrink: 0, padding: 0, borderRadius: '50%', cursor: 'pointer', border: `1px solid ${quickActive ? t.point : 'transparent'}`, background: quickActive ? `${t.point}2f` : `${t.border}66`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <QuickToolIcon size={16} color={quickActive ? t.narrColor : t.subText} />
+                <button className="ui-touch-target" onMouseDown={e => e.preventDefault()} onClick={() => runRoomTool(quickTool, true)} aria-label={`${selectedQuickTool.label} 빠른 실행`} title={selectedQuickTool.label} style={{ width: 44, height: 44, flexShrink: 0, padding: 0, borderRadius: '50%', cursor: 'pointer', border: `1px solid ${quickActive ? t.point : 'transparent'}`, background: quickActive ? `${t.point}2f` : `${t.border}55`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <QuickToolIcon size={18} color={quickActive ? t.narrColor : t.subText} />
                 </button>
               )
             })()}
-          <button onMouseDown={e => e.preventDefault()} onClick={sendMessage} aria-label="전송" style={{ width: 32, height: 32, borderRadius: '50%', border: 'none', background: t.point, cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <ArrowUp size={18} color="#fff" strokeWidth={2.5} />
+          <button className="ui-touch-target" disabled={!input.trim() || (!activeChar && !isNarrActive)} onMouseDown={e => e.preventDefault()} onClick={sendMessage} aria-label="전송" style={{ width: 44, height: 44, borderRadius: '50%', border: 'none', background: t.point, cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <ArrowUp size={20} color="#fff" strokeWidth={2.5} />
           </button>
         </div>
       </div>
