@@ -2,13 +2,17 @@ import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { getTheme } from '../lib/themes'
-import { Settings, Users, ChevronRight, Trash2, CirclePlus, LogIn, Search, ListRestart, GripVertical, X, Star, Clock3 } from 'lucide-react'
+import { Settings, Users, Trash2, CirclePlus, LogIn, Search, ListRestart, GripVertical, X, Star, Clock3, MoreHorizontal, MessageCircle } from 'lucide-react'
 import { DndContext, PointerSensor, TouchSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core'
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { IconButton } from '../components/ui'
 import LoadingScreen from '../components/LoadingScreen'
 import EntryCharacterPicker from '../components/EntryCharacterPicker'
+import ConfirmDialog from '../components/ConfirmDialog'
+import Toast from '../components/Toast'
+import useToast from '../hooks/useToast'
+import useConfirmDialog from '../hooks/useConfirmDialog'
 import { normalizeRoomSummaries, sortRoomList } from '../features/rooms/roomSummary'
 import { createClientMessageId, findRoomByInviteCode, joinRoomWithInvite } from '../features/messages/messageApi'
 
@@ -22,6 +26,8 @@ function SortableRoomCard({ roomId, disabled, children }) {
 }
 
 export default function RoomList() {
+  const { toast, showToast } = useToast()
+  const { confirmation, confirm, closeConfirmation } = useConfirmDialog()
   const [rooms, setRooms] = useState([])
   const [showCreate, setShowCreate] = useState(false)
   const [showJoin, setShowJoin] = useState(false)
@@ -35,6 +41,7 @@ export default function RoomList() {
   const [userId, setUserId] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [reordering, setReordering] = useState(false)
+  const [roomMenuId, setRoomMenuId] = useState(null)
   const [sortMode, setSortMode] = useState(() => localStorage.getItem('idea-room-sort-mode') || 'recent')
   const [playInitialRoomAnimation, setPlayInitialRoomAnimation] = useState(() => sessionStorage.getItem('idea-room-list-entered') !== '1')
   const navigate = useNavigate()
@@ -151,7 +158,7 @@ export default function RoomList() {
     const { error } = await supabase.from('room_members').update({ is_favorite: next }).eq('room_id', room.id).eq('user_id', userId)
     if (error) {
       setRooms(current => current.map(item => (item.id === room.id ? { ...item, is_favorite: !next } : item)))
-      alert('즐겨찾기를 저장하지 못했습니다.')
+      showToast('즐겨찾기를 저장하지 못했어요.', 'error')
     }
   }
 
@@ -204,7 +211,7 @@ export default function RoomList() {
         setPendingJoinRoom(room)
       }
     } else {
-      alert('초대 코드를 찾을 수 없어요.')
+      showToast('초대 코드를 찾을 수 없어요.', 'error')
     }
     setLoading(false)
   }
@@ -217,7 +224,7 @@ export default function RoomList() {
     } catch (error) {
       console.warn('room join failed:', error.message)
       setEntryJoining(false)
-      alert('대화방에 입장하지 못했어요.')
+      showToast('대화방에 입장하지 못했어요.', 'error')
       return
     }
     setEntryJoining(false)
@@ -230,10 +237,16 @@ export default function RoomList() {
   const deleteRoom = async (e, roomId, createdBy) => {
     e.stopPropagation()
     if (createdBy !== userId) {
-      alert('방장만 삭제할 수 있어요.')
+      showToast('방장만 채팅방을 삭제할 수 있어요.', 'error')
       return
     }
-    if (!confirm('채팅방을 삭제할까요? 모든 대화 내용이 사라져요.')) return
+    const accepted = await confirm({
+      title: '채팅방을 삭제할까요?',
+      description: '모든 대화 내용이 사라지며 되돌릴 수 없어요.',
+      confirmLabel: '삭제',
+      danger: true,
+    })
+    if (!accepted) return
     await supabase.from('messages').delete().eq('room_id', roomId)
     await supabase.from('room_members').delete().eq('room_id', roomId)
     await supabase.from('rooms').delete().eq('id', roomId)
@@ -251,7 +264,7 @@ export default function RoomList() {
       orderedRooms.map((room, index) => supabase.from('room_members').update({ sort_order: index }).eq('room_id', room.id).eq('user_id', userId))
     )
     if (results.some(result => result.error)) {
-      alert('채팅방 순서를 저장하지 못했어요.')
+      showToast('채팅방 순서를 저장하지 못했어요.', 'error')
       fetchRooms()
     }
   }
@@ -265,6 +278,13 @@ export default function RoomList() {
   const backgroundLogo = `${import.meta.env.BASE_URL}branding/idea-logo-background-tile-${logoVariant}.png`
   const normalizedSearch = searchQuery.trim().toLocaleLowerCase('ko-KR')
   const filteredRooms = rooms.filter(room => room.name.toLocaleLowerCase('ko-KR').includes(normalizedSearch))
+  const formatRoomTime = value => {
+    if (!value) return ''
+    const date = new Date(value)
+    const today = new Date()
+    if (date.toDateString() === today.toDateString()) return date.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
+    return date.toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' })
+  }
 
   return (
     <div
@@ -278,6 +298,14 @@ export default function RoomList() {
         padding: 16,
         transition: 'background-color 0.3s',
       }}>
+      <Toast toast={toast} />
+      <ConfirmDialog
+        open={Boolean(confirmation)}
+        theme={t}
+        {...confirmation}
+        onConfirm={() => closeConfirmation(true)}
+        onCancel={() => closeConfirmation(false)}
+      />
       <EntryCharacterPicker
         open={Boolean(pendingJoinRoom)}
         roomName={pendingJoinRoom?.name}
@@ -301,18 +329,18 @@ export default function RoomList() {
             <img src={headerLogo} alt="IDEA" style={{ display: 'block', width: 84, height: 'auto', maxHeight: 42, objectFit: 'contain', objectPosition: 'left center' }} />
           </div>
           <button
-            onClick={() => { setShowJoin(false); setShowCreate(current => !current) }}
-            aria-label="새 역극방"
-            title="새 역극방"
-            style={{ width: 40, height: 40, background: showCreate ? `${t.point}22` : 'none', border: `1px solid ${showCreate ? t.point : t.border}`, borderRadius: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <CirclePlus size={17} color={showCreate ? t.point : t.subText} />
-          </button>
-          <button
-            onClick={() => { setShowCreate(false); setShowJoin(current => !current) }}
-            aria-label="초대코드로 입장"
-            title="초대코드로 입장"
-            style={{ width: 40, height: 40, background: showJoin ? `${t.point}22` : 'none', border: `1px solid ${showJoin ? t.point : t.border}`, borderRadius: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <LogIn size={17} color={showJoin ? t.point : t.subText} />
+            className="ui-touch-target"
+            onClick={() => {
+              if (showCreate || showJoin) {
+                setShowCreate(false)
+                setShowJoin(false)
+              } else {
+                setShowCreate(true)
+              }
+            }}
+            aria-expanded={showCreate || showJoin}
+            style={{ height: 44, display: 'flex', alignItems: 'center', gap: 6, padding: '0 12px', background: showCreate || showJoin ? `${t.point}22` : t.point, border: `1px solid ${t.point}`, borderRadius: 11, color: showCreate || showJoin ? t.point : '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600, flexShrink: 0 }}>
+            <CirclePlus size={17} />새 대화
           </button>
           {sortMode === 'manual' && (
             <button
@@ -327,21 +355,23 @@ export default function RoomList() {
             onClick={() => navigate('/characters')}
             aria-label="캐릭터"
             title="캐릭터"
-            style={{ width: 40, height: 40, background: 'none', border: `1px solid ${t.border}`, borderRadius: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            className="ui-touch-target"
+            style={{ width: 44, height: 44, background: 'none', border: `1px solid ${t.border}`, borderRadius: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <Users size={17} color={t.subText} />
           </button>
           <button
             onClick={() => navigate('/settings')}
             aria-label="설정"
             title="설정"
-            style={{ width: 40, height: 40, background: 'none', border: `1px solid ${t.border}`, borderRadius: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            className="ui-touch-target"
+            style={{ width: 44, height: 44, background: 'none', border: `1px solid ${t.border}`, borderRadius: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <Settings size={17} color={t.subText} />
           </button>
         </div>
 
         <div style={{ position: 'relative', marginBottom: 14 }}>
           <Search size={15} color={t.subText} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)' }} />
-          <input value={searchQuery} onChange={event => setSearchQuery(event.target.value)} placeholder="역극방 이름 검색" aria-label="역극방 이름 검색" style={{ width: '100%', background: t.panel, border: `1px solid ${t.border}`, borderRadius: 10, padding: '9px 34px', color: t.inputText, fontSize: 12, outline: 'none' }} />
+          <input value={searchQuery} onChange={event => setSearchQuery(event.target.value)} placeholder="역극방 이름 검색" aria-label="역극방 이름 검색" style={{ width: '100%', minHeight: 44, background: t.panel, border: `1px solid ${t.border}`, borderRadius: 11, padding: '10px 38px', color: t.inputText, fontSize: 14, outline: 'none' }} />
           {searchQuery && <button onClick={() => setSearchQuery('')} aria-label="검색어 지우기" style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', border: 0, background: 'none', padding: 4, cursor: 'pointer', display: 'flex' }}><X size={14} color={t.subText} /></button>}
         </div>
 
@@ -370,6 +400,10 @@ export default function RoomList() {
               border: `1px solid ${t.border}`,
               boxShadow: `0 1px 4px rgba(0,0,0,0.15)`,
             }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 14, padding: 4, borderRadius: 10, background: t.bg }}>
+              <button style={{ minHeight: 38, border: 0, borderRadius: 8, background: `${t.point}28`, color: t.point, fontSize: 12, fontWeight: 600 }}>방 만들기</button>
+              <button onClick={() => { setShowCreate(false); setShowJoin(true) }} style={{ minHeight: 38, border: 0, borderRadius: 8, background: 'transparent', color: t.subText, fontSize: 12 }}>초대 코드</button>
+            </div>
             <div style={{ fontSize: 13, color: t.subText, marginBottom: 8 }}>채팅방 이름</div>
             <input
               value={roomName}
@@ -436,6 +470,10 @@ export default function RoomList() {
               border: `1px solid ${t.border}`,
               boxShadow: `0 1px 4px rgba(0,0,0,0.15)`,
             }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 14, padding: 4, borderRadius: 10, background: t.bg }}>
+              <button onClick={() => { setShowJoin(false); setShowCreate(true) }} style={{ minHeight: 38, border: 0, borderRadius: 8, background: 'transparent', color: t.subText, fontSize: 12 }}>방 만들기</button>
+              <button style={{ minHeight: 38, border: 0, borderRadius: 8, background: `${t.point}28`, color: t.point, fontSize: 12, fontWeight: 600 }}>초대 코드</button>
+            </div>
             <div style={{ fontSize: 13, color: t.subText, marginBottom: 8 }}>초대 코드</div>
             <input
               value={inviteCode}
@@ -496,15 +534,14 @@ export default function RoomList() {
           <SortableContext items={filteredRooms.map(room => room.id)} strategy={verticalListSortingStrategy}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {rooms.length === 0 && (
-            <div
-              style={{
-                textAlign: 'center',
-                color: t.subText,
-                fontSize: 13,
-                marginTop: 40,
-                opacity: 0.5,
-              }}>
-              아직 채팅방이 없어요
+            <div className="ui-empty-state" style={{ color: t.subText }}>
+              <div className="ui-empty-state__icon" style={{ color: t.point, background: `${t.point}18`, border: `1px solid ${t.point}38` }}><MessageCircle size={27} /></div>
+              <strong style={{ color: t.theirText, fontSize: 16 }}>첫 이야기를 시작해보세요</strong>
+              <span style={{ maxWidth: 270, fontSize: 13, lineHeight: 1.6 }}>새 역극방을 만들거나 받은 초대 코드로 친구의 방에 들어갈 수 있어요.</span>
+              <div className="ui-empty-state__actions">
+                <button onClick={() => { setShowJoin(false); setShowCreate(true) }} style={{ border: 0, background: t.point, color: '#fff' }}><CirclePlus size={15} /> 방 만들기</button>
+                <button onClick={() => { setShowCreate(false); setShowJoin(true) }} style={{ border: `1px solid ${t.border}`, background: t.panel, color: t.theirText }}><LogIn size={15} /> 코드 입장</button>
+              </div>
             </div>
           )}
           {rooms.length > 0 && filteredRooms.length === 0 && <div style={{ textAlign: 'center', color: t.subText, fontSize: 13, marginTop: 32, opacity: 0.6 }}>검색 결과가 없어요.</div>}
@@ -529,7 +566,11 @@ export default function RoomList() {
               {reordering && <button {...listeners} onClick={event => event.stopPropagation()} aria-label={`${room.name} 순서 이동`} style={{ border: 0, background: 'none', padding: 2, display: 'flex', cursor: 'grab', touchAction: 'none' }}><GripVertical size={18} color={t.subText} /></button>}
               <div className="squircle-media" style={{ width: 48, height: 48, background: t.point, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, color: t.bg, flexShrink: 0, overflow: 'hidden' }}>{room.cover_image ? <img src={room.cover_image} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '✦'}</div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 500, color: t.theirText }}>{room.name}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  {room.is_favorite && <Star size={14} color={t.point} fill={t.point} aria-label="즐겨찾기" style={{ flexShrink: 0 }} />}
+                  <div style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 15, fontWeight: 600, color: t.theirText }}>{room.name}</div>
+                  {room.lastMsg?.created_at && <time style={{ color: t.subText, fontSize: 11, flexShrink: 0 }}>{formatRoomTime(room.lastMsg.created_at)}</time>}
+                </div>
                 <div
                   style={{
                     fontSize: 11,
@@ -568,34 +609,22 @@ export default function RoomList() {
                   {room.unreadCount}
                 </div>
               )}
-              {!reordering && (
+              {!reordering && <div style={{ position: 'relative' }}>
                 <IconButton
-                  onClick={event => toggleFavorite(event, room)}
-                  label={room.is_favorite ? `${room.name} 즐겨찾기 해제` : `${room.name} 즐겨찾기`}
+                  onMouseDown={event => event.stopPropagation()}
+                  onClick={event => { event.stopPropagation(); setRoomMenuId(current => current === room.id ? null : room.id) }}
+                  label={`${room.name} 메뉴`}
                   borderColor="transparent"
                   pointColor={t.point}
                   color={t.subText}
-                  style={{ width: 36, height: 36 }}>
-                  <Star size={17} color={room.is_favorite ? t.point : t.subText} fill={room.is_favorite ? t.point : 'none'} opacity={room.is_favorite ? 1 : 0.55} />
+                  style={{ width: 44, height: 44 }}>
+                  <MoreHorizontal size={19} />
                 </IconButton>
-              )}
-              {!reordering && room.created_by === userId && (
-                <button
-                  onMouseDown={e => e.stopPropagation()}
-                  onClick={e => deleteRoom(e, room.id, room.created_by)}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                    padding: 4,
-                    opacity: 0.4,
-                    display: 'flex',
-                    alignItems: 'center',
-                  }}>
-                  <Trash2 size={15} color={t.subText} />
-                </button>
-              )}
-              {!reordering && <ChevronRight size={18} color={t.subText} opacity={0.5} />}
+                {roomMenuId === room.id && <div className="message-action-menu" onClick={event => event.stopPropagation()} style={{ position: 'absolute', zIndex: 20, top: 42, right: 0, width: 148, padding: 5, border: `1px solid ${t.border}`, borderRadius: 11, background: t.panel, boxShadow: '0 10px 28px rgba(0,0,0,.28)' }}>
+                  <button onClick={event => { toggleFavorite(event, room); setRoomMenuId(null) }} style={{ width: '100%', minHeight: 40, display: 'flex', alignItems: 'center', gap: 9, padding: '0 10px', border: 0, borderRadius: 8, background: 'transparent', color: t.theirText, fontSize: 12 }}><Star size={15} fill={room.is_favorite ? 'currentColor' : 'none'} />{room.is_favorite ? '즐겨찾기 해제' : '즐겨찾기'}</button>
+                  {room.created_by === userId && <button onClick={event => { setRoomMenuId(null); deleteRoom(event, room.id, room.created_by) }} style={{ width: '100%', minHeight: 40, display: 'flex', alignItems: 'center', gap: 9, padding: '0 10px', border: 0, borderRadius: 8, background: 'transparent', color: '#f87171', fontSize: 12 }}><Trash2 size={15} />채팅방 삭제</button>}
+                </div>}
+              </div>}
             </div>
               )}
             </SortableRoomCard>
