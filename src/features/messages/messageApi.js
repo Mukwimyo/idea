@@ -44,6 +44,7 @@ export const sendRoomMessage = async (supabase, message) => {
     p_character_id: message.character_id || null,
     p_type: message.type,
     p_content: message.content,
+    p_effect_key: message.effect_key || null,
   })
 
   if (error) throw error

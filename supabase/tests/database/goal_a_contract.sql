@@ -2,10 +2,11 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(29);
+select plan(33);
 
 select has_column('public', 'messages', 'client_message_id', 'messages has an idempotency key');
 select has_column('public', 'messages', 'sequence_no', 'messages has a stable server sequence');
+select has_column('public', 'messages', 'effect_key', 'messages can store an optional presentation effect');
 select has_table('public', 'room_read_cursors', 'read cursor table exists');
 
 select ok((select relrowsecurity from pg_class where oid = 'public.room_read_cursors'::regclass), 'read cursors use RLS');
@@ -39,6 +40,14 @@ select ok(
 select ok(
   not has_function_privilege('anon', 'public.send_room_message(uuid,uuid,uuid,text,text)', 'EXECUTE'),
   'anonymous users cannot call the send RPC'
+);
+select ok(
+  has_function_privilege('authenticated', 'public.send_room_message(uuid,uuid,uuid,text,text,text)', 'EXECUTE'),
+  'authenticated users can call the effect-aware send RPC'
+);
+select ok(
+  not has_function_privilege('anon', 'public.send_room_message(uuid,uuid,uuid,text,text,text)', 'EXECUTE'),
+  'anonymous users cannot call the effect-aware send RPC'
 );
 select ok(
   has_function_privilege('authenticated', 'public.advance_room_read_cursor(uuid,uuid)', 'EXECUTE'),
@@ -92,6 +101,15 @@ select ok(
       and proconfig @> array['search_path=pg_catalog, public']
   ),
   'send RPC is a security definer with a fixed search path'
+);
+select ok(
+  exists (
+    select 1 from pg_proc
+    where oid = 'public.send_room_message(uuid,uuid,uuid,text,text,text)'::regprocedure
+      and prosecdef
+      and proconfig @> array['search_path=pg_catalog, public']
+  ),
+  'effect-aware send RPC is a security definer with a fixed search path'
 );
 select ok(
   exists (
