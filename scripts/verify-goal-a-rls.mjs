@@ -75,11 +75,32 @@ try {
   const [senderUser, outsiderUser] = await signInTestUsers()
   assert.notEqual(senderUser.id, outsiderUser.id, 'test accounts must be different')
 
-  const [{ data: senderMembership }, { data: outsiderShared }, { data: outsiderPrivate }] = await Promise.all([
-    sender.from('room_members').select('room_id').eq('room_id', privateRoomId).maybeSingle(),
-    outsider.from('room_members').select('room_id').eq('room_id', sharedRoomId).maybeSingle(),
-    outsider.from('room_members').select('room_id').eq('room_id', privateRoomId).maybeSingle(),
+  const [senderMembershipResult, outsiderSharedResult, outsiderPrivateResult] = await Promise.all([
+    sender
+      .from('room_members')
+      .select('room_id')
+      .eq('room_id', privateRoomId)
+      .eq('user_id', senderUser.id)
+      .maybeSingle(),
+    outsider
+      .from('room_members')
+      .select('room_id')
+      .eq('room_id', sharedRoomId)
+      .eq('user_id', outsiderUser.id)
+      .maybeSingle(),
+    outsider
+      .from('room_members')
+      .select('room_id')
+      .eq('room_id', privateRoomId)
+      .eq('user_id', outsiderUser.id)
+      .maybeSingle(),
   ])
+  for (const result of [senderMembershipResult, outsiderSharedResult, outsiderPrivateResult]) {
+    if (result.error) throw result.error
+  }
+  const senderMembership = senderMembershipResult.data
+  const outsiderShared = outsiderSharedResult.data
+  const outsiderPrivate = outsiderPrivateResult.data
   assert(senderMembership, 'sender must belong to TEST_PRIVATE_ROOM_ID')
   assert(outsiderShared, 'reader must belong to TEST_ROOM_ID')
   assert.equal(outsiderPrivate, null, 'reader must not belong to TEST_PRIVATE_ROOM_ID')

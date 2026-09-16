@@ -191,6 +191,14 @@ try {
       .upsert(cursorRestore, { onConflict: 'room_id,user_id' })
     if (restoreError && !failure) failure = restoreError
   }
+  await Promise.allSettled([
+    admin.removeAllChannels(),
+    sender.removeAllChannels(),
+    reader.removeAllChannels(),
+  ])
+  admin.realtime.disconnect()
+  sender.realtime.disconnect()
+  reader.realtime.disconnect()
   await Promise.allSettled([sender.auth.signOut(), reader.auth.signOut()])
 }
 
