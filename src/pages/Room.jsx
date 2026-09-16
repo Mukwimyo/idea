@@ -2548,6 +2548,18 @@ export default function Room() {
               style={{ width: '100%', height: 28, display: 'grid', placeItems: 'center', border: 0, background: 'transparent', cursor: 'grab', touchAction: 'none' }}>
               <span style={{ width: 38, height: 4, borderRadius: 2, background: t.border }} />
             </button>
+            {toolPanel === 'effects' ? (
+              <MessageEffectPicker
+                selectedEffect={selectedMessageEffect}
+                theme={t}
+                onBack={() => setToolPanel(null)}
+                onSelect={effectKey => {
+                  setSelectedMessageEffect(effectKey)
+                  closeRoleplayMenu()
+                  window.setTimeout(() => inputRef.current?.focus(), 210)
+                }}
+              />
+            ) : <>
             {roomToolGroups.map((group, groupIndex) => (
               <section key={group.id} style={{ marginTop: groupIndex === 0 ? 0 : 12 }}>
                 <div style={{ margin: '0 3px 6px', color: t.subText, fontSize: 11, fontWeight: 600 }}>{group.label}</div>
@@ -2601,17 +2613,6 @@ export default function Room() {
                 </button>
               </div>
             )}
-            {toolPanel === 'effects' && (
-              <MessageEffectPicker
-                selectedEffect={selectedMessageEffect}
-                theme={t}
-                onSelect={effectKey => {
-                  setSelectedMessageEffect(effectKey)
-                  closeRoleplayMenu()
-                  window.setTimeout(() => inputRef.current?.focus(), 210)
-                }}
-              />
-            )}
             {showRoomInvitePicker && (
               <div className="inline-panel-reveal" style={{ display: 'grid', gap: 5, paddingTop: 9 }}>
                 <div style={{ color: t.subText, fontSize: 10 }}>초대할 방을 선택하세요.</div>
@@ -2627,6 +2628,7 @@ export default function Room() {
                 )}
               </div>
             )}
+            </>}
           </div>
           </div>
         )}

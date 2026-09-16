@@ -1,6 +1,36 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { MessageEffectBubble } from './MessageEffects'
+import { MessageEffectBubble, MessageEffectPicker } from './MessageEffects'
+
+const theme = {
+  bg: '#111111',
+  border: '#333333',
+  panel: '#222222',
+  point: '#8b5cf6',
+  subText: '#aaaaaa',
+  theirText: '#ffffff',
+}
+
+describe('MessageEffectPicker', () => {
+  it('exposes an immediate selection action and a way back to the tool menu', () => {
+    const onSelect = vi.fn()
+    const onBack = vi.fn()
+    render(
+      <MessageEffectPicker
+        selectedEffect={null}
+        onSelect={onSelect}
+        onBack={onBack}
+        theme={theme}
+      />
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /충격/ }))
+    fireEvent.click(screen.getByRole('button', { name: '대화 도구로 돌아가기' }))
+
+    expect(onSelect).toHaveBeenCalledWith('impact')
+    expect(onBack).toHaveBeenCalledOnce()
+  })
+})
 
 describe('MessageEffectBubble', () => {
   it('restarts a stored effect when the message is clicked', () => {
