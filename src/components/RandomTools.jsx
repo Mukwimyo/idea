@@ -46,16 +46,30 @@ export default function RandomTools({ open, roomId, theme, onClose, onShare }) {
     if (!open) return undefined
     let active = true
     const load = async () => {
-      const { data, error: loadError } = await supabase
-        .from('room_characters')
-        .select('character_id, sort_order, characters(id, name, image_url, color)')
-        .eq('room_id', roomId)
-        .order('sort_order')
+      setError('')
+      const [{ data: poolRows, error: poolError }, { data: messageRows, error: messageError }] = await Promise.all([
+        supabase
+          .from('room_characters')
+          .select('character_id, sort_order, characters(id, name, image_url, color)')
+          .eq('room_id', roomId)
+          .order('sort_order'),
+        supabase
+          .from('messages')
+          .select('character_id, characters(id, name, image_url, color)')
+          .eq('room_id', roomId)
+          .not('character_id', 'is', null)
+          .order('created_at', { ascending: false })
+          .limit(500),
+      ])
       if (!active) return
-      const unique = [...new Map((data || []).filter(row => row.characters).map(row => [row.characters.id, row.characters])).values()]
+      const characterFromRow = row => Array.isArray(row.characters) ? row.characters[0] : row.characters
+      const unique = [...new Map([...(poolRows || []), ...(messageRows || [])]
+        .map(characterFromRow)
+        .filter(Boolean)
+        .map(character => [character.id, character])).values()]
       setCharacters(unique)
       setSelectedIds(new Set(unique.map(character => character.id)))
-      if (loadError) setError('방 캐릭터 목록을 불러오지 못했어요.')
+      if (poolError && messageError) setError('방 캐릭터 목록을 불러오지 못했어요.')
     }
     load()
     return () => { active = false }
@@ -114,15 +128,24 @@ export default function RandomTools({ open, roomId, theme, onClose, onShare }) {
   }
 
   const characterPicker = (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 6 }}>
-      {characters.map(character => {
-        const selected = selectedIds.has(character.id)
-        return <button key={character.id} onClick={() => toggleCharacter(character.id)} style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0, padding: 7, borderRadius: 10, border: `1px solid ${selected ? t.point : t.border}`, background: selected ? `${t.point}18` : t.bg, color: t.theirText }}>
-          <img src={character.image_url || `${import.meta.env.BASE_URL}default-avatar.png`} alt="" className="squircle-media" style={{ width: 28, height: 28, flexShrink: 0, objectFit: 'cover' }} />
-          <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'left', fontSize: 11 }}>{character.name}</span>
-          {selected && <Check size={12} color={t.point} />}
-        </button>
-      })}
+    <div style={{ display: 'grid', gap: 7 }}>
+      <div style={{ minHeight: 32, display: 'flex', alignItems: 'center', gap: 6 }}>
+        <strong style={{ flex: 1, color: t.theirText, fontSize: 12 }}>참여 캐릭터 <span style={{ color: t.point }}>{selectedCharacters.length}/{characters.length}</span></strong>
+        <button disabled={characters.length === 0 || selectedIds.size === characters.length} onClick={() => setSelectedIds(new Set(characters.map(character => character.id)))} style={{ minHeight: 30, padding: '0 8px', borderRadius: 8, border: `1px solid ${t.border}`, background: 'transparent', color: t.subText, fontSize: 10 }}>전체 선택</button>
+        <button disabled={selectedIds.size === 0} onClick={() => setSelectedIds(new Set())} style={{ minHeight: 30, padding: '0 8px', borderRadius: 8, border: `1px solid ${t.border}`, background: 'transparent', color: t.subText, fontSize: 10 }}>선택 해제</button>
+      </div>
+      {characters.length === 0 ? (
+        <div style={{ padding: '18px 12px', border: `1px dashed ${t.border}`, borderRadius: 11, color: t.subText, textAlign: 'center', fontSize: 11, lineHeight: 1.6 }}>이 방에 등록되었거나 대화에 등장한 캐릭터가 없어요.</div>
+      ) : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 6 }}>
+        {characters.map(character => {
+          const selected = selectedIds.has(character.id)
+          return <button key={character.id} onClick={() => toggleCharacter(character.id)} aria-pressed={selected} style={{ minHeight: 44, display: 'flex', alignItems: 'center', gap: 7, minWidth: 0, padding: 7, borderRadius: 10, border: `1px solid ${selected ? t.point : t.border}`, background: selected ? `${t.point}18` : t.bg, color: t.theirText }}>
+            <img src={character.image_url || `${import.meta.env.BASE_URL}default-avatar.png`} alt="" className="squircle-media" style={{ width: 30, height: 30, flexShrink: 0, objectFit: 'cover' }} />
+            <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'left', fontSize: 12 }}>{character.name}</span>
+            {selected && <Check size={14} color={t.point} />}
+          </button>
+        })}
+      </div>}
     </div>
   )
 
