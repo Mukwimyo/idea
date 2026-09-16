@@ -16,6 +16,7 @@ import RandomTools from '../components/RandomTools'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { MessageEffectBubble, MessageEffectChip, MessageEffectPicker } from '../components/MessageEffects'
 import useConfirmDialog from '../hooks/useConfirmDialog'
+import useMessageStageEffects from '../hooks/useMessageStageEffects'
 import {
   advanceRoomReadCursor,
   createClientMessageId,
@@ -256,6 +257,8 @@ export default function Room() {
   const loadTalkingFramesRef = useRef(null)
   const persistMessageRef = useRef(null)
   const toolSheetDragRef = useRef({ pointerId: null, startY: 0, lastY: 0, startedAt: 0 })
+  const roomStageRef = useRef(null)
+  const playMessageStageEffect = useMessageStageEffects(roomStageRef)
 
   useEffect(() => {
     messagesRef.current = messages
@@ -1621,6 +1624,7 @@ export default function Room() {
 
   return (
     <div
+      ref={roomStageRef}
       style={{
         position: 'fixed',
         top: viewportOffsetTop,
@@ -2261,6 +2265,7 @@ export default function Room() {
                     effectKey={msg.effect_key}
                     animateOnMount={Boolean(messageEntranceClass)}
                     canReplay={allowMessageEffectReplay}
+                    onEffectPlay={playMessageStageEffect}
                     style={{ color: t.narrColor, fontStyle: 'italic', textAlign: 'center', padding: '1px 16px', lineHeight: 1.6, cursor: msg.effect_key ? 'pointer' : 'default' }}>
                     {msg.content.split('\n').map((line, i) => (
                       <div key={i} style={{ fontSize: 11 }}>{line}</div>
@@ -2398,6 +2403,7 @@ export default function Room() {
                     effectKey={msg.effect_key}
                     animateOnMount={Boolean(messageEntranceClass)}
                     canReplay={allowMessageEffectReplay}
+                    onEffectPlay={playMessageStageEffect}
                     style={{ background: bubbleBg, color: bubbleColor, padding: '8px 12px', borderRadius: 13, fontSize: 'calc(14px * var(--idea-font-scale, 1))', lineHeight: 1.55, border: 'none', cursor: msg.effect_key || isMine ? 'pointer' : 'default' }}>
                     {parseContent(msg.content, actionSize)}
                     {msg.edited && showEditedLabel && <span style={{ fontSize: 9, opacity: 0.5, marginLeft: 4 }}>수정됨</span>}

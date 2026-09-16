@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   ChevronLeft,
   CloudMoon,
@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import {
   MESSAGE_EFFECTS,
+  MESSAGE_ENTRANCE_EFFECT_DELAY_MS,
   getMessageEffect,
   getMessageEffectClassName,
 } from '../features/messages/messageEffects'
@@ -109,17 +110,36 @@ export function MessageEffectBubble({
   effectKey,
   animateOnMount = false,
   canReplay,
+  onEffectPlay,
   className = '',
   children,
   ...props
 }) {
   const effect = getMessageEffect(effectKey)
   const [replayCount, setReplayCount] = useState(0)
-  const shouldAnimate = Boolean(effect && (animateOnMount || replayCount > 0))
+  const [initialEffectReady, setInitialEffectReady] = useState(false)
+  const initialEffectRequestedRef = useRef(Boolean(effect && animateOnMount))
+  const onEffectPlayRef = useRef(onEffectPlay)
+
+  useEffect(() => {
+    onEffectPlayRef.current = onEffectPlay
+  }, [onEffectPlay])
+
+  useEffect(() => {
+    if (!initialEffectRequestedRef.current || !effect) return undefined
+    const timer = window.setTimeout(() => {
+      setInitialEffectReady(true)
+      onEffectPlayRef.current?.(effect.key)
+    }, MESSAGE_ENTRANCE_EFFECT_DELAY_MS)
+    return () => window.clearTimeout(timer)
+  }, [effect])
+
+  const shouldAnimate = Boolean(effect && (initialEffectReady || replayCount > 0))
   const effectClassName = getMessageEffectClassName(effectKey, shouldAnimate)
 
   const replay = () => {
     if (!effect || canReplay?.() === false) return
+    onEffectPlayRef.current?.(effect.key)
     setReplayCount(count => count + 1)
   }
 
@@ -135,7 +155,7 @@ export function MessageEffectBubble({
   return (
     <div
       {...props}
-      key={replayCount}
+      key={`${initialEffectReady ? 'ready' : 'waiting'}-${replayCount}`}
       data-message-bubble
       className={[className, effectClassName].filter(Boolean).join(' ')}
       role={effect ? 'button' : props.role}
