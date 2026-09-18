@@ -9,6 +9,10 @@ import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy, r
 import { CSS } from '@dnd-kit/utilities'
 import ProfileImageModal from '../components/ProfileImageModal'
 import LoadingScreen from '../components/LoadingScreen'
+import {
+  getRoomCharacterPoolErrorMessage,
+  replaceRoomCharacterPool,
+} from '../features/characters/roomCharacterPoolApi'
 
 const DEFAULT_CHARACTER_COLOR = '#AFA9EC'
 const DEFAULT_CHARACTER_TEXT_COLOR = '#26215C'
@@ -182,25 +186,21 @@ export default function Characters() {
     if (!roomId || !userId || roomCharacterIds.length === 0) return
     setRoomPoolSaving(true)
     setRoomPoolSaved(false)
-    const { error: deleteError } = await supabase.from('room_characters').delete().eq('room_id', roomId).eq('user_id', userId)
-    if (deleteError) {
-      alert('방 캐릭터 목록을 저장하지 못했어요.')
+    try {
+      await replaceRoomCharacterPool(supabase, roomId, roomCharacterIds)
+      setRoomPoolSaved(true)
+    } catch (error) {
+      console.error('방 캐릭터 목록 저장 실패', {
+        code: error?.code,
+        message: error?.message,
+        details: error?.details,
+        hint: error?.hint,
+      })
+      alert(getRoomCharacterPoolErrorMessage(error))
+      await fetchChars(userId)
+    } finally {
       setRoomPoolSaving(false)
-      return
     }
-    const rows = roomCharacterIds.map((characterId, index) => ({
-      room_id: roomId,
-      user_id: userId,
-      character_id: characterId,
-      sort_order: index,
-    }))
-    const { error: insertError } = await supabase.from('room_characters').insert(rows)
-    setRoomPoolSaving(false)
-    if (insertError) {
-      alert('방 캐릭터 목록을 저장하지 못했어요.')
-      return
-    }
-    setRoomPoolSaved(true)
   }
 
   const fetchArchived = async () => {
