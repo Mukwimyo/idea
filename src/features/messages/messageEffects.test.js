@@ -13,9 +13,10 @@ describe('message effects', () => {
       'shout',
       'tremble',
       'impact',
-      'monologue',
     ])
     expect(isMessageEffectKey('impact')).toBe(true)
+    expect(isMessageEffectKey('monologue')).toBe(true)
+    expect(getMessageEffect('monologue')?.label).toBe('독백')
     expect(isMessageEffectKey('arbitrary-css')).toBe(false)
   })
 
