@@ -5,10 +5,10 @@ describe('room summaries', () => {
   it('normalizes RPC wrapper rows and unread counts', () => {
     expect(
       normalizeRoomSummaries([
-        { summary: { id: 'room-1', unreadCount: '3', is_favorite: true, sort_order: '2' } },
+        { summary: { id: 'room-1', unreadCount: '3', is_favorite: true, sort_order: '2', room_group_id: 'space' } },
       ])
     ).toEqual([
-      expect.objectContaining({ id: 'room-1', unreadCount: 3, is_favorite: true, sort_order: 2 }),
+      expect.objectContaining({ id: 'room-1', unreadCount: 3, is_favorite: true, sort_order: 2, room_group_id: 'space' }),
     ])
   })
 
