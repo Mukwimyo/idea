@@ -29,6 +29,7 @@ describe('MessageEffectPicker', () => {
 
     expect(onSelect).toHaveBeenCalledWith('impact')
     expect(onBack).toHaveBeenCalledOnce()
+    expect(screen.queryByRole('button', { name: /독백/ })).not.toBeInTheDocument()
   })
 })
 
@@ -76,5 +77,16 @@ describe('MessageEffectBubble', () => {
 
     expect(canReplay).toHaveBeenCalledOnce()
     expect(container.firstChild).not.toHaveClass('message-effect--playing')
+  })
+
+  it('shows a tiny effect label on the requested side of the bubble', () => {
+    const { container } = render(
+      <MessageEffectBubble effectKey="whisper" indicatorSide="left">
+        표시되는 효과
+      </MessageEffectBubble>
+    )
+
+    expect(container.firstChild).toHaveAttribute('data-effect-label', '속삭임')
+    expect(container.firstChild).toHaveClass('message-effect--indicator-left')
   })
 })

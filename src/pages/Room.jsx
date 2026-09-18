@@ -2266,6 +2266,7 @@ export default function Room() {
                     animateOnMount={Boolean(messageEntranceClass)}
                     canReplay={allowMessageEffectReplay}
                     onEffectPlay={playMessageStageEffect}
+                    indicatorSide="right"
                     style={{ color: t.narrColor, fontStyle: 'italic', textAlign: 'center', padding: '1px 16px', lineHeight: 1.6, cursor: msg.effect_key ? 'pointer' : 'default' }}>
                     {msg.content.split('\n').map((line, i) => (
                       <div key={i} style={{ fontSize: 11 }}>{line}</div>
@@ -2404,6 +2405,7 @@ export default function Room() {
                     animateOnMount={Boolean(messageEntranceClass)}
                     canReplay={allowMessageEffectReplay}
                     onEffectPlay={playMessageStageEffect}
+                    indicatorSide={isMine ? 'left' : 'right'}
                     style={{ background: bubbleBg, color: bubbleColor, padding: '8px 12px', borderRadius: 13, fontSize: 'calc(14px * var(--idea-font-scale, 1))', lineHeight: 1.55, border: 'none', cursor: msg.effect_key || isMine ? 'pointer' : 'default' }}>
                     {parseContent(msg.content, actionSize)}
                     {msg.edited && showEditedLabel && <span style={{ fontSize: 9, opacity: 0.5, marginLeft: 4 }}>수정됨</span>}

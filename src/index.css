@@ -493,8 +493,30 @@ button:disabled {
 }
 
 .message-effect {
+    position: relative;
     transform-origin: center;
     -webkit-tap-highlight-color: transparent;
+}
+
+.message-effect::after {
+    content: attr(data-effect-label);
+    position: absolute;
+    bottom: 2px;
+    font-size: 8px;
+    font-weight: 500;
+    line-height: 1;
+    letter-spacing: 0;
+    opacity: 0.48;
+    pointer-events: none;
+    white-space: nowrap;
+}
+
+.message-effect--indicator-right::after {
+    left: calc(100% + 5px);
+}
+
+.message-effect--indicator-left::after {
+    right: calc(100% + 5px);
 }
 
 .message-effect--whisper {
@@ -508,19 +530,14 @@ button:disabled {
 }
 
 .message-effect--shout {
-    font-size: calc(15px * var(--idea-font-scale, 1)) !important;
+    font-size: calc(17px * var(--idea-font-scale, 1)) !important;
     font-weight: 700;
     letter-spacing: 0.025em;
 }
 
 .message-effect--shout > div {
-    font-size: 12px !important;
+    font-size: 13px !important;
     font-weight: 700;
-}
-
-.message-effect--impact {
-    outline: 1px solid color-mix(in srgb, currentColor 28%, transparent);
-    outline-offset: 1px;
 }
 
 .message-effect--monologue {

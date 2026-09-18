@@ -111,6 +111,7 @@ export function MessageEffectBubble({
   animateOnMount = false,
   canReplay,
   onEffectPlay,
+  indicatorSide = 'right',
   className = '',
   children,
   ...props
@@ -157,7 +158,12 @@ export function MessageEffectBubble({
       {...props}
       key={`${initialEffectReady ? 'ready' : 'waiting'}-${replayCount}`}
       data-message-bubble
-      className={[className, effectClassName].filter(Boolean).join(' ')}
+      data-effect-label={effect?.label}
+      className={[
+        className,
+        effectClassName,
+        effect ? `message-effect--indicator-${indicatorSide}` : '',
+      ].filter(Boolean).join(' ')}
       role={effect ? 'button' : props.role}
       tabIndex={effect ? 0 : props.tabIndex}
       aria-label={effect ? `${effect.label} 효과 다시 보기` : props['aria-label']}
