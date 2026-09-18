@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import RoomGroupPicker from './RoomGroupPicker'
 
@@ -20,7 +20,6 @@ describe('RoomGroupPicker', () => {
         groups={[{ id: 'space', name: '우주모험' }]}
         value={null}
         onChange={onChange}
-        onCreate={vi.fn()}
         theme={theme}
       />
     )
@@ -29,24 +28,12 @@ describe('RoomGroupPicker', () => {
     expect(onChange).toHaveBeenCalledWith('space')
   })
 
-  it('creates and selects a new group inline', async () => {
-    const onChange = vi.fn()
-    const onCreate = vi.fn().mockResolvedValue({ id: 'school', name: '판타지 학원' })
-    const { getByPlaceholderText, getByRole } = render(
-      <RoomGroupPicker
-        groups={[]}
-        value={null}
-        onChange={onChange}
-        onCreate={onCreate}
-        theme={theme}
-      />
+  it('only offers unassigned and existing groups', () => {
+    const { getAllByRole, queryByRole } = render(
+      <RoomGroupPicker groups={[{ id: 'space', name: '우주모험' }]} value={null} onChange={vi.fn()} theme={theme} />
     )
 
-    fireEvent.click(getByRole('button', { name: /새 그룹/ }))
-    fireEvent.change(getByPlaceholderText('예) 우주모험'), { target: { value: '판타지 학원' } })
-    fireEvent.click(getByRole('button', { name: '추가' }))
-
-    await waitFor(() => expect(onCreate).toHaveBeenCalledWith('판타지 학원'))
-    await waitFor(() => expect(onChange).toHaveBeenCalledWith('school'))
+    expect(getAllByRole('option').map(option => option.textContent)).toEqual(['미분류', '우주모험'])
+    expect(queryByRole('button', { name: /새 그룹/ })).toBeNull()
   })
 })

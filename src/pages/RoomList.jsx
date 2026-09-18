@@ -2,13 +2,14 @@ import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { getTheme } from '../lib/themes'
-import { Settings, Users, Trash2, CirclePlus, LogIn, Search, ListRestart, GripVertical, X, Star, Clock3, MoreHorizontal, MessageCircle, Folder, ChevronDown, ChevronRight } from 'lucide-react'
+import { Settings, Users, Trash2, CirclePlus, LogIn, Search, ListRestart, GripVertical, X, Star, Clock3, MoreHorizontal, MessageCircle, Folder, FolderPlus, ChevronDown, ChevronRight } from 'lucide-react'
 import { DndContext, PointerSensor, TouchSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core'
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { IconButton } from '../components/ui'
 import LoadingScreen from '../components/LoadingScreen'
 import EntryCharacterPicker from '../components/EntryCharacterPicker'
+import RoomGroupCreatePanel from '../components/RoomGroupCreatePanel'
 import RoomGroupPicker from '../components/RoomGroupPicker'
 import ConfirmDialog from '../components/ConfirmDialog'
 import Toast from '../components/Toast'
@@ -54,6 +55,7 @@ export default function RoomList() {
   const [collapsedGroupIds, setCollapsedGroupIds] = useState(loadCollapsedRoomGroups)
   const [showCreate, setShowCreate] = useState(false)
   const [showJoin, setShowJoin] = useState(false)
+  const [showGroupCreate, setShowGroupCreate] = useState(false)
   const [roomName, setRoomName] = useState('')
   const [inviteCode, setInviteCode] = useState('')
   const [pendingJoinRoom, setPendingJoinRoom] = useState(null)
@@ -517,6 +519,7 @@ export default function RoomList() {
           <button
             className="ui-touch-target"
             onClick={() => {
+              setShowGroupCreate(false)
               if (showCreate || showJoin) {
                 setShowCreate(false)
                 setShowJoin(false)
@@ -574,6 +577,22 @@ export default function RoomList() {
           </button>
         </div>
 
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+          <button
+            type="button"
+            onClick={() => {
+              setShowCreate(false)
+              setShowJoin(false)
+              setShowGroupCreate(current => !current)
+            }}
+            aria-expanded={showGroupCreate}
+            style={{ minHeight: 36, display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0 11px', border: `1px solid ${showGroupCreate ? t.point : t.border}`, borderRadius: 9, background: showGroupCreate ? `${t.point}22` : t.panel, color: showGroupCreate ? t.point : t.subText, fontSize: 11, cursor: 'pointer' }}>
+            <FolderPlus size={14} />새 그룹
+          </button>
+        </div>
+
+        {showGroupCreate && <RoomGroupCreatePanel onCreate={addRoomGroup} onClose={() => setShowGroupCreate(false)} theme={t} />}
+
         {/* 방 만들기 폼 */}
         {showCreate && (
           <div
@@ -613,7 +632,6 @@ export default function RoomList() {
               groups={roomGroups}
               value={createRoomGroupId}
               onChange={setCreateRoomGroupId}
-              onCreate={addRoomGroup}
               theme={t}
               disabled={loading}
             />
@@ -691,7 +709,6 @@ export default function RoomList() {
               groups={roomGroups}
               value={joinRoomGroupId}
               onChange={setJoinRoomGroupId}
-              onCreate={addRoomGroup}
               theme={t}
               disabled={loading}
             />
