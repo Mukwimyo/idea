@@ -26,10 +26,10 @@ import {
 } from '../features/rooms/roomGroups'
 import { createClientMessageId, findRoomByInviteCode, joinRoomWithInvite } from '../features/messages/messageApi'
 
-function SortableRoomCard({ roomId, disabled, children }) {
+function SortableRoomCard({ roomId, disabled, elevated = false, children }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: roomId, disabled })
   return (
-    <div ref={setNodeRef} {...attributes} style={{ transform: CSS.Transform.toString(transform), transition, position: 'relative', zIndex: isDragging ? 2 : 1, opacity: isDragging ? 0.72 : 1 }}>
+    <div ref={setNodeRef} {...attributes} style={{ width: '100%', minWidth: 0, maxWidth: '100%', transform: CSS.Transform.toString(transform), transition, position: 'relative', zIndex: isDragging ? 40 : elevated ? 30 : 'auto', opacity: isDragging ? 0.72 : 1 }}>
       {children({ listeners })}
     </div>
   )
@@ -397,12 +397,15 @@ export default function RoomList() {
   ).filter(section => !normalizedSearch || section.rooms.length > 0)
 
   const renderRoomCard = (room, roomIndex) => (
-    <SortableRoomCard key={room.id} roomId={room.id} disabled={!reordering}>
+    <SortableRoomCard key={room.id} roomId={room.id} disabled={!reordering} elevated={roomMenuId === room.id}>
       {({ listeners }) => (
         <div
           className={`room-card-transition${playInitialRoomAnimation ? ' room-card-first-enter' : ''}`}
           onClick={() => !reordering && navigate(`/room/${room.id}`)}
           style={{
+            width: '100%',
+            minWidth: 0,
+            maxWidth: '100%',
             background: t.panel,
             borderRadius: 12,
             padding: '13px 15px',
@@ -470,7 +473,9 @@ export default function RoomList() {
   return (
     <div
       style={{
+        width: '100%',
         minHeight: '100vh',
+        overflowX: 'hidden',
         backgroundColor: t.bg,
         backgroundImage: `url("${backgroundLogo}")`,
         backgroundRepeat: 'repeat',
@@ -496,7 +501,7 @@ export default function RoomList() {
         onSelect={completeJoinRoom}
         onClose={() => !entryJoining && setPendingJoinRoom(null)}
       />
-      <div style={{ maxWidth: 400, margin: '0 auto', position: 'relative' }}>
+      <div style={{ width: '100%', minWidth: 0, maxWidth: 400, margin: '0 auto', position: 'relative' }}>
         {/* 헤더 */}
         <div
           style={{
@@ -742,12 +747,12 @@ export default function RoomList() {
           {rooms.length > 0 && filteredRooms.length === 0 && <div style={{ textAlign: 'center', color: t.subText, fontSize: 13, marginTop: 32, opacity: 0.6 }}>검색 결과가 없어요.</div>}
         </div>
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleRoomDragEnd}>
-          <div style={{ display: 'grid', gap: 15, marginTop: rooms.length === 0 ? 10 : 0 }}>
+          <div style={{ width: '100%', minWidth: 0, maxWidth: '100%', display: 'grid', gap: 15, marginTop: rooms.length === 0 ? 10 : 0 }}>
             {roomGroupSections.map(section => {
               const collapsed = collapsedGroupIds.has(section.id)
               const unreadCount = section.rooms.reduce((sum, room) => sum + room.unreadCount, 0)
               return (
-                <section key={section.id}>
+                <section key={section.id} style={{ width: '100%', minWidth: 0, maxWidth: '100%' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 5, minHeight: 34, marginBottom: collapsed ? 0 : 7 }}>
                     <button
                       type="button"
@@ -766,7 +771,7 @@ export default function RoomList() {
                   </div>
                   {!collapsed && (
                     <SortableContext items={section.rooms.map(room => room.id)} strategy={verticalListSortingStrategy}>
-                      <div style={{ display: 'grid', gap: 8 }}>
+                      <div style={{ width: '100%', minWidth: 0, maxWidth: '100%', display: 'grid', gap: 8 }}>
                         {section.rooms.map(renderRoomCard)}
                         {section.rooms.length === 0 && <div style={{ padding: '10px 12px', borderRadius: 10, background: `${t.panel}88`, color: t.subText, fontSize: 11 }}>아직 이 그룹에 방이 없어요.</div>}
                       </div>
