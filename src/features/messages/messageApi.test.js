@@ -88,6 +88,22 @@ describe('message RPC API', () => {
       p_invite_code: 'abc123',
       p_character_id: 'character-1',
       p_client_message_id: 'client-1',
+      p_room_group_id: null,
     })
+  })
+
+  it('assigns an invited room to the selected personal group', async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: [{ id: 'room-1' }], error: null })
+    await joinRoomWithInvite(
+      { rpc },
+      'abc123',
+      'character-1',
+      'client-1',
+      'group-1'
+    )
+
+    expect(rpc).toHaveBeenCalledWith('join_room_with_invite', expect.objectContaining({
+      p_room_group_id: 'group-1',
+    }))
   })
 })

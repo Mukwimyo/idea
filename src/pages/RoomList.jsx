@@ -2,18 +2,28 @@ import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { getTheme } from '../lib/themes'
-import { Settings, Users, Trash2, CirclePlus, LogIn, Search, ListRestart, GripVertical, X, Star, Clock3, MoreHorizontal, MessageCircle } from 'lucide-react'
+import { Settings, Users, Trash2, CirclePlus, LogIn, Search, ListRestart, GripVertical, X, Star, Clock3, MoreHorizontal, MessageCircle, Folder, ChevronDown, ChevronRight } from 'lucide-react'
 import { DndContext, PointerSensor, TouchSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core'
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { IconButton } from '../components/ui'
 import LoadingScreen from '../components/LoadingScreen'
 import EntryCharacterPicker from '../components/EntryCharacterPicker'
+import RoomGroupPicker from '../components/RoomGroupPicker'
 import ConfirmDialog from '../components/ConfirmDialog'
 import Toast from '../components/Toast'
 import useToast from '../hooks/useToast'
 import useConfirmDialog from '../hooks/useConfirmDialog'
 import { normalizeRoomSummaries, sortRoomList } from '../features/rooms/roomSummary'
+import {
+  UNASSIGNED_ROOM_GROUP_ID,
+  buildRoomGroupSections,
+  createRoomGroup,
+  createRoomInGroup,
+  deleteRoomGroup,
+  fetchRoomGroups,
+  moveRoomToGroup,
+} from '../features/rooms/roomGroups'
 import { createClientMessageId, findRoomByInviteCode, joinRoomWithInvite } from '../features/messages/messageApi'
 
 function SortableRoomCard({ roomId, disabled, children }) {
@@ -25,10 +35,23 @@ function SortableRoomCard({ roomId, disabled, children }) {
   )
 }
 
+const loadCollapsedRoomGroups = () => {
+  try {
+    const stored = JSON.parse(localStorage.getItem('idea-collapsed-room-groups') || '[]')
+    return new Set(Array.isArray(stored) ? stored : [])
+  } catch {
+    return new Set()
+  }
+}
+
 export default function RoomList() {
   const { toast, showToast } = useToast()
   const { confirmation, confirm, closeConfirmation } = useConfirmDialog()
   const [rooms, setRooms] = useState([])
+  const [roomGroups, setRoomGroups] = useState([])
+  const [createRoomGroupId, setCreateRoomGroupId] = useState(null)
+  const [joinRoomGroupId, setJoinRoomGroupId] = useState(null)
+  const [collapsedGroupIds, setCollapsedGroupIds] = useState(loadCollapsedRoomGroups)
   const [showCreate, setShowCreate] = useState(false)
   const [showJoin, setShowJoin] = useState(false)
   const [roomName, setRoomName] = useState('')
@@ -63,6 +86,7 @@ export default function RoomList() {
     localStorage.setItem('idea-theme-id', data?.theme_id || 'dark-purple')
       setTheme(resolvedTheme)
       document.querySelector('meta[name="theme-color"]')?.setAttribute('content', resolvedTheme.panel)
+      fetchGroups()
       fetchRoomsRef.current?.(user.id)
 
       const scheduleRefresh = () => {
@@ -83,6 +107,10 @@ export default function RoomList() {
         )
         .on('postgres_changes', { event: '*', schema: 'public', table: 'room_read_cursors' }, scheduleRefresh)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'room_members', filter: `user_id=eq.${user.id}` }, scheduleRefresh)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'room_groups', filter: `user_id=eq.${user.id}` }, () => {
+          fetchGroups()
+          scheduleRefresh()
+        })
         .subscribe(status => {
           if (status === 'SUBSCRIBED') scheduleRefresh()
         })
@@ -112,7 +140,7 @@ export default function RoomList() {
     }
 
     console.warn('room summary RPC unavailable; using legacy queries:', summaryError?.message)
-    let { data, error } = await supabase.from('room_members').select('room_id, sort_order, is_favorite, rooms(*)').eq('user_id', id)
+    let { data, error } = await supabase.from('room_members').select('room_id, room_group_id, sort_order, is_favorite, rooms(*)').eq('user_id', id)
     if (error) {
       const fallback = await supabase.from('room_members').select('room_id, sort_order, rooms(*)').eq('user_id', id)
       data = fallback.data?.map(member => ({ ...member, is_favorite: false })) || null
@@ -124,7 +152,7 @@ export default function RoomList() {
     }
     if (!data) return
 
-    const rooms = data.map(d => ({ ...d.rooms, sort_order: d.sort_order ?? 0, is_favorite: d.is_favorite === true })).filter(room => room.id)
+    const rooms = data.map(d => ({ ...d.rooms, room_group_id: d.room_group_id || null, sort_order: d.sort_order ?? 0, is_favorite: d.is_favorite === true })).filter(room => room.id)
 
     const enriched = await Promise.all(
       rooms.map(async room => {
@@ -143,6 +171,25 @@ export default function RoomList() {
   useLayoutEffect(() => {
     fetchRoomsRef.current = fetchRooms
   })
+
+  const fetchGroups = async () => {
+    try {
+      setRoomGroups(await fetchRoomGroups(supabase))
+    } catch (error) {
+      console.warn('room group fetch failed:', error.message)
+    }
+  }
+
+  const addRoomGroup = async name => {
+    try {
+      const group = await createRoomGroup(supabase, name, roomGroups.length)
+      setRoomGroups(current => [...current, group])
+      return group
+    } catch (error) {
+      showToast(error?.code === '23505' ? '같은 이름의 방 그룹이 이미 있어요.' : '방 그룹을 만들지 못했어요.', 'error')
+      return null
+    }
+  }
 
   const changeSortMode = mode => {
     setSortMode(mode)
@@ -168,20 +215,17 @@ export default function RoomList() {
     const {
       data: { user },
     } = await supabase.auth.getUser()
-    const { data: room } = await supabase
-      .from('rooms')
-      .insert({
-        name: roomName,
-        created_by: user.id,
-      })
-      .select()
-      .single()
-    if (room) {
-      await supabase.from('room_members').insert({ room_id: room.id, user_id: user.id, sort_order: rooms.length })
+    try {
+      const room = await createRoomInGroup(supabase, roomName, createRoomGroupId)
       await supabase.from('profiles').upsert({ id: user.id, email: user.email })
       setRoomName('')
+      setCreateRoomGroupId(null)
       setShowCreate(false)
       fetchRooms()
+      if (!room) showToast('대화방 생성 결과를 확인하지 못했어요.', 'error')
+    } catch (error) {
+      console.warn('room creation failed:', error.message)
+      showToast('대화방을 만들지 못했어요.', 'error')
     }
     setLoading(false)
   }
@@ -202,7 +246,16 @@ export default function RoomList() {
       await supabase.from('profiles').upsert({ id: user.id, email: user.email })
       const { data: existingMember } = await supabase.from('room_members').select('room_id').eq('room_id', room.id).eq('user_id', user.id).maybeSingle()
       if (existingMember) {
+        try {
+          await moveRoomToGroup(supabase, room.id, joinRoomGroupId)
+        } catch (error) {
+          console.warn('existing room group update failed:', error.message)
+          showToast('방 그룹을 저장하지 못했어요.', 'error')
+          setLoading(false)
+          return
+        }
         setInviteCode('')
+        setJoinRoomGroupId(null)
         setShowJoin(false)
         fetchRooms()
       } else {
@@ -220,7 +273,7 @@ export default function RoomList() {
     if (!pendingJoinRoom || !character) return
     setEntryJoining(true)
     try {
-      await joinRoomWithInvite(supabase, inviteCode, character.id, createClientMessageId())
+      await joinRoomWithInvite(supabase, inviteCode, character.id, createClientMessageId(), joinRoomGroupId)
     } catch (error) {
       console.warn('room join failed:', error.message)
       setEntryJoining(false)
@@ -230,8 +283,52 @@ export default function RoomList() {
     setEntryJoining(false)
     setPendingJoinRoom(null)
     setInviteCode('')
+    setJoinRoomGroupId(null)
     setShowJoin(false)
     fetchRooms()
+  }
+
+  const moveRoom = async (room, roomGroupId) => {
+    const nextGroupId = roomGroupId || null
+    setRooms(current => current.map(item => item.id === room.id ? { ...item, room_group_id: nextGroupId } : item))
+    setRoomMenuId(null)
+    try {
+      await moveRoomToGroup(supabase, room.id, nextGroupId)
+      showToast('방 그룹을 옮겼어요.')
+    } catch (error) {
+      console.warn('room group move failed:', error.message)
+      showToast('방 그룹을 옮기지 못했어요.', 'error')
+      fetchRooms()
+    }
+  }
+
+  const removeRoomGroup = async group => {
+    const accepted = await confirm({
+      title: `${group.name} 그룹을 삭제할까요?`,
+      description: '그룹 안의 방은 삭제되지 않고 미분류로 이동해요.',
+      confirmLabel: '그룹 삭제',
+      danger: true,
+    })
+    if (!accepted) return
+    try {
+      await deleteRoomGroup(supabase, group.id)
+      setRoomGroups(current => current.filter(item => item.id !== group.id))
+      setRooms(current => current.map(room => room.room_group_id === group.id ? { ...room, room_group_id: null } : room))
+      showToast('방 그룹을 삭제했어요.')
+    } catch (error) {
+      console.warn('room group delete failed:', error.message)
+      showToast('방 그룹을 삭제하지 못했어요.', 'error')
+    }
+  }
+
+  const toggleRoomGroup = groupId => {
+    setCollapsedGroupIds(current => {
+      const next = new Set(current)
+      if (next.has(groupId)) next.delete(groupId)
+      else next.add(groupId)
+      localStorage.setItem('idea-collapsed-room-groups', JSON.stringify([...next]))
+      return next
+    })
   }
 
   const deleteRoom = async (e, roomId, createdBy) => {
@@ -255,13 +352,17 @@ export default function RoomList() {
 
   const handleRoomDragEnd = async ({ active, over }) => {
     if (!over || active.id === over.id) return
-    const oldIndex = rooms.findIndex(room => room.id === active.id)
-    const newIndex = rooms.findIndex(room => room.id === over.id)
+    const activeRoom = rooms.find(room => room.id === active.id)
+    const overRoom = rooms.find(room => room.id === over.id)
+    if (!activeRoom || !overRoom || activeRoom.room_group_id !== overRoom.room_group_id) return
+    const groupRooms = rooms.filter(room => room.room_group_id === activeRoom.room_group_id)
+    const oldIndex = groupRooms.findIndex(room => room.id === active.id)
+    const newIndex = groupRooms.findIndex(room => room.id === over.id)
     if (oldIndex < 0 || newIndex < 0) return
-    const orderedRooms = arrayMove(rooms, oldIndex, newIndex).map((room, index) => ({ ...room, sort_order: index }))
-    setRooms(orderedRooms)
+    const orderedGroupRooms = arrayMove(groupRooms, oldIndex, newIndex).map((room, index) => ({ ...room, sort_order: index }))
+    setRooms(current => current.map(room => orderedGroupRooms.find(item => item.id === room.id) || room))
     const results = await Promise.all(
-      orderedRooms.map((room, index) => supabase.from('room_members').update({ sort_order: index }).eq('room_id', room.id).eq('user_id', userId))
+      orderedGroupRooms.map((room, index) => supabase.from('room_members').update({ sort_order: index }).eq('room_id', room.id).eq('user_id', userId))
     )
     if (results.some(result => result.error)) {
       showToast('채팅방 순서를 저장하지 못했어요.', 'error')
@@ -277,7 +378,11 @@ export default function RoomList() {
   const headerLogo = `${import.meta.env.BASE_URL}branding/idea-logo-header-${logoVariant}.png`
   const backgroundLogo = `${import.meta.env.BASE_URL}branding/idea-logo-background-tile-${logoVariant}.png`
   const normalizedSearch = searchQuery.trim().toLocaleLowerCase('ko-KR')
-  const filteredRooms = rooms.filter(room => room.name.toLocaleLowerCase('ko-KR').includes(normalizedSearch))
+  const roomGroupNameById = new Map(roomGroups.map(group => [group.id, group.name.toLocaleLowerCase('ko-KR')]))
+  const filteredRooms = rooms.filter(room =>
+    room.name.toLocaleLowerCase('ko-KR').includes(normalizedSearch)
+    || (room.room_group_id && roomGroupNameById.get(room.room_group_id)?.includes(normalizedSearch))
+  )
   const formatRoomTime = value => {
     if (!value) return ''
     const date = new Date(value)
@@ -285,6 +390,82 @@ export default function RoomList() {
     if (date.toDateString() === today.toDateString()) return date.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
     return date.toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' })
   }
+  const roomGroupSections = buildRoomGroupSections(
+    filteredRooms,
+    roomGroups,
+    groupRooms => sortRoomList(groupRooms, sortMode)
+  ).filter(section => !normalizedSearch || section.rooms.length > 0)
+
+  const renderRoomCard = (room, roomIndex) => (
+    <SortableRoomCard key={room.id} roomId={room.id} disabled={!reordering}>
+      {({ listeners }) => (
+        <div
+          className={`room-card-transition${playInitialRoomAnimation ? ' room-card-first-enter' : ''}`}
+          onClick={() => !reordering && navigate(`/room/${room.id}`)}
+          style={{
+            background: t.panel,
+            borderRadius: 12,
+            padding: '13px 15px',
+            cursor: reordering ? 'default' : 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            border: `1px solid ${t.border}`,
+            boxShadow: '0 1px 4px rgba(0,0,0,0.15)',
+            animationDelay: playInitialRoomAnimation ? `${Math.min(roomIndex, 10) * 70}ms` : undefined,
+          }}>
+          {reordering && <button {...listeners} onClick={event => event.stopPropagation()} aria-label={`${room.name} 순서 이동`} style={{ border: 0, background: 'none', padding: 2, display: 'flex', cursor: 'grab', touchAction: 'none' }}><GripVertical size={18} color={t.subText} /></button>}
+          <div className="squircle-media" style={{ width: 48, height: 48, background: t.point, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, color: t.bg, flexShrink: 0, overflow: 'hidden' }}>{room.cover_image ? <img src={room.cover_image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '✦'}</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {room.is_favorite && <Star size={14} color={t.point} fill={t.point} aria-label="즐겨찾기" style={{ flexShrink: 0 }} />}
+              <div style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 15, fontWeight: 600, color: t.theirText }}>{room.name}</div>
+              {room.lastMsg?.created_at && <time style={{ color: t.subText, fontSize: 11, flexShrink: 0 }}>{formatRoomTime(room.lastMsg.created_at)}</time>}
+            </div>
+            <div style={{ fontSize: 11, color: t.subText, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {room.lastMsg
+                ? room.lastMsg.type === 'chat'
+                  ? `${room.lastMsg.characters?.name || ''}: ${room.lastMsg.content}`
+                  : room.lastMsg.type === 'room_invite'
+                    ? '[대화방 초대]'
+                    : room.lastMsg.type === 'member_joined' || room.lastMsg.type === 'member_left'
+                      ? room.lastMsg.content
+                      : room.lastMsg.type === 'image' || room.lastMsg.type === 'image_group'
+                        ? '[이미지]'
+                        : room.lastMsg.type === 'random_result'
+                          ? '[랜덤 결과]'
+                          : `[${room.lastMsg.type === 'narration' ? '나레이션' : '시스템 메시지'}]`
+                : ''}
+            </div>
+          </div>
+          {room.unreadCount > 0 && <div style={{ background: t.point, color: t.bg, borderRadius: 10, padding: '2px 7px', fontSize: 11, fontWeight: 600, flexShrink: 0 }}>{room.unreadCount}</div>}
+          {!reordering && <div style={{ position: 'relative' }}>
+            <IconButton
+              onMouseDown={event => event.stopPropagation()}
+              onClick={event => { event.stopPropagation(); setRoomMenuId(current => current === room.id ? null : room.id) }}
+              label={`${room.name} 메뉴`}
+              borderColor="transparent"
+              pointColor={t.point}
+              color={t.subText}
+              style={{ width: 44, height: 44 }}>
+              <MoreHorizontal size={19} />
+            </IconButton>
+            {roomMenuId === room.id && <div className="message-action-menu" onClick={event => event.stopPropagation()} style={{ position: 'absolute', zIndex: 20, top: 42, right: 0, width: 190, padding: 5, border: `1px solid ${t.border}`, borderRadius: 11, background: t.panel, boxShadow: '0 10px 28px rgba(0,0,0,.28)' }}>
+              <button onClick={event => { toggleFavorite(event, room); setRoomMenuId(null) }} style={{ width: '100%', minHeight: 40, display: 'flex', alignItems: 'center', gap: 9, padding: '0 10px', border: 0, borderRadius: 8, background: 'transparent', color: t.theirText, fontSize: 12 }}><Star size={15} fill={room.is_favorite ? 'currentColor' : 'none'} />{room.is_favorite ? '즐겨찾기 해제' : '즐겨찾기'}</button>
+              <div style={{ padding: '5px 9px 8px' }}>
+                <label htmlFor={`room-group-${room.id}`} style={{ display: 'block', marginBottom: 5, color: t.subText, fontSize: 9 }}>그룹 이동</label>
+                <select id={`room-group-${room.id}`} value={room.room_group_id || ''} onChange={event => moveRoom(room, event.target.value)} style={{ width: '100%', padding: '7px 8px', border: `1px solid ${t.border}`, borderRadius: 7, background: t.bg, color: t.inputText, fontSize: 11 }}>
+                  <option value="">미분류</option>
+                  {roomGroups.map(group => <option key={group.id} value={group.id}>{group.name}</option>)}
+                </select>
+              </div>
+              {room.created_by === userId && <button onClick={event => { setRoomMenuId(null); deleteRoom(event, room.id, room.created_by) }} style={{ width: '100%', minHeight: 40, display: 'flex', alignItems: 'center', gap: 9, padding: '0 10px', border: 0, borderRadius: 8, background: 'transparent', color: '#f87171', fontSize: 12 }}><Trash2 size={15} />채팅방 삭제</button>}
+            </div>}
+          </div>}
+        </div>
+      )}
+    </SortableRoomCard>
+  )
 
   return (
     <div
@@ -423,6 +604,14 @@ export default function RoomList() {
                 boxSizing: 'border-box',
               }}
             />
+            <RoomGroupPicker
+              groups={roomGroups}
+              value={createRoomGroupId}
+              onChange={setCreateRoomGroupId}
+              onCreate={addRoomGroup}
+              theme={t}
+              disabled={loading}
+            />
             <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
               <button
                 onClick={createRoom}
@@ -493,6 +682,14 @@ export default function RoomList() {
                 boxSizing: 'border-box',
               }}
             />
+            <RoomGroupPicker
+              groups={roomGroups}
+              value={joinRoomGroupId}
+              onChange={setJoinRoomGroupId}
+              onCreate={addRoomGroup}
+              theme={t}
+              disabled={loading}
+            />
             <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
               <button
                 onClick={joinRoom}
@@ -530,8 +727,6 @@ export default function RoomList() {
 
         {/* 방 목록 */}
         {reordering && <div className="reorder-mode-reveal" style={{ color: t.subText, fontSize: 11, marginBottom: 8 }}>손잡이를 끌어 채팅방 순서를 변경하세요.</div>}
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleRoomDragEnd}>
-          <SortableContext items={filteredRooms.map(room => room.id)} strategy={verticalListSortingStrategy}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {rooms.length === 0 && (
             <div className="ui-empty-state" style={{ color: t.subText }}>
@@ -545,92 +740,42 @@ export default function RoomList() {
             </div>
           )}
           {rooms.length > 0 && filteredRooms.length === 0 && <div style={{ textAlign: 'center', color: t.subText, fontSize: 13, marginTop: 32, opacity: 0.6 }}>검색 결과가 없어요.</div>}
-          {filteredRooms.map((room, roomIndex) => (
-            <SortableRoomCard key={room.id} roomId={room.id} disabled={!reordering}>
-              {({ listeners }) => (
-            <div
-              className={`room-card-transition${playInitialRoomAnimation ? ' room-card-first-enter' : ''}`}
-              onClick={() => !reordering && navigate(`/room/${room.id}`)}
-              style={{
-                background: t.panel,
-                borderRadius: 12,
-                padding: '13px 15px',
-                cursor: reordering ? 'default' : 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 12,
-                border: `1px solid ${t.border}`,
-                boxShadow: `0 1px 4px rgba(0,0,0,0.15)`,
-                animationDelay: playInitialRoomAnimation ? `${Math.min(roomIndex, 10) * 70}ms` : undefined,
-              }}>
-              {reordering && <button {...listeners} onClick={event => event.stopPropagation()} aria-label={`${room.name} 순서 이동`} style={{ border: 0, background: 'none', padding: 2, display: 'flex', cursor: 'grab', touchAction: 'none' }}><GripVertical size={18} color={t.subText} /></button>}
-              <div className="squircle-media" style={{ width: 48, height: 48, background: t.point, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, color: t.bg, flexShrink: 0, overflow: 'hidden' }}>{room.cover_image ? <img src={room.cover_image} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '✦'}</div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  {room.is_favorite && <Star size={14} color={t.point} fill={t.point} aria-label="즐겨찾기" style={{ flexShrink: 0 }} />}
-                  <div style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 15, fontWeight: 600, color: t.theirText }}>{room.name}</div>
-                  {room.lastMsg?.created_at && <time style={{ color: t.subText, fontSize: 11, flexShrink: 0 }}>{formatRoomTime(room.lastMsg.created_at)}</time>}
-                </div>
-                <div
-                  style={{
-                    fontSize: 11,
-                    color: t.subText,
-                    marginTop: 2,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}>
-                  {room.lastMsg
-                    ? room.lastMsg.type === 'chat'
-                      ? `${room.lastMsg.characters?.name || ''}: ${room.lastMsg.content}`
-                      : room.lastMsg.type === 'room_invite'
-                        ? '[대화방 초대]'
-                        : room.lastMsg.type === 'member_joined' || room.lastMsg.type === 'member_left'
-                          ? room.lastMsg.content
-                          : room.lastMsg.type === 'image' || room.lastMsg.type === 'image_group'
-                            ? '[이미지]'
-                            : room.lastMsg.type === 'random_result'
-                              ? '[랜덤 결과]'
-                            : `[${room.lastMsg.type === 'narration' ? '나레이션' : '시스템 메시지'}]`
-                    : ''}
-                </div>
-              </div>
-              {room.unreadCount > 0 && (
-                <div
-                  style={{
-                    background: t.point,
-                    color: t.bg,
-                    borderRadius: 10,
-                    padding: '2px 7px',
-                    fontSize: 11,
-                    fontWeight: 600,
-                    flexShrink: 0,
-                  }}>
-                  {room.unreadCount}
-                </div>
-              )}
-              {!reordering && <div style={{ position: 'relative' }}>
-                <IconButton
-                  onMouseDown={event => event.stopPropagation()}
-                  onClick={event => { event.stopPropagation(); setRoomMenuId(current => current === room.id ? null : room.id) }}
-                  label={`${room.name} 메뉴`}
-                  borderColor="transparent"
-                  pointColor={t.point}
-                  color={t.subText}
-                  style={{ width: 44, height: 44 }}>
-                  <MoreHorizontal size={19} />
-                </IconButton>
-                {roomMenuId === room.id && <div className="message-action-menu" onClick={event => event.stopPropagation()} style={{ position: 'absolute', zIndex: 20, top: 42, right: 0, width: 148, padding: 5, border: `1px solid ${t.border}`, borderRadius: 11, background: t.panel, boxShadow: '0 10px 28px rgba(0,0,0,.28)' }}>
-                  <button onClick={event => { toggleFavorite(event, room); setRoomMenuId(null) }} style={{ width: '100%', minHeight: 40, display: 'flex', alignItems: 'center', gap: 9, padding: '0 10px', border: 0, borderRadius: 8, background: 'transparent', color: t.theirText, fontSize: 12 }}><Star size={15} fill={room.is_favorite ? 'currentColor' : 'none'} />{room.is_favorite ? '즐겨찾기 해제' : '즐겨찾기'}</button>
-                  {room.created_by === userId && <button onClick={event => { setRoomMenuId(null); deleteRoom(event, room.id, room.created_by) }} style={{ width: '100%', minHeight: 40, display: 'flex', alignItems: 'center', gap: 9, padding: '0 10px', border: 0, borderRadius: 8, background: 'transparent', color: '#f87171', fontSize: 12 }}><Trash2 size={15} />채팅방 삭제</button>}
-                </div>}
-              </div>}
-            </div>
-              )}
-            </SortableRoomCard>
-          ))}
         </div>
-          </SortableContext>
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleRoomDragEnd}>
+          <div style={{ display: 'grid', gap: 15, marginTop: rooms.length === 0 ? 10 : 0 }}>
+            {roomGroupSections.map(section => {
+              const collapsed = collapsedGroupIds.has(section.id)
+              const unreadCount = section.rooms.reduce((sum, room) => sum + room.unreadCount, 0)
+              return (
+                <section key={section.id}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, minHeight: 34, marginBottom: collapsed ? 0 : 7 }}>
+                    <button
+                      type="button"
+                      onClick={() => toggleRoomGroup(section.id)}
+                      aria-expanded={!collapsed}
+                      style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 7, padding: '5px 2px', border: 0, background: 'transparent', color: t.theirText, textAlign: 'left' }}>
+                      {collapsed ? <ChevronRight size={14} color={t.subText} /> : <ChevronDown size={14} color={t.subText} />}
+                      <Folder size={14} color={section.id === UNASSIGNED_ROOM_GROUP_ID ? t.subText : t.point} />
+                      <strong style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 12 }}>{section.name}</strong>
+                      <span style={{ color: t.subText, fontSize: 10 }}>{section.rooms.length}</span>
+                      {unreadCount > 0 && <span style={{ marginLeft: 2, padding: '1px 6px', borderRadius: 9, background: `${t.point}24`, color: t.point, fontSize: 9 }}>{unreadCount}</span>}
+                    </button>
+                    {section.id !== UNASSIGNED_ROOM_GROUP_ID && (
+                      <button type="button" aria-label={`${section.name} 그룹 삭제`} onClick={() => removeRoomGroup(section)} style={{ width: 32, height: 32, display: 'grid', placeItems: 'center', border: 0, borderRadius: 8, background: 'transparent', color: t.subText, opacity: 0.58 }}><Trash2 size={13} /></button>
+                    )}
+                  </div>
+                  {!collapsed && (
+                    <SortableContext items={section.rooms.map(room => room.id)} strategy={verticalListSortingStrategy}>
+                      <div style={{ display: 'grid', gap: 8 }}>
+                        {section.rooms.map(renderRoomCard)}
+                        {section.rooms.length === 0 && <div style={{ padding: '10px 12px', borderRadius: 10, background: `${t.panel}88`, color: t.subText, fontSize: 11 }}>아직 이 그룹에 방이 없어요.</div>}
+                      </div>
+                    </SortableContext>
+                  )}
+                </section>
+              )
+            })}
+          </div>
         </DndContext>
       </div>
     </div>
