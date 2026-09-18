@@ -79,14 +79,15 @@ describe('MessageEffectBubble', () => {
     expect(container.firstChild).not.toHaveClass('message-effect--playing')
   })
 
-  it('shows a tiny effect label on the requested side of the bubble', () => {
+  it('shows a tiny effect sparkle on the requested side of the bubble', () => {
     const { container } = render(
       <MessageEffectBubble effectKey="whisper" indicatorSide="left">
         표시되는 효과
       </MessageEffectBubble>
     )
 
-    expect(container.firstChild).toHaveAttribute('data-effect-label', '속삭임')
+    expect(container.firstChild).toHaveAttribute('data-effect-indicator', 'sparkle')
+    expect(container.firstChild).not.toHaveAttribute('data-effect-label')
     expect(container.firstChild).toHaveClass('message-effect--indicator-left')
   })
 })

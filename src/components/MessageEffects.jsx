@@ -158,7 +158,7 @@ export function MessageEffectBubble({
       {...props}
       key={`${initialEffectReady ? 'ready' : 'waiting'}-${replayCount}`}
       data-message-bubble
-      data-effect-label={effect?.label}
+      data-effect-indicator={effect ? 'sparkle' : undefined}
       className={[
         className,
         effectClassName,
