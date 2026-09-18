@@ -71,11 +71,12 @@ export const findRoomByInviteCode = async (supabase, inviteCode) => {
   return Array.isArray(data) ? data[0] || null : data || null
 }
 
-export const joinRoomWithInvite = async (supabase, inviteCode, characterId, clientMessageId) => {
+export const joinRoomWithInvite = async (supabase, inviteCode, characterId, clientMessageId, roomGroupId = null) => {
   const { data, error } = await supabase.rpc('join_room_with_invite', {
     p_invite_code: inviteCode.trim(),
     p_character_id: characterId,
     p_client_message_id: clientMessageId,
+    p_room_group_id: roomGroupId || null,
   })
   if (error) throw error
   return Array.isArray(data) ? data[0] || null : data || null
