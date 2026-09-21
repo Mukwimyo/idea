@@ -19,7 +19,7 @@ export default function RoomGroupCreatePanel({ onCreate, onClose, theme }) {
 
   return (
     <div
-      className="inline-panel-reveal"
+      className="inline-panel-reveal room-list-inline-panel room-group-create-panel"
       style={{
         padding: 14,
         marginBottom: 12,

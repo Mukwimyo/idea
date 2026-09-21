@@ -4,8 +4,10 @@ import { THEMES, getTheme } from '../lib/themes'
 import { ChevronLeft, ChevronRight, LogOut, Users, Bell, BellOff, CircleHelp } from 'lucide-react'
 import { supabase, subscribePush, unsubscribePush } from '../lib/supabase'
 import Toast from '../components/Toast'
+import UiModeToggleCard from '../components/UiModeToggleCard'
 import useToast from '../hooks/useToast'
 import { clearPendingMessages } from '../features/messages/pendingMessageStore'
+import { getStoredUiMode, saveUiMode } from '../lib/uiMode'
 
 const FONTS = [
   { id: 'sans', name: '기본', family: 'sans-serif' },
@@ -144,6 +146,7 @@ export default function Settings() {
   const [showEntering, setShowEntering] = useState(true)
   const [showMessageTime, setShowMessageTime] = useState(true)
   const [showEditedLabel, setShowEditedLabel] = useState(true)
+  const [uiMode, setUiMode] = useState(getStoredUiMode)
   const [pushLoading, setPushLoading] = useState(false)
   const [closing, setClosing] = useState(false)
 
@@ -212,6 +215,12 @@ export default function Settings() {
     } = await supabase.auth.getUser()
     const { error } = await supabase.from('profiles').update({ font_scale: scale }).eq('id', user.id)
     showToast(error ? '글자 크기를 저장하지 못했어요.' : '글자 크기가 저장됐어요.', error ? 'error' : 'success')
+  }
+
+  const changeUiMode = mode => {
+    const nextMode = saveUiMode(mode)
+    setUiMode(nextMode)
+    showToast(nextMode === 'modern' ? '새 디자인을 켰어요.' : '기존 디자인으로 돌아왔어요.')
   }
 
   const togglePush = async () => {
@@ -295,6 +304,16 @@ export default function Settings() {
           <div style={{ fontSize: 16, fontWeight: 500, color: t.theirText }}>설정</div>
           {saving && <div style={{ marginLeft: 'auto', fontSize: 11, color: t.subText }}>저장 중...</div>}
         </div>
+
+        <div style={{ marginBottom: 28 }}>
+          <div style={{ fontSize: 11, color: t.subText, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>화면 디자인</div>
+          <UiModeToggleCard mode={uiMode} onChange={changeUiMode} theme={t} />
+          <div style={{ marginTop: 9, color: t.subText, fontSize: 10, lineHeight: 1.55, opacity: 0.72 }}>
+            새 디자인은 화면 표현만 바꿔요. 언제든 끄면 기존 디자인으로 돌아갈 수 있어요.
+          </div>
+        </div>
+
+        <div style={{ height: 0.5, background: t.border, marginBottom: 28 }} />
 
         <div style={{ marginBottom: 28 }}>
           <div
