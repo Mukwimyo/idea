@@ -1,6 +1,6 @@
 export default function RoomGroupPicker({ groups, value, onChange, theme, disabled = false }) {
   return (
-    <div style={{ marginTop: 11 }}>
+    <div className="room-group-picker" style={{ marginTop: 11 }}>
       <div style={{ marginBottom: 7, color: theme.subText, fontSize: 12 }}>방 그룹</div>
       <select
         value={value || ''}
