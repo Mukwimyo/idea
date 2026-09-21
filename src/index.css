@@ -499,16 +499,13 @@ button:disabled {
 }
 
 .message-effect::after {
-    content: attr(data-effect-label);
+    content: "✦";
     position: absolute;
-    bottom: 2px;
-    font-size: 8px;
-    font-weight: 500;
+    bottom: 3px;
+    font-size: 7px;
     line-height: 1;
-    letter-spacing: 0;
-    opacity: 0.48;
+    opacity: 0.44;
     pointer-events: none;
-    white-space: nowrap;
 }
 
 .message-effect--indicator-right::after {
