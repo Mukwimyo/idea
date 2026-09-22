@@ -2,7 +2,7 @@ import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase, uploadFile, validateImageFile } from '../lib/supabase'
 import { THEMES, getTheme } from '../lib/themes'
-import { ChevronLeft, Settings, Search, Images, ArrowUp, Eye, ArrowDown, ChevronDown, ChevronUp, Quote, RotateCcw, AlertCircle, Minus, Phone, Copy, DoorOpen, Send, Music, Grid2X2, ImagePlus, Pin, Bookmark, MapPin, StickyNote, Dices, Crown, Percent, Scissors, Shuffle, Sparkles } from 'lucide-react'
+import { ChevronLeft, Settings, Search, Images, ArrowUp, Eye, ArrowDown, ChevronDown, ChevronUp, Quote, RotateCcw, AlertCircle, Minus, Phone, Copy, DoorOpen, Send, Music, Grid2X2, ImagePlus, Star, Bookmark, MapPin, StickyNote, Dices, Crown, Percent, Scissors, Shuffle, Sparkles } from 'lucide-react'
 import ProfileImageModal from '../components/ProfileImageModal'
 import CommunicationSessions from '../components/CommunicationSessions'
 import CommunicationRecord from '../components/CommunicationRecord'
@@ -14,6 +14,7 @@ import SharedBackgroundAudio from '../components/SharedBackgroundAudio'
 import RoomWorldPanel from '../components/RoomWorldPanel'
 import RandomTools from '../components/RandomTools'
 import ConfirmDialog from '../components/ConfirmDialog'
+import QuickToolPicker from '../components/QuickToolPicker'
 import { MessageEffectBubble, MessageEffectChip, MessageEffectPicker } from '../components/MessageEffects'
 import useConfirmDialog from '../hooks/useConfirmDialog'
 import useMessageStageEffects from '../hooks/useMessageStageEffects'
@@ -27,6 +28,7 @@ import {
   sendRoomMessage as sendRoomMessageRpc,
 } from '../features/messages/messageApi'
 import { highestReadableMessage, mergeMessages } from '../features/messages/messageState'
+import { readQuickToolPreferences, toggleFavoriteTool, writeQuickToolPreferences } from '../features/rooms/quickToolPreferences'
 import {
   queuePendingMessage,
   readPendingMessages,
@@ -217,7 +219,8 @@ export default function Room() {
   const [closingRoleplayMenu, setClosingRoleplayMenu] = useState(false)
   const [toolSheetOffset, setToolSheetOffset] = useState(0)
   const [draggingToolSheet, setDraggingToolSheet] = useState(false)
-  const [quickTool, setQuickTool] = useState(() => localStorage.getItem('idea-room-quick-tool') || 'narration')
+  const [quickToolPreferences, setQuickToolPreferences] = useState(() => readQuickToolPreferences(window.localStorage))
+  const [showQuickToolPicker, setShowQuickToolPicker] = useState(false)
   const [toolPanel, setToolPanel] = useState(null)
   const [selectedMessageEffect, setSelectedMessageEffect] = useState(null)
   const [showRoomInvitePicker, setShowRoomInvitePicker] = useState(false)
@@ -240,6 +243,8 @@ export default function Room() {
   const longPressTriggeredRef = useRef(false)
   const profileGestureStartRef = useRef(null)
   const profileGestureHandledRef = useRef(false)
+  const quickToolGestureRef = useRef(null)
+  const quickToolGestureHandledRef = useRef(false)
   const fileInputRef = useRef(null)
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
@@ -1373,10 +1378,30 @@ export default function Room() {
     })
   }
 
-  const pinQuickTool = toolId => {
-    setQuickTool(toolId)
-    localStorage.setItem('idea-room-quick-tool', toolId)
-    showToast('빠른 실행 기능을 변경했어요.')
+  const quickTool = quickToolPreferences.activeId
+  const favoriteTools = quickToolPreferences.favorites
+
+  const saveQuickToolPreferences = nextPreferences => {
+    const saved = writeQuickToolPreferences(window.localStorage, nextPreferences)
+    setQuickToolPreferences(saved)
+    return saved
+  }
+
+  const toggleQuickToolFavorite = toolId => {
+    const next = toggleFavoriteTool(quickToolPreferences, toolId)
+    if (!next.changed) {
+      showToast('빠른 실행 도구는 하나 이상 남겨주세요.')
+      return
+    }
+    const wasFavorite = favoriteTools.includes(toolId)
+    saveQuickToolPreferences(next)
+    showToast(wasFavorite ? '즐겨찾기에서 해제했어요.' : '즐겨찾기에 추가했어요.')
+  }
+
+  const selectQuickTool = toolId => {
+    if (!favoriteTools.includes(toolId)) return
+    saveQuickToolPreferences({ activeId: toolId, favorites: favoriteTools })
+    setShowQuickToolPicker(false)
   }
 
   const runRoomTool = async (toolId, fromQuickButton = false) => {
@@ -1447,6 +1472,7 @@ export default function Room() {
     { id: 'room', label: '방 관리', tools: ['invite', 'notes'] },
   ]
   const selectedQuickTool = roomTools.find(tool => tool.id === quickTool) || roomTools[1]
+  const favoriteRoomTools = favoriteTools.map(toolId => roomTools.find(tool => tool.id === toolId)).filter(Boolean)
 
   const renderMessageActions = (msg, canEdit = true) => {
     if (messageMenuId !== msg.id) return null
@@ -2574,7 +2600,7 @@ export default function Room() {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8 }}>
                   {group.tools.map(toolId => roomTools.find(tool => tool.id === toolId)).filter(Boolean).map(tool => {
                     const ToolIcon = tool.icon
-                    const selected = quickTool === tool.id
+                    const selected = favoriteTools.includes(tool.id)
                     const active = (tool.id === 'narration' && isNarrActive) || (tool.id === 'effects' && Boolean(selectedMessageEffect))
                     return (
                       <div key={tool.id} style={{ position: 'relative', minWidth: 0 }}>
@@ -2589,11 +2615,11 @@ export default function Room() {
                           onMouseDown={event => event.preventDefault()}
                           onClick={event => {
                             event.stopPropagation()
-                            pinQuickTool(tool.id)
+                            toggleQuickToolFavorite(tool.id)
                           }}
-                          aria-label={`${tool.label} 빠른 실행 지정`}
+                          aria-label={`${tool.label} 즐겨찾기 ${selected ? '해제' : '추가'}`}
                           style={{ position: 'absolute', top: 4, right: 4, width: 28, height: 28, display: 'grid', placeItems: 'center', padding: 0, border: 0, borderRadius: '50%', background: selected ? `${t.point}33` : 'transparent', color: selected ? t.point : t.subText, cursor: 'pointer' }}>
-                          <Pin size={13} fill={selected ? 'currentColor' : 'none'} />
+                          <Star size={13} fill={selected ? 'currentColor' : 'none'} />
                         </button>
                       </div>
                     )
@@ -2640,8 +2666,11 @@ export default function Room() {
           </div>
           </div>
         )}
+        {showQuickToolPicker && (
+          <QuickToolPicker tools={favoriteRoomTools} activeId={quickTool} theme={t} onSelect={selectQuickTool} />
+        )}
         <div style={{ display: 'flex', gap: 2, alignItems: 'center', width: '100%', height: 42, minHeight: 42, padding: '0 2px', borderRadius: 22, background: `color-mix(in srgb, ${t.panel} 86%, transparent)`, backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)', border: `1px solid ${t.border}`, boxShadow: '0 8px 24px rgba(0,0,0,0.22)', pointerEvents: 'auto' }}>
-          <button className="ui-touch-target" onMouseDown={e => e.preventDefault()} onClick={() => { if (showRoleplayMenu) closeRoleplayMenu(); else openRoleplayMenu() }} aria-label="대화 도구 메뉴" aria-expanded={showRoleplayMenu} style={{ width: 44, height: 44, padding: 0, border: 0, background: 'transparent', cursor: 'pointer', flexShrink: 0, display: 'grid', placeItems: 'center' }}>
+          <button className="ui-touch-target" onMouseDown={e => e.preventDefault()} onClick={() => { setShowQuickToolPicker(false); if (showRoleplayMenu) closeRoleplayMenu(); else openRoleplayMenu() }} aria-label="대화 도구 메뉴" aria-expanded={showRoleplayMenu} style={{ width: 44, height: 44, padding: 0, border: 0, background: 'transparent', cursor: 'pointer', flexShrink: 0, display: 'grid', placeItems: 'center' }}>
             <span style={{ width: 34, height: 34, display: 'grid', placeItems: 'center', borderRadius: '50%', border: `1px solid ${showRoleplayMenu ? t.point : 'transparent'}`, background: showRoleplayMenu ? `${t.point}2f` : `${t.border}66` }}><Grid2X2 size={16} color={showRoleplayMenu ? t.point : t.subText} /></span>
           </button>
           <input type="file" multiple accept="image/jpeg,image/png,image/webp,image/gif" ref={fileInputRef} onChange={e => sendImages(e.target.files)} style={{ display: 'none' }} />
@@ -2659,6 +2688,7 @@ export default function Room() {
                 }
               }}
               onFocus={() => {
+                setShowQuickToolPicker(false)
                 ;[0, 140, 320].forEach(delay => {
                   window.setTimeout(() => {
                     if (window.visualViewport) {
@@ -2678,12 +2708,63 @@ export default function Room() {
               const QuickToolIcon = selectedQuickTool.icon
               const quickActive = quickTool === 'narration' && isNarrActive
               return (
-                <button className="ui-touch-target" onMouseDown={e => e.preventDefault()} onClick={() => runRoomTool(quickTool, true)} aria-label={`${selectedQuickTool.label} 빠른 실행`} title={selectedQuickTool.label} style={{ width: 44, height: 44, flexShrink: 0, padding: 0, border: 0, background: 'transparent', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>
+                <button
+                  className="ui-touch-target"
+                  onMouseDown={e => e.preventDefault()}
+                  onPointerDown={event => {
+                    quickToolGestureRef.current = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY }
+                    quickToolGestureHandledRef.current = false
+                    event.currentTarget.setPointerCapture?.(event.pointerId)
+                  }}
+                  onPointerMove={event => {
+                    const gesture = quickToolGestureRef.current
+                    if (!gesture || quickToolGestureHandledRef.current) return
+                    const distanceY = gesture.startY - event.clientY
+                    const distanceX = Math.abs(gesture.startX - event.clientX)
+                    if (distanceY > 28 && distanceY > distanceX) {
+                      quickToolGestureHandledRef.current = true
+                      if (favoriteRoomTools.length > 1) {
+                        if (showRoleplayMenu) closeRoleplayMenu()
+                        setShowQuickToolPicker(true)
+                      }
+                    }
+                  }}
+                  onPointerUp={event => {
+                    quickToolGestureRef.current = null
+                    event.currentTarget.releasePointerCapture?.(event.pointerId)
+                  }}
+                  onPointerCancel={() => {
+                    quickToolGestureRef.current = null
+                    quickToolGestureHandledRef.current = false
+                  }}
+                  onClick={() => {
+                    if (quickToolGestureHandledRef.current) {
+                      quickToolGestureHandledRef.current = false
+                      return
+                    }
+                    if (showQuickToolPicker) {
+                      setShowQuickToolPicker(false)
+                      return
+                    }
+                    runRoomTool(quickTool, true)
+                  }}
+                  onKeyDown={event => {
+                    if (event.key === 'ArrowUp' && favoriteRoomTools.length > 1) {
+                      event.preventDefault()
+                      setShowQuickToolPicker(true)
+                    } else if (event.key === 'Escape') {
+                      setShowQuickToolPicker(false)
+                    }
+                  }}
+                  aria-label={`${selectedQuickTool.label} 빠른 실행${favoriteRoomTools.length > 1 ? '. 위로 밀어 즐겨찾기 선택' : ''}`}
+                  aria-expanded={showQuickToolPicker}
+                  title={selectedQuickTool.label}
+                  style={{ width: 44, height: 44, flexShrink: 0, padding: 0, border: 0, background: 'transparent', cursor: 'pointer', display: 'grid', placeItems: 'center', touchAction: 'none' }}>
                   <span style={{ width: 34, height: 34, display: 'grid', placeItems: 'center', borderRadius: '50%', border: `1px solid ${quickActive ? t.point : 'transparent'}`, background: quickActive ? `${t.point}2f` : `${t.border}55` }}><QuickToolIcon size={16} color={quickActive ? t.narrColor : t.subText} /></span>
                 </button>
               )
             })()}
-          <button className="ui-touch-target" disabled={!input.trim() || (!activeChar && !isNarrActive)} onMouseDown={e => e.preventDefault()} onClick={sendMessage} aria-label="전송" style={{ width: 44, height: 44, padding: 0, border: 'none', background: 'transparent', cursor: 'pointer', flexShrink: 0, display: 'grid', placeItems: 'center' }}>
+          <button className="ui-touch-target" disabled={!input.trim() || (!activeChar && !isNarrActive)} onMouseDown={e => e.preventDefault()} onClick={() => { setShowQuickToolPicker(false); sendMessage() }} aria-label="전송" style={{ width: 44, height: 44, padding: 0, border: 'none', background: 'transparent', cursor: 'pointer', flexShrink: 0, display: 'grid', placeItems: 'center' }}>
             <span style={{ width: 34, height: 34, display: 'grid', placeItems: 'center', borderRadius: '50%', background: t.point }}><ArrowUp size={18} color="#fff" strokeWidth={2.5} /></span>
           </button>
         </div>
