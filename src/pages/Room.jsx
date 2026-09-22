@@ -363,8 +363,8 @@ export default function Room() {
     }, 190)
   }
 
-  const openRoleplayMenu = () => {
-    inputRef.current?.blur()
+  const openRoleplayMenu = ({ preserveComposerFocus = false } = {}) => {
+    if (!preserveComposerFocus) inputRef.current?.blur()
     setToolSheetOffset(0)
     setClosingRoleplayMenu(false)
     setShowRoleplayMenu(true)
@@ -1423,7 +1423,7 @@ export default function Room() {
     }
     if (toolId === 'effects') {
       setToolPanel('effects')
-      if (fromQuickButton && !showRoleplayMenu) openRoleplayMenu()
+      if (fromQuickButton && !showRoleplayMenu) openRoleplayMenu({ preserveComposerFocus: true })
       return
     }
     if (toolId === 'communication') {
