@@ -115,7 +115,7 @@
     }
 
     .stage {
-      min-height: 620px;
+      min-height: 850px;
       display: grid;
       align-content: center;
       gap: 34px;
@@ -185,6 +185,32 @@
       content: "";
     }
 
+    .effect-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 7px;
+    }
+
+    .effect-meta .label { margin-top: 0; }
+
+    .copy-options {
+      padding: 3px 7px;
+      border: 1px solid #35323a;
+      border-radius: 7px;
+      color: #8e8895;
+      background: transparent;
+      font-size: 9px;
+      cursor: pointer;
+    }
+
+    .copy-options:hover,
+    .copy-options:focus-visible {
+      border-color: #8068b5;
+      color: #cdbdf0;
+      outline: none;
+    }
+
     .twisted-text {
       display: inline;
       white-space: pre-wrap;
@@ -230,12 +256,20 @@
 
     .progressive-char.is-building {
       opacity: 1;
-      animation: glyph-build 150ms cubic-bezier(0.18, 0.78, 0.25, 1) both;
+      animation: glyph-build var(--build-duration) cubic-bezier(0.18, 0.78, 0.25, 1) both;
     }
 
     .progressive-char.is-visible {
       opacity: 1;
-      animation: syllable-rise 390ms cubic-bezier(0.16, 0.82, 0.22, 1) both;
+      animation: syllable-rise var(--rise-duration) cubic-bezier(0.16, 0.82, 0.22, 1) both;
+    }
+
+    .progressive-text.is-stationary .progressive-char.is-building {
+      animation-name: glyph-build-stationary;
+    }
+
+    .progressive-text.is-stationary .progressive-char.is-visible {
+      animation-name: syllable-appear-stationary;
     }
 
     @keyframes twist-arrive {
@@ -284,6 +318,32 @@
         transform: translate(var(--x), calc(var(--y) - 2px)) rotate(calc(var(--r) * 1.12)) scale(calc(var(--s) * 1.035));
       }
       100% {
+        opacity: 1;
+        filter: blur(0);
+        transform: translate(var(--x), var(--y)) rotate(var(--r)) scale(var(--s));
+      }
+    }
+
+    @keyframes glyph-build-stationary {
+      from {
+        opacity: 0.28;
+        filter: blur(1px);
+        transform: translate(var(--x), var(--y)) rotate(var(--r)) scale(var(--s));
+      }
+      to {
+        opacity: 1;
+        filter: blur(0);
+        transform: translate(var(--x), var(--y)) rotate(var(--r)) scale(var(--s));
+      }
+    }
+
+    @keyframes syllable-appear-stationary {
+      from {
+        opacity: 0;
+        filter: blur(1.2px);
+        transform: translate(var(--x), var(--y)) rotate(var(--r)) scale(var(--s));
+      }
+      to {
         opacity: 1;
         filter: blur(0);
         transform: translate(var(--x), var(--y)) rotate(var(--r)) scale(var(--s));
@@ -469,7 +529,10 @@
             <div class="message-body">
               <p class="speaker">효과 적용</p>
               <div class="bubble"><span class="twisted-text" id="effectPreview" aria-live="polite"></span></div>
-              <span class="label">비틀림</span>
+              <div class="effect-meta">
+                <span class="label">비틀림</span>
+                <button type="button" class="copy-options" data-copy-effect="twist" data-effect-label="비틀림" data-entry-motion="자리 찾기">옵션 복사</button>
+              </div>
             </div>
           </div>
           <div class="message-sample">
@@ -477,7 +540,21 @@
             <div class="message-body">
               <p class="speaker">초성·중성·종성 조합</p>
               <div class="bubble"><span class="progressive-text" id="jamoPreview" aria-live="polite"></span></div>
-              <span class="label">자모 조합</span>
+              <div class="effect-meta">
+                <span class="label">자모 조합</span>
+                <button type="button" class="copy-options" data-copy-effect="jamo-compose-rise" data-effect-label="자모 조합 · 아래에서" data-entry-motion="아래에서">옵션 복사</button>
+              </div>
+            </div>
+          </div>
+          <div class="message-sample">
+            <div class="avatar" aria-hidden="true">A</div>
+            <div class="message-body">
+              <p class="speaker">초성·중성·종성 제자리 조합</p>
+              <div class="bubble"><span class="progressive-text is-stationary" id="jamoStationaryPreview" aria-live="polite"></span></div>
+              <div class="effect-meta">
+                <span class="label">자모 조합 · 제자리</span>
+                <button type="button" class="copy-options" data-copy-effect="jamo-compose-stationary" data-effect-label="자모 조합 · 제자리" data-entry-motion="제자리">옵션 복사</button>
+              </div>
             </div>
           </div>
           <div class="message-sample">
@@ -485,7 +562,21 @@
             <div class="message-body">
               <p class="speaker">완성된 글자 순차 등장</p>
               <div class="bubble"><span class="progressive-text" id="syllablePreview" aria-live="polite"></span></div>
-              <span class="label">음절 등장</span>
+              <div class="effect-meta">
+                <span class="label">음절 등장</span>
+                <button type="button" class="copy-options" data-copy-effect="syllable-reveal-rise" data-effect-label="음절 등장 · 아래에서" data-entry-motion="아래에서">옵션 복사</button>
+              </div>
+            </div>
+          </div>
+          <div class="message-sample">
+            <div class="avatar" aria-hidden="true">A</div>
+            <div class="message-body">
+              <p class="speaker">완성된 글자 제자리 등장</p>
+              <div class="bubble"><span class="progressive-text is-stationary" id="syllableStationaryPreview" aria-live="polite"></span></div>
+              <div class="effect-meta">
+                <span class="label">음절 등장 · 제자리</span>
+                <button type="button" class="copy-options" data-copy-effect="syllable-reveal-stationary" data-effect-label="음절 등장 · 제자리" data-entry-motion="제자리">옵션 복사</button>
+              </div>
             </div>
           </div>
         </div>
@@ -514,6 +605,10 @@
           <div class="slider">
             <label class="slider-label" for="tracking">글자 간격 <output id="trackingValue">1</output></label>
             <input id="tracking" type="range" min="-2" max="6" value="1" />
+          </div>
+          <div class="slider">
+            <label class="slider-label" for="speed">등장 속도 <output id="speedValue">1.0×</output></label>
+            <input id="speed" type="range" min="50" max="200" step="10" value="100" />
           </div>
         </div>
 
@@ -549,9 +644,12 @@
       effect: document.querySelector('#effectPreview'),
       jamo: document.querySelector('#jamoPreview'),
       syllable: document.querySelector('#syllablePreview'),
+      jamoStationary: document.querySelector('#jamoStationaryPreview'),
+      syllableStationary: document.querySelector('#syllableStationaryPreview'),
       intensity: document.querySelector('#intensity'),
       irregularity: document.querySelector('#irregularity'),
       tracking: document.querySelector('#tracking'),
+      speed: document.querySelector('#speed'),
       motion: document.querySelector('#motionEnabled'),
       combineTwist: document.querySelector('#combineTwist'),
       replay: document.querySelector('#replayButton'),
@@ -600,6 +698,7 @@
       document.querySelector('#intensityValue').value = elements.intensity.value
       document.querySelector('#irregularityValue').value = elements.irregularity.value
       document.querySelector('#trackingValue').value = elements.tracking.value
+      document.querySelector('#speedValue').value = `${(Number(elements.speed.value) / 100).toFixed(1)}×`
     }
 
     function clearPresetSelection() {
@@ -650,11 +749,13 @@
       return finalIndex === 0 ? [initial, character] : [initial, initialAndVowel, character]
     }
 
-    function createProgressiveSpan(character, random, intensity, irregularity, tracking) {
+    function createProgressiveSpan(character, random, intensity, irregularity, tracking, timeScale) {
       const span = document.createElement('span')
       span.className = `progressive-char${character === ' ' ? ' is-space' : ''}`
       span.setAttribute('aria-hidden', 'true')
       applyTwistStyles(span, twistMetrics(random, intensity, irregularity), tracking, elements.combineTwist.checked)
+      span.style.setProperty('--build-duration', `${Math.round(150 * timeScale)}ms`)
+      span.style.setProperty('--rise-duration', `${Math.round(390 * timeScale)}ms`)
       return span
     }
 
@@ -664,28 +765,31 @@
       span.classList.add(className)
     }
 
-    function renderProgressiveEffects(text, intensity, irregularity, tracking, replay) {
+    function renderProgressiveEffects(text, intensity, irregularity, tracking, timeScale, replay, containers, stationary = false) {
       const animate = replay && elements.motion.checked
       const characters = graphemes(text)
       const jamoRandom = randomFrom(hashString(text) ^ patternSeed)
       const syllableRandom = randomFrom(hashString(text) ^ patternSeed)
+      const { jamo, syllable } = containers
 
-      elements.jamo.replaceChildren()
-      elements.syllable.replaceChildren()
-      elements.jamo.setAttribute('aria-label', text)
-      elements.syllable.setAttribute('aria-label', text)
+      jamo.replaceChildren()
+      syllable.replaceChildren()
+      jamo.setAttribute('aria-label', text)
+      syllable.setAttribute('aria-label', text)
+      jamo.classList.toggle('is-stationary', stationary)
+      syllable.classList.toggle('is-stationary', stationary)
 
       characters.forEach((character, index) => {
         if (character === '\n') {
-          elements.jamo.append(document.createElement('br'))
-          elements.syllable.append(document.createElement('br'))
+          jamo.append(document.createElement('br'))
+          syllable.append(document.createElement('br'))
           return
         }
 
-        const jamoSpan = createProgressiveSpan(character, jamoRandom, intensity, irregularity, tracking)
-        const syllableSpan = createProgressiveSpan(character, syllableRandom, intensity, irregularity, tracking)
-        elements.jamo.append(jamoSpan)
-        elements.syllable.append(syllableSpan)
+        const jamoSpan = createProgressiveSpan(character, jamoRandom, intensity, irregularity, tracking, timeScale)
+        const syllableSpan = createProgressiveSpan(character, syllableRandom, intensity, irregularity, tracking, timeScale)
+        jamo.append(jamoSpan)
+        syllable.append(syllableSpan)
 
         if (character === ' ') {
           jamoSpan.textContent = '\u00a0'
@@ -704,19 +808,57 @@
           return
         }
 
-        const jamoStart = index * 170
+        const jamoStart = index * 170 * timeScale
         stages.forEach((stage, stageIndex) => {
           schedule(() => {
             jamoSpan.textContent = stage
             restartClassAnimation(jamoSpan, 'is-building')
-          }, jamoStart + stageIndex * 78)
+          }, jamoStart + stageIndex * 78 * timeScale)
         })
 
         schedule(() => {
           syllableSpan.textContent = character
           syllableSpan.classList.add('is-visible')
-        }, index * 105)
+        }, index * 105 * timeScale)
       })
+    }
+
+    async function copyEffectOptions(effect, effectLabel, entryMotion, button) {
+      const text = elements.input.value || '대사를 입력해 주세요.'
+      const options = [
+        '[IDEA 텍스트 효과 옵션]',
+        `효과: ${effectLabel} (${effect})`,
+        `텍스트: ${JSON.stringify(text)}`,
+        `비틀림 강도: ${elements.intensity.value}`,
+        `불규칙성: ${elements.irregularity.value}`,
+        `글자 간격: ${elements.tracking.value}px`,
+        `등장 속도: ${(Number(elements.speed.value) / 100).toFixed(1)}x`,
+        `등장 위치: ${entryMotion}`,
+        `등장 애니메이션: ${elements.motion.checked ? '사용' : '사용 안 함'}`,
+        `비틀림 결합: ${elements.combineTwist.checked ? '사용' : '사용 안 함'}`,
+        `패턴 시드: ${patternSeed}`,
+      ].join('\n')
+
+      try {
+        if (navigator.clipboard?.writeText) {
+          await navigator.clipboard.writeText(options)
+        } else {
+          const helper = document.createElement('textarea')
+          helper.value = options
+          helper.style.position = 'fixed'
+          helper.style.opacity = '0'
+          document.body.append(helper)
+          helper.select()
+          if (!document.execCommand('copy')) throw new Error('copy command failed')
+          helper.remove()
+        }
+        const originalLabel = button.textContent
+        button.textContent = '복사됨'
+        window.setTimeout(() => { button.textContent = originalLabel }, 1200)
+      } catch {
+        button.textContent = '복사 실패'
+        window.setTimeout(() => { button.textContent = '옵션 복사' }, 1600)
+      }
     }
 
     function render({ replay = false } = {}) {
@@ -725,6 +867,7 @@
       const intensity = Number(elements.intensity.value) / 100
       const irregularity = Number(elements.irregularity.value) / 100
       const tracking = Number(elements.tracking.value)
+      const timeScale = 100 / Number(elements.speed.value)
       const random = randomFrom(hashString(text) ^ patternSeed)
 
       elements.normal.textContent = text
@@ -746,12 +889,13 @@
         span.textContent = character === ' ' ? '\u00a0' : character
         span.setAttribute('aria-hidden', 'true')
         applyTwistStyles(span, metrics, tracking)
-        span.style.setProperty('--duration', `${Math.round(470 + irregularity * 330)}ms`)
-        span.style.setProperty('--delay', `${Math.round(delay)}ms`)
+        span.style.setProperty('--duration', `${Math.round((470 + irregularity * 330) * timeScale)}ms`)
+        span.style.setProperty('--delay', `${Math.round(delay * timeScale)}ms`)
         elements.effect.append(span)
       })
 
-      renderProgressiveEffects(text, intensity, irregularity, tracking, replay)
+      renderProgressiveEffects(text, intensity, irregularity, tracking, timeScale, replay, { jamo: elements.jamo, syllable: elements.syllable })
+      renderProgressiveEffects(text, intensity, irregularity, tracking, timeScale, replay, { jamo: elements.jamoStationary, syllable: elements.syllableStationary }, true)
 
       updateOutputs()
 
@@ -764,7 +908,7 @@
 
     elements.input.addEventListener('input', () => render({ replay: true }))
 
-    ;[elements.intensity, elements.irregularity, elements.tracking].forEach(control => {
+    ;[elements.intensity, elements.irregularity, elements.tracking, elements.speed].forEach(control => {
       control.addEventListener('input', () => {
         clearPresetSelection()
         render()
@@ -778,6 +922,10 @@
     elements.shuffle.addEventListener('click', () => {
       patternSeed = Math.floor(Math.random() * 0xffffffff)
       render({ replay: true })
+    })
+
+    document.querySelectorAll('[data-copy-effect]').forEach(button => {
+      button.addEventListener('click', () => copyEffectOptions(button.dataset.copyEffect, button.dataset.effectLabel, button.dataset.entryMotion, button))
     })
 
     document.querySelectorAll('[data-preset]').forEach(button => {
