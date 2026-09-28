@@ -7,18 +7,27 @@ import {
 } from '../features/messages/textEffectSettings'
 
 function StyledText({ text, settings, seed }) {
-  const random = useMemo(() => createSeededRandom(seed), [seed])
   const intensity = settings.intensity / 100
   const irregularity = settings.irregularity / 100
   const twist = settings.modifiers.includes('twist')
   const runaway = settings.modifiers.includes('runaway')
   const characters = [...text]
+  const characterCount = characters.length
+  const characterStyles = useMemo(() => {
+    const random = createSeededRandom(seed)
+    return Array.from({ length: characterCount }, (_, index) => {
+      const progress = characterCount > 1 ? index / (characterCount - 1) : 0
+      const rotation = twist ? (random() * 2 - 1) * 13 * intensity * (0.45 + irregularity) : 0
+      const offset = twist ? (random() * 2 - 1) * 1.7 * intensity * irregularity : 0
+      const scale = 1 + (twist ? (random() * 2 - 1) * 0.1 * intensity : 0) + (runaway ? progress * 0.15 * intensity : 0)
+      return {
+        transform: `translateY(${offset}px) rotate(${rotation}deg) scale(${scale})`,
+        fontWeight: runaway ? Math.round(400 + progress * 280 * intensity) : undefined,
+      }
+    })
+  }, [characterCount, intensity, irregularity, runaway, seed, twist])
 
   return characters.map((character, index) => {
-    const progress = characters.length > 1 ? index / (characters.length - 1) : 0
-    const rotation = twist ? (random() * 2 - 1) * 13 * intensity * (0.45 + irregularity) : 0
-    const offset = twist ? (random() * 2 - 1) * 1.7 * intensity * irregularity : 0
-    const scale = 1 + (twist ? (random() * 2 - 1) * 0.1 * intensity : 0) + (runaway ? progress * 0.15 * intensity : 0)
     return (
       <span
         key={`${index}-${character}`}
@@ -26,9 +35,9 @@ function StyledText({ text, settings, seed }) {
         style={{
           display: 'inline-block',
           whiteSpace: character === ' ' ? 'pre' : undefined,
-          transform: `translateY(${offset}px) rotate(${rotation}deg) scale(${scale})`,
+          transform: characterStyles[index].transform,
           transformOrigin: '50% 68%',
-          fontWeight: runaway ? Math.round(400 + progress * 280 * intensity) : undefined,
+          fontWeight: characterStyles[index].fontWeight,
         }}>
         {character}
       </span>
