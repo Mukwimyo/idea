@@ -7,7 +7,7 @@ export const DEFAULT_TEXT_EFFECT_SETTINGS = Object.freeze({
   modifiers: [],
   intensity: 49,
   irregularity: 64,
-  letterSpacing: -2,
+  letterSpacing: 0,
   speed: 4,
   autoAccelerate: true,
   animate: true,

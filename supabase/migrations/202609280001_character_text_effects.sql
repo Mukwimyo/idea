@@ -7,7 +7,7 @@ language sql
 immutable
 set search_path = pg_catalog, public
 as $$
-  select '{"entryMode":"jamo","entryMotion":"stationary","modifiers":[],"intensity":49,"irregularity":64,"letterSpacing":-2,"speed":4,"autoAccelerate":true,"animate":true}'::jsonb;
+  select '{"entryMode":"jamo","entryMotion":"stationary","modifiers":[],"intensity":49,"irregularity":64,"letterSpacing":0,"speed":4,"autoAccelerate":true,"animate":true}'::jsonb;
 $$;
 
 create or replace function public.is_valid_text_effect_settings(value jsonb)
