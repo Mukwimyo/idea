@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase, uploadFile, validateImageFile } from '../lib/supabase'
 import { getTheme } from '../lib/themes'
-import { ChevronLeft, X, RotateCcw, Search, Check, ArrowDownAZ, GripVertical, Play, Pause, Trash2 } from 'lucide-react'
+import { ChevronLeft, X, RotateCcw, Search, Check, ArrowDownAZ, GripVertical, Play, Pause, Trash2, Sparkles } from 'lucide-react'
 import Cropper from 'react-easy-crop'
 import { DndContext, PointerSensor, TouchSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core'
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy, rectSortingStrategy } from '@dnd-kit/sortable'
@@ -728,6 +728,9 @@ export default function Characters() {
                       <div style={{ fontSize: 14, fontWeight: 500, color: t.theirText }}>{c.name}</div>
                       {c.description && <div style={{ fontSize: 11, color: t.subText, marginTop: 2 }}>{c.description}</div>}
                     </div>
+                    <button onClick={() => navigate(`/characters/${c.id}/text-effects`)} aria-label={`${c.name} 대사 연출 설정`} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 5, opacity: 0.65, display: 'flex', alignItems: 'center' }}>
+                      <Sparkles size={16} color={t.subText} />
+                    </button>
                     <button onClick={() => deleteChar(c.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, opacity: 0.4, display: 'flex', alignItems: 'center' }}>
                       <X size={16} color={t.subText} />
                     </button>

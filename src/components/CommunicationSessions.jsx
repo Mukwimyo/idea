@@ -25,9 +25,15 @@ export default function CommunicationSessions({ roomId, userId, myChars, theme, 
   const [now, setNow] = useState(Date.now())
   const [characterLoadError, setCharacterLoadError] = useState('')
   const [hiddenSessionId, setHiddenSessionId] = useState(null)
+  const [remoteTyping, setRemoteTyping] = useState(null)
   const [viewportHeight, setViewportHeight] = useState(() => window.visualViewport?.height || window.innerHeight)
   const [viewportOffsetTop, setViewportOffsetTop] = useState(() => window.visualViewport?.offsetTop || 0)
   const messageInputRef = useRef(null)
+  const messageListRef = useRef(null)
+  const communicationChannelRef = useRef(null)
+  const isNearMessageBottomRef = useRef(true)
+  const typingStopTimerRef = useRef(null)
+  const lastTypingBroadcastRef = useRef(0)
   const sessionIdsRef = useRef(new Set())
   const t = theme
 
@@ -37,6 +43,9 @@ export default function CommunicationSessions({ roomId, userId, myChars, theme, 
   const effectiveSenderId = myChars.some(character => character.id === senderId) ? senderId : myChars[0]?.id || ''
   const selectedSender = myChars.find(character => character.id === effectiveSenderId)
   const selectedReceiver = receiverOptions.find(character => character.id === receiverId)
+  const activeSessionId = activeSession?.id || null
+  const activeSessionMessageCount = activeSession ? (messages[activeSession.id]?.length || 0) : 0
+  const remoteTypingExpiresAt = remoteTyping?.expiresAt || 0
 
   useEffect(() => {
     sessionIdsRef.current = new Set(sessions.map(session => session.id))
@@ -116,12 +125,21 @@ export default function CommunicationSessions({ roomId, userId, myChars, theme, 
           return { ...current, [payload.new.session_id]: [...sessionMessages, payload.new] }
         })
       })
+      .on('broadcast', { event: 'typing' }, ({ payload }) => {
+        if (!payload || payload.userId === userId || !sessionIdsRef.current.has(payload.sessionId)) return
+        setRemoteTyping(payload.active ? payload : null)
+      })
       .subscribe(status => {
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
           setSendError('실시간 연결이 끊겼습니다. 연결이 복구되면 대화를 다시 불러옵니다.')
         }
       })
-    return () => supabase.removeChannel(channel)
+    communicationChannelRef.current = channel
+    return () => {
+      communicationChannelRef.current = null
+      window.clearTimeout(typingStopTimerRef.current)
+      supabase.removeChannel(channel)
+    }
   }, [roomId, userId, myChars])
 
   useEffect(() => {
@@ -134,6 +152,12 @@ export default function CommunicationSessions({ roomId, userId, myChars, theme, 
     const timer = window.setInterval(() => setNow(Date.now()), 1000)
     return () => window.clearInterval(timer)
   }, [])
+
+  useEffect(() => {
+    const list = messageListRef.current
+    if (!activeSessionId || !list || !isNearMessageBottomRef.current) return
+    window.requestAnimationFrame(() => list.scrollTo({ top: list.scrollHeight, behavior: 'smooth' }))
+  }, [activeSessionId, activeSessionMessageCount, remoteTypingExpiresAt])
 
   useEffect(() => {
     const viewport = window.visualViewport
@@ -286,6 +310,7 @@ export default function CommunicationSessions({ roomId, userId, myChars, theme, 
       return
     }
 
+    isNearMessageBottomRef.current = true
     setMessages(current => {
       const sessionMessages = current[session.id] || []
       if (sessionMessages.some(message => message.id === savedMessage.id)) return current
@@ -294,6 +319,26 @@ export default function CommunicationSessions({ roomId, userId, myChars, theme, 
     setDraft(current => current.trim() === content ? '' : current)
     setSendingSessionId(null)
     window.requestAnimationFrame(() => messageInputRef.current?.focus({ preventScroll: true }))
+  }
+
+  const broadcastTyping = (session, value) => {
+    const channel = communicationChannelRef.current
+    if (!channel) return
+    const hasContent = value.trim().length > 0
+    const timestamp = Date.now()
+    const ownCharacterId = session.sender_user_id === userId ? session.sender_character_id : session.receiver_character_id
+    const characterName = characterById[ownCharacterId]?.name || '상대방'
+    const send = active => channel.send({
+      type: 'broadcast',
+      event: 'typing',
+      payload: { sessionId: session.id, userId, characterName, active, expiresAt: timestamp + 2500 },
+    })
+    if (!hasContent || timestamp - lastTypingBroadcastRef.current > 900) {
+      lastTypingBroadcastRef.current = timestamp
+      send(hasContent)
+    }
+    window.clearTimeout(typingStopTimerRef.current)
+    if (hasContent) typingStopTimerRef.current = window.setTimeout(() => send(false), 1800)
   }
 
   const sessionTitle = session => `${characterById[session.sender_character_id]?.name || '캐릭터'} × ${characterById[session.receiver_character_id]?.name || '캐릭터'}`
@@ -384,12 +429,21 @@ export default function CommunicationSessions({ roomId, userId, myChars, theme, 
               <div style={{ fontSize: 11, color: t.subText }}>{activeSession.kind === 'call' ? `통화 중 · ${durationLabel(activeSession.started_at, null, now)}` : '문자 대화'}</div>
               <strong style={{ color: t.theirText }}>{sessionTitle(activeSession)}</strong>
             </div>
-            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 14 }}>
+            <div ref={messageListRef} onScroll={event => {
+              const node = event.currentTarget
+              isNearMessageBottomRef.current = node.scrollHeight - node.scrollTop - node.clientHeight < 80
+            }} style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 14 }}>
               {(messages[activeSession.id] || []).map(message => <div key={message.id} style={{ width: 'fit-content', maxWidth: '75%', margin: message.user_id === userId ? '0 0 9px auto' : '0 auto 9px 0', padding: '8px 11px', borderRadius: 12, background: message.user_id === userId ? t.myBubble : t.theirBubble, color: message.user_id === userId ? t.myText : t.theirText }}>{message.content}</div>)}
+              {remoteTyping?.sessionId === activeSession.id && remoteTyping.expiresAt > now && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '4px 0 8px', color: t.subText, fontSize: 10 }}>
+                  <span style={{ letterSpacing: 2 }}>•••</span>
+                  {remoteTyping.characterName} · {activeSession.kind === 'call' ? '말하는 중…' : '입력 중…'}
+                </div>
+              )}
             </div>
             {sendError && <div role="alert" style={{ padding: '7px 12px 0', color: '#ef7777', fontSize: 10, lineHeight: 1.45 }}>{sendError}</div>}
             <div style={{ flexShrink: 0, display: 'flex', gap: 7, padding: '10px 10px calc(10px + env(safe-area-inset-bottom))', borderTop: `1px solid ${t.border}` }}>
-              <input ref={messageInputRef} value={draft} onChange={event => { setDraft(event.target.value); if (sendError) setSendError('') }} onKeyDown={event => { if (event.key === 'Enter' && !event.nativeEvent.isComposing) { event.preventDefault(); sendMessage(activeSession) } }} placeholder="대화를 입력…" style={{ flex: 1, minWidth: 0, padding: 9, borderRadius: 10, background: t.bg, color: t.inputText, border: `1px solid ${sendError ? '#ef7777' : t.border}` }} />
+              <input ref={messageInputRef} value={draft} onChange={event => { setDraft(event.target.value); broadcastTyping(activeSession, event.target.value); if (sendError) setSendError('') }} onKeyDown={event => { if (event.key === 'Enter' && !event.nativeEvent.isComposing) { event.preventDefault(); sendMessage(activeSession) } }} placeholder="대화를 입력…" style={{ flex: 1, minWidth: 0, padding: 9, borderRadius: 10, background: t.bg, color: t.inputText, border: `1px solid ${sendError ? '#ef7777' : t.border}` }} />
               <button disabled={sendingSessionId === activeSession.id} onPointerDown={event => event.preventDefault()} onClick={() => sendMessage(activeSession)} aria-label={sendingSessionId === activeSession.id ? '전송 중' : '전송'} style={{ width: 40, border: 0, borderRadius: 10, background: t.point, color: '#fff', opacity: sendingSessionId === activeSession.id ? 0.5 : 1 }}><Send size={16} /></button>
               <button disabled={sendingSessionId === activeSession.id} onClick={() => updateSession(activeSession, 'ended')} aria-label="종료" style={{ width: 40, borderRadius: 10, border: `1px solid ${t.border}`, background: 'none', color: t.subText, opacity: sendingSessionId === activeSession.id ? 0.4 : 1 }}><PhoneOff size={16} /></button>
             </div>
