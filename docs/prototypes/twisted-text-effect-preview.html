@@ -290,12 +290,6 @@
       }
     }
 
-    @media (prefers-reduced-motion: reduce) {
-      .twisted-text.is-animated .twisted-char { animation: none; }
-      .progressive-char.is-building,
-      .progressive-char.is-visible { animation: none; }
-    }
-
     .controls { padding: 18px; }
 
     .control-group + .control-group {
@@ -525,7 +519,7 @@
 
         <div class="control-group">
           <div class="toggle-row">
-            <span>등장할 때 자리 찾기</span>
+            <span>등장 애니메이션 사용</span>
             <label class="switch">
               <input id="motionEnabled" type="checkbox" checked />
               <span aria-hidden="true"></span>
@@ -671,8 +665,7 @@
     }
 
     function renderProgressiveEffects(text, intensity, irregularity, tracking, replay) {
-      const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-      const animate = replay && !reducedMotion
+      const animate = replay && elements.motion.checked
       const characters = graphemes(text)
       const jamoRandom = randomFrom(hashString(text) ^ patternSeed)
       const syllableRandom = randomFrom(hashString(text) ^ patternSeed)
