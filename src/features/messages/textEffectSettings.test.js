@@ -11,6 +11,7 @@ import {
 describe('textEffectSettings', () => {
   it('uses the requested global defaults', () => {
     expect(normalizeTextEffectSettings()).toEqual(DEFAULT_TEXT_EFFECT_SETTINGS)
+    expect(DEFAULT_TEXT_EFFECT_SETTINGS.letterSpacing).toBe(0)
   })
 
   it('drops unsupported modifiers and clamps numeric values', () => {
