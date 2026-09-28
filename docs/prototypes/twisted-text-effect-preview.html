@@ -610,6 +610,13 @@
             <label class="slider-label" for="speed">등장 속도 <output id="speedValue">1.0×</output></label>
             <input id="speed" type="range" min="50" max="500" step="10" value="100" />
           </div>
+          <div class="toggle-row" style="margin-top: 16px;">
+            <span>긴 문장 자동 가속</span>
+            <label class="switch">
+              <input id="autoAccelerate" type="checkbox" checked />
+              <span aria-hidden="true"></span>
+            </label>
+          </div>
         </div>
 
         <div class="control-group">
@@ -650,6 +657,7 @@
       irregularity: document.querySelector('#irregularity'),
       tracking: document.querySelector('#tracking'),
       speed: document.querySelector('#speed'),
+      autoAccelerate: document.querySelector('#autoAccelerate'),
       motion: document.querySelector('#motionEnabled'),
       combineTwist: document.querySelector('#combineTwist'),
       replay: document.querySelector('#replayButton'),
@@ -694,11 +702,22 @@
       return Array.from(text)
     }
 
-    function updateOutputs() {
+    function speedProfile(text) {
+      const base = Number(elements.speed.value) / 100
+      const characterCount = graphemes(text).filter(character => !/^\s$/u.test(character)).length
+      const extraCharacters = Math.max(0, characterCount - 24)
+      const lengthBoost = elements.autoAccelerate.checked ? Math.min(2.5, 1 + extraCharacters / 60) : 1
+      return { base, effective: base * lengthBoost, characterCount, lengthBoost }
+    }
+
+    function updateOutputs(text) {
+      const speed = speedProfile(text)
       document.querySelector('#intensityValue').value = elements.intensity.value
       document.querySelector('#irregularityValue').value = elements.irregularity.value
       document.querySelector('#trackingValue').value = elements.tracking.value
-      document.querySelector('#speedValue').value = `${(Number(elements.speed.value) / 100).toFixed(1)}×`
+      document.querySelector('#speedValue').value = speed.lengthBoost > 1
+        ? `${speed.base.toFixed(1)}× → ${speed.effective.toFixed(1)}×`
+        : `${speed.base.toFixed(1)}×`
     }
 
     function clearPresetSelection() {
@@ -825,6 +844,7 @@
 
     async function copyEffectOptions(effect, effectLabel, entryMotion, button) {
       const text = elements.input.value || '대사를 입력해 주세요.'
+      const speed = speedProfile(text)
       const options = [
         '[IDEA 텍스트 효과 옵션]',
         `효과: ${effectLabel} (${effect})`,
@@ -832,7 +852,10 @@
         `비틀림 강도: ${elements.intensity.value}`,
         `불규칙성: ${elements.irregularity.value}`,
         `글자 간격: ${elements.tracking.value}px`,
-        `등장 속도: ${(Number(elements.speed.value) / 100).toFixed(1)}x`,
+        `기준 등장 속도: ${speed.base.toFixed(1)}x`,
+        `긴 문장 자동 가속: ${elements.autoAccelerate.checked ? '사용' : '사용 안 함'}`,
+        `현재 글자 수: ${speed.characterCount}`,
+        `현재 실효 속도: ${speed.effective.toFixed(1)}x`,
         `등장 위치: ${entryMotion}`,
         `등장 애니메이션: ${elements.motion.checked ? '사용' : '사용 안 함'}`,
         `비틀림 결합: ${elements.combineTwist.checked ? '사용' : '사용 안 함'}`,
@@ -867,7 +890,8 @@
       const intensity = Number(elements.intensity.value) / 100
       const irregularity = Number(elements.irregularity.value) / 100
       const tracking = Number(elements.tracking.value)
-      const timeScale = 100 / Number(elements.speed.value)
+      const speed = speedProfile(text)
+      const timeScale = 1 / speed.effective
       const random = randomFrom(hashString(text) ^ patternSeed)
 
       elements.normal.textContent = text
@@ -897,7 +921,7 @@
       renderProgressiveEffects(text, intensity, irregularity, tracking, timeScale, replay, { jamo: elements.jamo, syllable: elements.syllable })
       renderProgressiveEffects(text, intensity, irregularity, tracking, timeScale, replay, { jamo: elements.jamoStationary, syllable: elements.syllableStationary }, true)
 
-      updateOutputs()
+      updateOutputs(text)
 
       if (replay && elements.motion.checked) {
         elements.effect.classList.remove('is-animated')
@@ -917,6 +941,7 @@
     })
 
     elements.motion.addEventListener('change', () => render({ replay: elements.motion.checked }))
+    elements.autoAccelerate.addEventListener('change', () => render({ replay: true }))
     elements.combineTwist.addEventListener('change', () => render({ replay: true }))
     elements.replay.addEventListener('click', () => render({ replay: true }))
     elements.shuffle.addEventListener('click', () => {
