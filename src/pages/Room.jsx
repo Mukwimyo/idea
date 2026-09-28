@@ -2468,18 +2468,18 @@ export default function Room() {
 
         {/* 입력중 표시 */}
         {showTypingIndicator && typingInfo && typingInfo.expiresAt > Date.now() && (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '2px 0' }}>
-            <div style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
-              <div style={{ width: 5, height: 5, borderRadius: '50%', background: t.subText, opacity: 0.6, animation: 'typing-dot 1.2s infinite', animationDelay: '0s' }} />
-              <div style={{ width: 5, height: 5, borderRadius: '50%', background: t.subText, opacity: 0.6, animation: 'typing-dot 1.2s infinite', animationDelay: '0.2s' }} />
-              <div style={{ width: 5, height: 5, borderRadius: '50%', background: t.subText, opacity: 0.6, animation: 'typing-dot 1.2s infinite', animationDelay: '0.4s' }} />
+          typingInfo.characterId ? (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '2px 0' }}>
+              <div style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
+                {[0, 1, 2].map(index => <div key={index} style={{ width: 5, height: 5, borderRadius: '50%', background: t.subText, opacity: 0.6, animation: 'typing-dot 1.2s infinite', animationDelay: `${index * 0.2}s` }} />)}
+              </div>
+              <span style={{ fontSize: 11, color: t.subText, opacity: 0.7 }}>{typingInfo.charName}{subjectParticle(typingInfo.charName)} 말하는 중...</span>
             </div>
-            <span style={{ fontSize: 11, color: t.subText, opacity: 0.7 }}>
-              {typingInfo.characterId
-                ? <>{typingInfo.charName}{subjectParticle(typingInfo.charName)} 말하는 중...</>
-                : '누군가 장면을 서술하는 중...'}
-            </span>
-          </div>
+          ) : (
+            <div aria-label="나레이션 입력 중" style={{ display: 'flex', justifyContent: 'center', gap: 8, padding: '4px 0', color: t.narrColor, fontSize: 13, lineHeight: 1 }}>
+              {[0, 1, 2, 3, 4].map(index => <span key={index} aria-hidden="true" style={{ opacity: 0, animation: 'narration-typing-dot 2.6s infinite', animationDelay: `${index * 0.34}s` }}>.</span>)}
+            </div>
+          )
         )}
 
         <div ref={messagesEndRef} />
@@ -2795,6 +2795,11 @@ export default function Room() {
             @keyframes typing-dot {
                 0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
                 30% { transform: translateY(-4px); opacity: 1; }
+            }
+            @keyframes narration-typing-dot {
+                0%, 12% { opacity: 0; }
+                20%, 72% { opacity: 0.8; }
+                88%, 100% { opacity: 0; }
             }
             `}</style>
     </div>
