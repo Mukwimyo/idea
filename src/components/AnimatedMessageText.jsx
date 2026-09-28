@@ -48,9 +48,10 @@ function StyledText({ text, settings, seed }) {
 function AnimatedMessageText({ text, settings: settingsValue, messageId, animateOnMount = false, renderFinal }) {
   const settings = useMemo(() => normalizeTextEffectSettings(settingsValue), [settingsValue])
   const frames = useMemo(() => buildTextEffectFrames(text, settings), [text, settings])
-  const [frameIndex, setFrameIndex] = useState(frames.length - 1)
+  const [initialAnimationRequested] = useState(() => Boolean(settings.animate && animateOnMount))
+  const [frameIndex, setFrameIndex] = useState(() => initialAnimationRequested ? 0 : frames.length - 1)
   const [replayCount, setReplayCount] = useState(0)
-  const shouldAnimate = settings.animate && (animateOnMount || replayCount > 0)
+  const shouldAnimate = settings.animate && (initialAnimationRequested || replayCount > 0)
 
   useEffect(() => {
     if (!shouldAnimate || frames.length <= 1) return undefined
@@ -79,6 +80,7 @@ function AnimatedMessageText({ text, settings: settingsValue, messageId, animate
   const hasPersistentStyle = settings.modifiers.some(modifier => modifier === 'twist' || modifier === 'runaway')
   const replay = () => {
     if (!settings.animate) return
+    setFrameIndex(0)
     setReplayCount(count => count + 1)
   }
 
