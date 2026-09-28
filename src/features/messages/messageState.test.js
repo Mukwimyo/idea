@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { highestReadableMessage, mergeMessages } from './messageState'
+import { highestReadableMessage, mergeMessages, messageRenderKey } from './messageState'
 
 describe('mergeMessages', () => {
   it('replaces an optimistic message by client id without duplicating it', () => {
@@ -40,6 +40,19 @@ describe('mergeMessages', () => {
       { id: 'earlier', sequence_no: 1, created_at: '2026-01-01T00:00:01Z' }
     )
     expect(result.map(message => message.id)).toEqual(['earlier', 'later'])
+  })
+})
+
+describe('messageRenderKey', () => {
+  it('stays stable when an optimistic message receives its server id', () => {
+    const optimistic = { id: 'temp-1', client_message_id: 'client-1' }
+    const persisted = { id: 'server-1', client_message_id: 'client-1' }
+
+    expect(messageRenderKey(optimistic)).toBe(messageRenderKey(persisted))
+  })
+
+  it('falls back to the row id for legacy messages', () => {
+    expect(messageRenderKey({ id: 'server-legacy' })).toBe('server-legacy')
   })
 })
 

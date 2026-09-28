@@ -29,7 +29,7 @@ import {
   joinRoomWithInvite,
   sendRoomMessage as sendRoomMessageRpc,
 } from '../features/messages/messageApi'
-import { highestReadableMessage, mergeMessages } from '../features/messages/messageState'
+import { highestReadableMessage, mergeMessages, messageRenderKey } from '../features/messages/messageState'
 import { readQuickToolPreferences, toggleFavoriteTool, writeQuickToolPreferences } from '../features/rooms/quickToolPreferences'
 import {
   queuePendingMessage,
@@ -861,8 +861,10 @@ export default function Room() {
       }
     }
 
+    const clientMessageId = createClientMessageId()
     const tempMsg = {
       id: 'temp-' + Date.now(),
+      client_message_id: clientMessageId,
       room_id: roomId,
       user_id: user.id,
       character_id: isNarr ? null : activeChar?.id,
@@ -888,6 +890,7 @@ export default function Room() {
       type: isNarr ? 'narration' : 'chat',
       content,
       effect_key: effectKey,
+      client_message_id: clientMessageId,
     })
   }
 
@@ -2086,6 +2089,7 @@ export default function Room() {
       <div ref={messageListRef} onScroll={handleScroll} className={`chat-scroll${hideScroll ? ' hide-scroll' : ''}`} style={{ position: 'relative', flex: 1, minHeight: 0, padding: `58px 10px ${showCharList && myChars.length > 0 ? 156 : 106}px`, scrollPaddingTop: 58, display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto', background: t.bg, transition: 'padding-bottom 210ms cubic-bezier(0.2, 0.8, 0.2, 1)' }}>
         {filteredMessages.map((msg, messageIndex) => {
           const isMine = msg.user_id === userId
+          const renderKey = messageRenderKey(msg)
           const messageEntranceClass = msg.entrance_side === 'right' ? 'message-enter-right' : msg.entrance_side === 'left' ? 'message-enter-left' : ''
           const char = msg.characters
           const previousMessage = filteredMessages[messageIndex - 1]
@@ -2135,7 +2139,7 @@ export default function Room() {
 
           if (msg.type === 'chapter')
             return (
-              <div key={msg.id} id={'msg-' + msg.id} style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 10, padding: `${timelineMarkerHeight + 8}px 8px 8px` }}>
+              <div key={renderKey} id={'msg-' + msg.id} style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 10, padding: `${timelineMarkerHeight + 8}px 8px 8px` }}>
                 {timelineMarkers}
                 <span style={{ flex: 1, height: 1, background: t.border }} />
                 <span style={{ color: t.subText, fontSize: 10 }}>{msg.content || '구분선'}</span>
@@ -2153,7 +2157,7 @@ export default function Room() {
             })()
             return (
               <div
-                key={msg.id}
+                key={renderKey}
                 id={'msg-' + msg.id}
                 onPointerDown={event => startLongPress(event, msg)}
                 onPointerMove={moveLongPress}
@@ -2188,7 +2192,7 @@ export default function Room() {
             const title = result.kind === 'king' ? '왕게임' : result.kind === 'chance' ? '성공·실패' : result.kind === 'character' ? '캐릭터 추첨' : result.kind === 'rps' ? '가위바위보' : `D6 × ${result.diceCount || result.rolls?.length || 1}`
             return (
               <div
-                key={msg.id}
+                key={renderKey}
                 id={'msg-' + msg.id}
                 onPointerDown={event => startLongPress(event, msg)}
                 onPointerMove={moveLongPress}
@@ -2214,7 +2218,7 @@ export default function Room() {
 
           if (msg.type === 'member_joined' || msg.type === 'member_left')
             return (
-              <div key={msg.id} id={'msg-' + msg.id} style={{ position: 'relative', paddingTop: timelineMarkerHeight }}>
+              <div key={renderKey} id={'msg-' + msg.id} style={{ position: 'relative', paddingTop: timelineMarkerHeight }}>
                 {timelineMarkers}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', color: t.subText, fontSize: 10 }}>
                   <span style={{ flex: 1, height: 1, background: t.border, opacity: 0.55 }} />
@@ -2234,7 +2238,7 @@ export default function Room() {
             if (!invite?.roomId) return null
             const alreadyJoined = joinedRoomIds.includes(invite.roomId)
             return (
-              <div key={msg.id} id={'msg-' + msg.id} style={{ position: 'relative', paddingTop: timelineMarkerHeight }}>
+              <div key={renderKey} id={'msg-' + msg.id} style={{ position: 'relative', paddingTop: timelineMarkerHeight }}>
                 {timelineMarkers}
                 <div style={{ margin: '2px auto', width: 'min(88%, 330px)', padding: 12, borderRadius: 14, border: `1px solid ${t.border}`, background: t.panel, boxShadow: '0 8px 22px rgba(0,0,0,0.15)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -2254,7 +2258,7 @@ export default function Room() {
 
           if (msg.type === 'communication')
             return (
-              <div key={msg.id} id={'msg-' + msg.id} style={{ position: 'relative', paddingTop: timelineMarkerHeight }}>
+              <div key={renderKey} id={'msg-' + msg.id} style={{ position: 'relative', paddingTop: timelineMarkerHeight }}>
                 {timelineMarkers}
                 <CommunicationRecord message={msg} theme={t} onOpenSession={() => setShowCommunication(true)} />
               </div>
@@ -2265,7 +2269,7 @@ export default function Room() {
               <div
                 className={messageEntranceClass}
                 onAnimationEnd={event => event.currentTarget === event.target && messageEntranceClass && finishMessageEntrance(msg.id)}
-                key={msg.id}
+                key={renderKey}
                 id={'msg-' + msg.id}
                 onPointerDown={event => startLongPress(event, msg)}
                 onPointerMove={moveLongPress}
@@ -2302,7 +2306,7 @@ export default function Room() {
                     <AnimatedMessageText
                       text={msg.content}
                       settings={msg.text_effect_settings}
-                      messageId={msg.id}
+                      messageId={renderKey}
                       animateOnMount={Boolean(messageEntranceClass)}
                       renderFinal={() => msg.content.split('\n').map((line, i) => <div key={i} style={{ fontSize: 11 }}>{line}</div>)}
                     />
@@ -2329,7 +2333,7 @@ export default function Room() {
               <div
                 className={messageEntranceClass}
                 onAnimationEnd={() => messageEntranceClass && finishMessageEntrance(msg.id)}
-                key={msg.id}
+                key={renderKey}
                 id={'msg-' + msg.id}
                 onPointerDown={event => startLongPress(event, msg)}
                 onPointerMove={moveLongPress}
@@ -2379,7 +2383,7 @@ export default function Room() {
               <div
                 className={messageEntranceClass}
                 onAnimationEnd={() => messageEntranceClass && finishMessageEntrance(msg.id)}
-                key={msg.id}
+                key={renderKey}
                 id={'msg-' + msg.id}
                 onPointerDown={event => startLongPress(event, msg)}
                 onPointerMove={moveLongPress}
@@ -2409,7 +2413,7 @@ export default function Room() {
               <div
               className={messageEntranceClass}
               onAnimationEnd={event => event.currentTarget === event.target && messageEntranceClass && finishMessageEntrance(msg.id)}
-              key={msg.id}
+              key={renderKey}
               id={'msg-' + msg.id}
               onPointerDown={event => startLongPress(event, msg)}
               onPointerMove={moveLongPress}
@@ -2446,7 +2450,7 @@ export default function Room() {
                     <AnimatedMessageText
                       text={msg.content}
                       settings={msg.text_effect_settings}
-                      messageId={msg.id}
+                      messageId={renderKey}
                       animateOnMount={Boolean(messageEntranceClass)}
                       renderFinal={() => parseContent(msg.content, actionSize)}
                     />

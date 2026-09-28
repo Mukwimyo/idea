@@ -46,7 +46,8 @@ function StyledText({ text, settings, seed }) {
 }
 
 function AnimatedMessageText({ text, settings: settingsValue, messageId, animateOnMount = false, renderFinal }) {
-  const settings = useMemo(() => normalizeTextEffectSettings(settingsValue), [settingsValue])
+  const settingsJson = JSON.stringify(normalizeTextEffectSettings(settingsValue))
+  const settings = useMemo(() => JSON.parse(settingsJson), [settingsJson])
   const frames = useMemo(() => buildTextEffectFrames(text, settings), [text, settings])
   const [initialAnimationRequested] = useState(() => Boolean(settings.animate && animateOnMount))
   const [frameIndex, setFrameIndex] = useState(() => initialAnimationRequested ? 0 : frames.length - 1)

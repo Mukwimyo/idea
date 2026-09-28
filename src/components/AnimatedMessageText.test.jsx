@@ -35,4 +35,24 @@ describe('AnimatedMessageText', () => {
     expect(visibleText()).toContain(props.text)
     vi.useRealTimers()
   })
+
+  it('does not restart composition when equivalent settings arrive from the server', () => {
+    vi.useFakeTimers()
+    const settings = { ...DEFAULT_TEXT_EFFECT_SETTINGS, speed: 4 }
+    const props = { text: '서버 저장 뒤에도 계속 조합된다', messageId: 'client-message-1' }
+    const { container, rerender } = render(
+      <AnimatedMessageText {...props} settings={settings} animateOnMount />
+    )
+    const visibleText = () => container.querySelector('[data-text-effect]')?.textContent || ''
+
+    act(() => vi.advanceTimersByTime(80))
+    const beforeServerUpdate = visibleText()
+    rerender(<AnimatedMessageText {...props} settings={{ ...settings }} animateOnMount />)
+    act(() => vi.advanceTimersByTime(0))
+
+    expect(visibleText()).toBe(beforeServerUpdate)
+    act(() => vi.runAllTimers())
+    expect(visibleText()).toContain(props.text)
+    vi.useRealTimers()
+  })
 })
