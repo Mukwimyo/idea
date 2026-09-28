@@ -485,6 +485,9 @@ export default function Characters() {
                     <img className="squircle-media" src={character.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   </div>
                   <div style={{ flex: 1, color: t.theirText, fontSize: 13 }}>{character.name}</div>
+                  <button onClick={() => navigate(`/characters/${character.id}/text-effects`)} aria-label={`${character.name} 대사 연출 설정`} style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, padding: '6px 8px', border: `1px solid ${t.border}`, borderRadius: 8, background: `${t.point}18`, color: t.theirText, fontSize: 10, cursor: 'pointer' }}>
+                    <Sparkles size={13} color={t.point} /> 연출
+                  </button>
                   </div>}
                 </SortableCard>
                 )
@@ -728,8 +731,8 @@ export default function Characters() {
                       <div style={{ fontSize: 14, fontWeight: 500, color: t.theirText }}>{c.name}</div>
                       {c.description && <div style={{ fontSize: 11, color: t.subText, marginTop: 2 }}>{c.description}</div>}
                     </div>
-                    <button onClick={() => navigate(`/characters/${c.id}/text-effects`)} aria-label={`${c.name} 대사 연출 설정`} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 5, opacity: 0.65, display: 'flex', alignItems: 'center' }}>
-                      <Sparkles size={16} color={t.subText} />
+                    <button onClick={() => navigate(`/characters/${c.id}/text-effects`)} aria-label={`${c.name} 대사 연출 설정`} style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, padding: '6px 8px', border: `1px solid ${t.border}`, borderRadius: 8, background: `${t.point}18`, color: t.theirText, fontSize: 10, cursor: 'pointer' }}>
+                      <Sparkles size={13} color={t.point} /> 연출
                     </button>
                     <button onClick={() => deleteChar(c.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, opacity: 0.4, display: 'flex', alignItems: 'center' }}>
                       <X size={16} color={t.subText} />
