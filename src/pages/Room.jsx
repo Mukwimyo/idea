@@ -16,6 +16,8 @@ import RandomTools from '../components/RandomTools'
 import ConfirmDialog from '../components/ConfirmDialog'
 import QuickToolPicker from '../components/QuickToolPicker'
 import { MessageEffectBubble, MessageEffectChip, MessageEffectPicker } from '../components/MessageEffects'
+import AnimatedMessageText from '../components/AnimatedMessageText'
+import { normalizeTextEffectSettings, textEffectDurationMs } from '../features/messages/textEffectSettings'
 import useConfirmDialog from '../hooks/useConfirmDialog'
 import useMessageStageEffects from '../hooks/useMessageStageEffects'
 import {
@@ -732,7 +734,8 @@ export default function Room() {
   }
 
   const handleTyping = async e => {
-    if (!showTypingIndicator || !activeChar || !userIdRef.current) return
+    const isNarration = mode === 'narration'
+    if (!showTypingIndicator || (!activeChar && !isNarration) || !userIdRef.current) return
     const hasContent = e.target.value.trim().length > 0
     const currentTime = Date.now()
     const shouldRefresh = hasContent && currentTime - lastTypingSentAtRef.current >= 2000
@@ -743,8 +746,8 @@ export default function Room() {
         .from('room_members')
         .update({
           is_typing: true,
-          typing_char_name: activeChar.name,
-          typing_character_id: activeChar.id,
+          typing_char_name: isNarration ? '나레이션' : activeChar.name,
+          typing_character_id: isNarration ? null : activeChar.id,
           typing_expires_at: new Date(currentTime + 5000).toISOString(),
         })
         .eq('room_id', roomId)
@@ -867,6 +870,7 @@ export default function Room() {
       type: isNarr ? 'narration' : 'chat',
       content,
       effect_key: effectKey,
+      text_effect_settings: normalizeTextEffectSettings(isNarr ? null : activeChar?.text_effect_settings),
       edited: false,
       created_at: new Date().toISOString(),
       delivery_state: 'sending',
@@ -2290,13 +2294,18 @@ export default function Room() {
                   <MessageEffectBubble
                     effectKey={msg.effect_key}
                     animateOnMount={Boolean(messageEntranceClass)}
+                    effectDelayMs={textEffectDurationMs(msg.content, msg.text_effect_settings) + 280}
                     canReplay={allowMessageEffectReplay}
                     onEffectPlay={playMessageStageEffect}
                     indicatorSide="right"
                     style={{ color: t.narrColor, fontStyle: 'italic', textAlign: 'center', padding: '1px 16px', lineHeight: 1.6, cursor: msg.effect_key ? 'pointer' : 'default' }}>
-                    {msg.content.split('\n').map((line, i) => (
-                      <div key={i} style={{ fontSize: 11 }}>{line}</div>
-                    ))}
+                    <AnimatedMessageText
+                      text={msg.content}
+                      settings={msg.text_effect_settings}
+                      messageId={msg.id}
+                      animateOnMount={Boolean(messageEntranceClass)}
+                      renderFinal={() => msg.content.split('\n').map((line, i) => <div key={i} style={{ fontSize: 11 }}>{line}</div>)}
+                    />
                   </MessageEffectBubble>
                 )}
                 <div style={{ display: 'flex', gap: 3 }}>
@@ -2429,11 +2438,18 @@ export default function Room() {
                   <MessageEffectBubble
                     effectKey={msg.effect_key}
                     animateOnMount={Boolean(messageEntranceClass)}
+                    effectDelayMs={textEffectDurationMs(msg.content, msg.text_effect_settings) + 280}
                     canReplay={allowMessageEffectReplay}
                     onEffectPlay={playMessageStageEffect}
                     indicatorSide={isMine ? 'left' : 'right'}
                     style={{ background: bubbleBg, color: bubbleColor, padding: '8px 12px', borderRadius: 13, fontSize: 'calc(14px * var(--idea-font-scale, 1))', lineHeight: 1.55, border: 'none', cursor: msg.effect_key || isMine ? 'pointer' : 'default' }}>
-                    {parseContent(msg.content, actionSize)}
+                    <AnimatedMessageText
+                      text={msg.content}
+                      settings={msg.text_effect_settings}
+                      messageId={msg.id}
+                      animateOnMount={Boolean(messageEntranceClass)}
+                      renderFinal={() => parseContent(msg.content, actionSize)}
+                    />
                     {msg.edited && showEditedLabel && <span style={{ fontSize: 9, opacity: 0.5, marginLeft: 4 }}>수정됨</span>}
                   </MessageEffectBubble>
                 )}
@@ -2459,8 +2475,9 @@ export default function Room() {
               <div style={{ width: 5, height: 5, borderRadius: '50%', background: t.subText, opacity: 0.6, animation: 'typing-dot 1.2s infinite', animationDelay: '0.4s' }} />
             </div>
             <span style={{ fontSize: 11, color: t.subText, opacity: 0.7 }}>
-              {typingInfo.charName}
-              {subjectParticle(typingInfo.charName)} 말하는 중...
+              {typingInfo.characterId
+                ? <>{typingInfo.charName}{subjectParticle(typingInfo.charName)} 말하는 중...</>
+                : '누군가 장면을 서술하는 중...'}
             </span>
           </div>
         )}

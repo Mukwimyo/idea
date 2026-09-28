@@ -109,6 +109,7 @@ export function MessageEffectChip({ effectKey, onClear, theme }) {
 export function MessageEffectBubble({
   effectKey,
   animateOnMount = false,
+  effectDelayMs = MESSAGE_ENTRANCE_EFFECT_DELAY_MS,
   canReplay,
   onEffectPlay,
   indicatorSide = 'right',
@@ -131,9 +132,9 @@ export function MessageEffectBubble({
     const timer = window.setTimeout(() => {
       setInitialEffectReady(true)
       onEffectPlayRef.current?.(effect.key)
-    }, MESSAGE_ENTRANCE_EFFECT_DELAY_MS)
+    }, effectDelayMs)
     return () => window.clearTimeout(timer)
-  }, [effect])
+  }, [effect, effectDelayMs])
 
   const shouldAnimate = Boolean(effect && (initialEffectReady || replayCount > 0))
   const effectClassName = getMessageEffectClassName(effectKey, shouldAnimate)

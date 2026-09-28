@@ -163,7 +163,7 @@
       <aside class="panel controls" aria-label="텍스트 효과 설정">
         <div class="control-group">
           <label class="control-title" for="messageInput">미리볼 대사</label>
-          <textarea id="messageInput" maxlength="240">안녕, 난 사과야. 조금 어지러운 것 같아.</textarea>
+          <textarea id="messageInput" maxlength="240">fix: 발주서 비고 행의 문구 및 입력 영역 배치 수정</textarea>
         </div>
 
         <div class="control-group">
@@ -190,32 +190,27 @@
           <div class="control-title">조합 효과 <small>여러 개 선택 가능</small></div>
           <div class="modifier-grid" id="modifierChoices">
             <label class="modifier"><input type="checkbox" value="twist" /><span>비틀림</span></label>
-            <label class="modifier"><input type="checkbox" value="decay" /><span>침식</span></label>
-            <label class="modifier"><input type="checkbox" value="echo" /><span>메아리</span></label>
-            <label class="modifier"><input type="checkbox" value="breathe" /><span>호흡</span></label>
             <label class="modifier"><input type="checkbox" value="runaway" /><span>폭주</span></label>
             <label class="modifier"><input type="checkbox" value="disconnect" /><span>단절</span></label>
-            <label class="modifier"><input type="checkbox" value="censor" /><span>검열</span></label>
-            <label class="modifier"><input type="checkbox" value="bleed" /><span>번짐</span></label>
           </div>
         </div>
 
         <div class="control-group">
           <div class="slider">
-            <label class="slider-label" for="intensity">효과 강도 <output id="intensityValue">52</output></label>
-            <input id="intensity" type="range" min="0" max="100" value="52" />
+            <label class="slider-label" for="intensity">효과 강도 <output id="intensityValue">49</output></label>
+            <input id="intensity" type="range" min="0" max="100" value="49" />
           </div>
           <div class="slider">
             <label class="slider-label" for="irregularity">불규칙성 <output id="irregularityValue">64</output></label>
             <input id="irregularity" type="range" min="0" max="100" value="64" />
           </div>
           <div class="slider">
-            <label class="slider-label" for="tracking">글자 간격 <output id="trackingValue">1px</output></label>
-            <input id="tracking" type="range" min="-2" max="6" value="1" />
+            <label class="slider-label" for="tracking">글자 간격 <output id="trackingValue">-2px</output></label>
+            <input id="tracking" type="range" min="-2" max="6" value="-2" />
           </div>
           <div class="slider">
-            <label class="slider-label" for="speed">등장 속도 <output id="speedValue">4.5×</output></label>
-            <input id="speed" type="range" min="50" max="500" step="10" value="450" />
+            <label class="slider-label" for="speed">등장 속도 <output id="speedValue">4.0×</output></label>
+            <input id="speed" type="range" min="50" max="500" step="10" value="400" />
           </div>
           <div class="toggle-row" style="margin-top: 16px;">
             <span>긴 문장 자동 가속</span>
