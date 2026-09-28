@@ -5,6 +5,8 @@ const timestamp = message => {
 
 const hasSequence = message => Number.isFinite(Number(message?.sequence_no))
 
+export const messageRenderKey = message => message?.client_message_id || message?.id
+
 export const compareMessages = (left, right) => {
   if (hasSequence(left) && hasSequence(right)) {
     const sequenceDifference = Number(left.sequence_no) - Number(right.sequence_no)
