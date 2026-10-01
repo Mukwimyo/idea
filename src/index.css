@@ -326,6 +326,256 @@ body {
     }
 }
 
+/* Modern UI: one continuous surface instead of stacked cards. */
+:root[data-ui-mode="modern"] .modern-surface-page {
+    --modern-divider: color-mix(in srgb, currentColor 12%, transparent);
+}
+
+:root[data-ui-mode="modern"] .modern-page-shell {
+    max-width: 480px !important;
+    padding-left: 20px !important;
+    padding-right: 20px !important;
+}
+
+:root[data-ui-mode="modern"] .modern-page-header {
+    border-bottom-color: transparent !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+:root[data-ui-mode="modern"] .room-list-page {
+    padding: max(18px, env(safe-area-inset-top)) 20px max(32px, env(safe-area-inset-bottom)) !important;
+    background-image: none !important;
+}
+
+:root[data-ui-mode="modern"] .room-list-shell {
+    max-width: 460px !important;
+}
+
+:root[data-ui-mode="modern"] .room-list-header {
+    position: static;
+    min-height: 58px;
+    margin: 0 0 18px !important;
+    padding: 0 !important;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
+:root[data-ui-mode="modern"] .room-list-header__logo {
+    width: 88px !important;
+}
+
+:root[data-ui-mode="modern"] .room-list-primary-action,
+:root[data-ui-mode="modern"] .room-list-icon-action {
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+}
+
+:root[data-ui-mode="modern"] .room-list-primary-action {
+    width: 44px;
+    padding: 0 !important;
+    justify-content: center;
+}
+
+:root[data-ui-mode="modern"] .room-list-primary-action span {
+    display: none;
+}
+
+:root[data-ui-mode="modern"] .room-list-search__input {
+    min-height: 46px !important;
+    border: 0 !important;
+    border-radius: 14px !important;
+    background: color-mix(in srgb, var(--room-list-text) 8%, transparent) !important;
+    box-shadow: none !important;
+}
+
+:root[data-ui-mode="modern"] .room-list-sort {
+    width: max-content;
+    max-width: 100%;
+    gap: 8px !important;
+    padding: 0 !important;
+    border: 0 !important;
+    background: transparent !important;
+}
+
+:root[data-ui-mode="modern"] .room-list-sort__button {
+    min-width: 104px;
+    min-height: 42px;
+    padding: 0 18px !important;
+    border-radius: 999px !important;
+    background: color-mix(in srgb, var(--room-list-text) 10%, transparent) !important;
+}
+
+:root[data-ui-mode="modern"] .room-list-sort__button.is-active {
+    background: var(--room-list-text) !important;
+    color: var(--room-list-bg) !important;
+    box-shadow: none !important;
+}
+
+:root[data-ui-mode="modern"] .room-list-group-create {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    background: transparent !important;
+}
+
+:root[data-ui-mode="modern"] .room-list-groups {
+    gap: 24px !important;
+}
+
+:root[data-ui-mode="modern"] .room-list-group__header {
+    margin-bottom: 4px !important;
+    padding: 0 !important;
+}
+
+:root[data-ui-mode="modern"] .room-list-group__rooms {
+    gap: 0 !important;
+}
+
+:root[data-ui-mode="modern"] .room-list-card {
+    min-height: 84px;
+    padding: 13px 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
+:root[data-ui-mode="modern"] .room-list-card + .room-list-card {
+    border-top: 1px solid color-mix(in srgb, var(--room-list-border) 18%, transparent) !important;
+}
+
+:root[data-ui-mode="modern"] .room-list-card:hover {
+    transform: none;
+    background: color-mix(in srgb, var(--room-list-text) 4%, transparent) !important;
+    box-shadow: none !important;
+}
+
+:root[data-ui-mode="modern"] .room-list-card__cover {
+    width: 56px !important;
+    height: 56px !important;
+    border-radius: 50% !important;
+    box-shadow: none !important;
+}
+
+:root[data-ui-mode="modern"] .room-list-card__name {
+    font-size: 16px !important;
+    font-weight: 700 !important;
+}
+
+:root[data-ui-mode="modern"] .room-list-card__preview {
+    margin-top: 6px !important;
+    font-size: 12px !important;
+}
+
+:root[data-ui-mode="modern"] .room-list-card-menu {
+    border: 0 !important;
+    border-radius: 18px !important;
+}
+
+:root[data-ui-mode="modern"] .auth-page {
+    align-items: flex-start !important;
+    padding-top: max(76px, calc(env(safe-area-inset-top) + 48px)) !important;
+    background: #090909 !important;
+}
+
+:root[data-ui-mode="modern"] .auth-panel {
+    max-width: 380px !important;
+    padding: 26px 22px !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+}
+
+:root[data-ui-mode="modern"] .auth-panel input {
+    min-height: 50px !important;
+    border-color: transparent !important;
+    border-radius: 14px !important;
+    background: #1c1c1e !important;
+}
+
+:root[data-ui-mode="modern"] .characters-page {
+    padding: max(18px, env(safe-area-inset-top)) 0 max(32px, env(safe-area-inset-bottom)) !important;
+}
+
+:root[data-ui-mode="modern"] .characters-page .character-editor-panel,
+:root[data-ui-mode="modern"] .characters-page .character-list-item {
+    border-color: transparent !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+:root[data-ui-mode="modern"] .characters-page .character-list-item {
+    min-height: 68px;
+    border-bottom: 1px solid color-mix(in srgb, currentColor 10%, transparent) !important;
+}
+
+:root[data-ui-mode="modern"] .characters-page input:not([type="range"]),
+:root[data-ui-mode="modern"] .characters-page textarea,
+:root[data-ui-mode="modern"] .app-settings-page input:not([type="range"]),
+:root[data-ui-mode="modern"] .app-settings-page select {
+    min-height: 46px;
+    border-color: transparent !important;
+    border-radius: 13px !important;
+    background: color-mix(in srgb, currentColor 7%, transparent) !important;
+}
+
+:root[data-ui-mode="modern"] .app-settings-page .ui-mode-card {
+    padding: 14px 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+}
+
+:root[data-ui-mode="modern"] .app-settings-page .modern-page-shell > div[style*="height: 0.5px"] {
+    opacity: 0.34;
+}
+
+:root[data-ui-mode="modern"] .help-guide-card {
+    padding: 14px 0 !important;
+    border-width: 0 0 1px !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+}
+
+:root[data-ui-mode="modern"] .help-section {
+    margin-bottom: 34px !important;
+}
+
+:root[data-ui-mode="modern"] .character-effects-page .text-effect-preview {
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    border-bottom: 1px solid color-mix(in srgb, currentColor 12%, transparent) !important;
+}
+
+:root[data-ui-mode="modern"] .character-effects-page .text-effect-configurator section {
+    padding: 10px 0;
+    border-bottom: 1px solid color-mix(in srgb, currentColor 10%, transparent);
+}
+
+:root[data-ui-mode="modern"] .character-effects-page .text-effect-configurator section button {
+    border-color: transparent !important;
+    border-radius: 999px !important;
+}
+
+:root[data-ui-mode="modern"] .settings-page-drawer.top-panel-sheet {
+    border-left: 0 !important;
+    box-shadow: none !important;
+}
+
 .ui-touch-target {
     min-width: 44px;
     min-height: 44px;

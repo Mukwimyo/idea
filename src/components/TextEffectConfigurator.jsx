@@ -34,8 +34,8 @@ export default function TextEffectConfigurator({ value, onChange, theme, sampleT
   })
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 15 }}>
-      <div style={{ minHeight: 112, padding: 18, borderRadius: 14, border: `1px solid ${theme.border}`, background: theme.bg, color: theme.theirText, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+    <div className="text-effect-configurator" style={{ display: 'flex', flexDirection: 'column', gap: 15 }}>
+      <div className="text-effect-preview" style={{ minHeight: 112, padding: 18, borderRadius: 14, border: `1px solid ${theme.border}`, background: theme.bg, color: theme.theirText, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
         <div style={{ marginBottom: 10, color: theme.subText, fontSize: 10 }}>미리보기</div>
         <div style={{ fontSize: 15, lineHeight: 1.65, overflowWrap: 'anywhere' }}>
           <AnimatedMessageText key={previewKey} text={sampleText} settings={settings} messageId={`preview-${previewKey}`} animateOnMount />
