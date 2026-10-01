@@ -1,5 +1,43 @@
 import { describe, expect, it, vi } from 'vitest'
-import { advanceRoomReadCursor, joinRoomWithInvite, sendRoomMessage } from './messageApi'
+import { advanceRoomReadCursor, fetchRoomMessages, joinRoomWithInvite, sendRoomMessage } from './messageApi'
+
+const createMessageQuery = data => {
+  const query = {
+    select: vi.fn(() => query),
+    eq: vi.fn(() => query),
+    order: vi.fn(() => query),
+    limit: vi.fn(() => query),
+    lt: vi.fn(() => query),
+    then: resolve => resolve({ data, error: null }),
+  }
+  return query
+}
+
+describe('message history API', () => {
+  it('loads the newest page and returns it in timeline order', async () => {
+    const query = createMessageQuery([{ id: '3', sequence_no: 3 }, { id: '2', sequence_no: 2 }, { id: '1', sequence_no: 1 }])
+    const result = await fetchRoomMessages({ from: vi.fn(() => query) }, 'room-1', { pageSize: 2 })
+
+    expect(query.order).toHaveBeenCalledWith('sequence_no', { ascending: false })
+    expect(query.limit).toHaveBeenCalledWith(3)
+    expect(query.lt).not.toHaveBeenCalled()
+    expect(result).toEqual({
+      messages: [{ id: '2', sequence_no: 2 }, { id: '3', sequence_no: 3 }],
+      hasMore: true,
+    })
+  })
+
+  it('uses the oldest loaded sequence as a stable history cursor', async () => {
+    const query = createMessageQuery([{ id: '1', sequence_no: 1 }])
+    const result = await fetchRoomMessages({ from: vi.fn(() => query) }, 'room-1', {
+      beforeSequence: 2,
+      pageSize: 200,
+    })
+
+    expect(query.lt).toHaveBeenCalledWith('sequence_no', 2)
+    expect(result.hasMore).toBe(false)
+  })
+})
 
 describe('message RPC API', () => {
   it('never sends a caller-controlled user id', async () => {

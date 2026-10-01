@@ -57,7 +57,7 @@ describe('messageRenderKey', () => {
 })
 
 describe('highestReadableMessage', () => {
-  it('ignores own, chapter, and optimistic messages', () => {
+  it('advances through own and system messages while ignoring optimistic messages', () => {
     const result = highestReadableMessage(
       [
         { id: 'one', user_id: 'other', type: 'chat', sequence_no: 1 },
@@ -68,6 +68,6 @@ describe('highestReadableMessage', () => {
       ],
       'me'
     )
-    expect(result.id).toBe('four')
+    expect(result.id).toBe('three')
   })
 })

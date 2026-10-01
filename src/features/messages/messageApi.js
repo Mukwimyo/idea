@@ -1,17 +1,29 @@
 export const MESSAGE_SELECT =
   '*, characters(name, color, text_color, avatar_letter, image_url)'
 
+export const MESSAGE_PAGE_SIZE = 200
+
 export const createClientMessageId = () => crypto.randomUUID()
 
-export const fetchRoomMessages = async (supabase, roomId) => {
-  const { data, error } = await supabase
+export const fetchRoomMessages = async (supabase, roomId, { beforeSequence = null, pageSize = MESSAGE_PAGE_SIZE } = {}) => {
+  let query = supabase
     .from('messages')
     .select(MESSAGE_SELECT)
     .eq('room_id', roomId)
-    .order('sequence_no', { ascending: true })
+    .order('sequence_no', { ascending: false })
+    .limit(pageSize + 1)
+
+  if (beforeSequence != null) query = query.lt('sequence_no', beforeSequence)
+
+  const { data, error } = await query
 
   if (error) throw error
-  return data || []
+  const descending = data || []
+  const page = descending.slice(0, pageSize)
+  return {
+    messages: [...page].reverse(),
+    hasMore: descending.length > pageSize,
+  }
 }
 
 export const fetchRoomReadCursors = async (supabase, roomId) => {
