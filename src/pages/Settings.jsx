@@ -269,7 +269,7 @@ export default function Settings() {
 
   return (
     <div
-      className={`settings-page-drawer${closing ? ' is-closing' : ''}`}
+      className={`settings-page-drawer modern-surface-page app-settings-page${closing ? ' is-closing' : ''}`}
       style={{
         position: 'fixed',
         inset: 0,
@@ -280,7 +280,7 @@ export default function Settings() {
         transition: 'background 0.3s',
       }}>
       <Toast toast={toast} />
-      <div style={{ maxWidth: 480, margin: '0 auto', padding: 16 }}>
+      <div className="modern-page-shell" style={{ maxWidth: 480, margin: '0 auto', padding: 16 }}>
         <div
           style={{
             display: 'flex',

@@ -440,8 +440,8 @@ export default function Characters() {
     return (
       <>
       <ProfileImageModal profile={profilePreview} onClose={() => setProfilePreview(null)} />
-      <div style={{ minHeight: '100vh', background: t.bg, padding: 16 }}>
-        <div style={{ maxWidth: 400, margin: '0 auto' }}>
+      <div className="modern-surface-page characters-page" style={{ minHeight: '100vh', background: t.bg, padding: 16 }}>
+        <div className="modern-page-shell" style={{ maxWidth: 400, margin: '0 auto' }}>
           <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16, paddingTop: 8 }}>
             <button onClick={() => navigate(-1)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 4px', marginRight: 8, display: 'flex', alignItems: 'center' }}>
               <ChevronLeft size={22} color={t.subText} />
@@ -474,7 +474,7 @@ export default function Characters() {
                 {visibleSelectedCharacters.map(character => {
                 return (
                 <SortableCard key={character.id} id={character.id} disabled={alphabeticalView}>
-                  {({ listeners }) => <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: t.panel, border: `1px solid ${t.border}`, borderRadius: 11, padding: '10px 11px' }}>
+                  {({ listeners }) => <div className="character-list-item" style={{ display: 'flex', alignItems: 'center', gap: 10, background: t.panel, border: `1px solid ${t.border}`, borderRadius: 11, padding: '10px 11px' }}>
                   <button {...listeners} disabled={alphabeticalView} aria-label={`${character.name} 순서 이동`} style={{ display: 'flex', background: 'none', border: 0, padding: 2, cursor: alphabeticalView ? 'default' : 'grab', touchAction: 'none', opacity: alphabeticalView ? 0.25 : 0.65 }}>
                     <GripVertical size={16} color={t.subText} />
                   </button>
@@ -499,7 +499,7 @@ export default function Characters() {
           <div style={{ fontSize: 11, color: t.subText, marginBottom: 8 }}>전체 풀에서 추가</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
             {availableCharacters.map(character => (
-              <button key={character.id} onClick={() => toggleRoomCharacter(character.id)} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', background: t.panel, border: `1px solid ${t.border}`, borderRadius: 11, padding: '10px 11px', cursor: 'pointer', textAlign: 'left' }}>
+              <button className="character-list-item" key={character.id} onClick={() => toggleRoomCharacter(character.id)} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', background: t.panel, border: `1px solid ${t.border}`, borderRadius: 11, padding: '10px 11px', cursor: 'pointer', textAlign: 'left' }}>
                 <div style={{ width: 24, height: 24, borderRadius: 7, border: `1px solid ${t.border}`, flexShrink: 0 }} />
                 <div role="button" tabIndex={0} aria-label={`${character.name} 프로필 사진 크게 보기`} onClick={event => { event.stopPropagation(); setProfilePreview({ url: character.image_url || DEFAULT_AVATAR, name: character.name }) }} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); setProfilePreview({ url: character.image_url || DEFAULT_AVATAR, name: character.name }) } }} style={{ width: 43, height: 43, borderRadius: 12, background: character.color, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', color: character.text_color, flexShrink: 0, cursor: 'zoom-in' }}>
                   <img className="squircle-media" src={character.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -565,8 +565,8 @@ export default function Characters() {
           </div>
         </div>
       )}
-      <div style={{ minHeight: '100vh', background: t.bg, padding: 16 }}>
-        <div style={{ maxWidth: 400, margin: '0 auto' }}>
+      <div className="modern-surface-page characters-page" style={{ minHeight: '100vh', background: t.bg, padding: 16 }}>
+        <div className="modern-page-shell" style={{ maxWidth: 400, margin: '0 auto' }}>
           <div style={{ display: 'flex', alignItems: 'center', marginBottom: 20, paddingTop: 8 }}>
             <button onClick={() => navigate(-1)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 4px', marginRight: 8, display: 'flex', alignItems: 'center' }}>
               <ChevronLeft size={22} color={t.subText} />
@@ -605,7 +605,7 @@ export default function Characters() {
           </div>
 
           {showAdd && (
-            <div style={{ background: t.panel, borderRadius: 14, padding: 16, marginBottom: 14, border: `0.5px solid ${t.border}` }}>
+            <div className="character-editor-panel" style={{ background: t.panel, borderRadius: 14, padding: 16, marginBottom: 14, border: `0.5px solid ${t.border}` }}>
               <div style={{ fontSize: 13, color: t.subText, marginBottom: 10 }}>새 캐릭터</div>
               <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
                 <label style={{ cursor: 'pointer' }}>
@@ -663,7 +663,7 @@ export default function Characters() {
                 {chars.length > 0 && filteredChars.length === 0 && <div style={{ textAlign: 'center', color: t.subText, fontSize: 13, marginTop: 28, opacity: 0.65 }}>검색 결과가 없습니다.</div>}
                 {visibleChars.map(c => (
               <SortableCard key={c.id} id={c.id} disabled={alphabeticalView}>
-                {({ listeners }) => <div style={{ background: t.panel, borderRadius: 12, padding: '13px 15px', border: `0.5px solid ${t.border}` }}>
+                {({ listeners }) => <div className="character-list-item" style={{ background: t.panel, borderRadius: 12, padding: '13px 15px', border: `0.5px solid ${t.border}` }}>
                 {editingChar === c.id ? (
                   <div style={{ transformOrigin: 'top', animation: 'character-card-expand 240ms cubic-bezier(0.2, 0.8, 0.2, 1)' }}>
                     <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>

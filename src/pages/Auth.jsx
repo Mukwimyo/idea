@@ -29,6 +29,7 @@ export default function Auth() {
 
   return (
     <main
+      className="modern-surface-page auth-page"
       style={{
         minHeight: '100dvh',
         display: 'flex',
@@ -39,6 +40,7 @@ export default function Auth() {
         '--focus-color': '#afa9ec',
       }}>
       <section
+        className="auth-panel modern-flat-section"
         aria-labelledby="auth-title"
         style={{
           background: 'color-mix(in srgb, #2d2157 88%, transparent)',

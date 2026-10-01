@@ -5,14 +5,14 @@ import { supabase } from '../lib/supabase'
 import { getTheme } from '../lib/themes'
 
 const Section = ({ title, children, theme }) => (
-  <section style={{ marginBottom: 26 }}>
+  <section className="help-section" style={{ marginBottom: 26 }}>
     <h2 style={{ marginBottom: 10, color: theme.theirText, fontSize: 15 }}>{title}</h2>
     <div style={{ display: 'grid', gap: 10 }}>{children}</div>
   </section>
 )
 
 const GuideCard = ({ title, description, children, theme }) => (
-  <div style={{ padding: 14, borderRadius: 13, border: `1px solid ${theme.border}`, background: theme.panel }}>
+  <div className="help-guide-card" style={{ padding: 14, borderRadius: 13, border: `1px solid ${theme.border}`, background: theme.panel }}>
     <div style={{ color: theme.theirText, fontSize: 13, fontWeight: 500 }}>{title}</div>
     {description && <div style={{ marginTop: 5, color: theme.subText, fontSize: 11, lineHeight: 1.65 }}>{description}</div>}
     {children && <div style={{ marginTop: 12 }}>{children}</div>}
@@ -41,9 +41,9 @@ export default function Help() {
   const t = theme
 
   return (
-    <div className="settings-page-drawer" style={{ position: 'fixed', inset: 0, zIndex: 100, overflowY: 'auto', background: t.bg }}>
-      <div style={{ width: '100%', maxWidth: 480, minHeight: '100dvh', margin: '0 auto', padding: '14px 16px 40px' }}>
-        <header style={{ position: 'sticky', top: 0, zIndex: 2, display: 'flex', alignItems: 'center', gap: 8, margin: '-14px -16px 22px', padding: '12px 16px', background: `color-mix(in srgb, ${t.panel} 88%, transparent)`, backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)' }}>
+    <div className="settings-page-drawer modern-surface-page help-page" style={{ position: 'fixed', inset: 0, zIndex: 100, overflowY: 'auto', background: t.bg }}>
+      <div className="modern-page-shell" style={{ width: '100%', maxWidth: 480, minHeight: '100dvh', margin: '0 auto', padding: '14px 16px 40px' }}>
+        <header className="modern-page-header" style={{ position: 'sticky', top: 0, zIndex: 2, display: 'flex', alignItems: 'center', gap: 8, margin: '-14px -16px 22px', padding: '12px 16px', background: `color-mix(in srgb, ${t.panel} 88%, transparent)`, backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)' }}>
           <button onClick={() => navigate(-1)} aria-label="뒤로 가기" style={{ width: 36, height: 36, display: 'grid', placeItems: 'center', border: 0, background: 'none', color: t.subText }}><ChevronLeft size={22} /></button>
           <div>
             <h1 style={{ color: t.theirText, fontSize: 16 }}>IDEA 사용법</h1>
