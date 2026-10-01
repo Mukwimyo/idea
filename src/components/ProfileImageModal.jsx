@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
-import { ChevronLeft, ChevronRight, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Settings, X } from 'lucide-react'
 
-export default function ProfileImageModal({ profile, onClose }) {
+export default function ProfileImageModal({ profile, onClose, onEdit }) {
   if (!profile) return null
   const urls = profile.urls?.length ? profile.urls : profile.url ? [profile.url] : []
   const modalKey = `${urls.join('|')}::${profile.index || 0}`
-  return <ProfileImageViewer key={modalKey} profile={profile} urls={urls} onClose={onClose} />
+  return <ProfileImageViewer key={modalKey} profile={profile} urls={urls} onClose={onClose} onEdit={onEdit} />
 }
 
-function ProfileImageViewer({ profile, urls, onClose }) {
+function ProfileImageViewer({ profile, urls, onClose, onEdit }) {
   const [currentIndex, setCurrentIndex] = useState(() => Math.max(0, Math.min(profile.index || 0, urls.length - 1)))
   const [dragOffset, setDragOffset] = useState(0)
   const [isDragging, setIsDragging] = useState(false)
@@ -117,6 +117,11 @@ function ProfileImageViewer({ profile, urls, onClose }) {
         </>
       )}
       {profile.name && <div style={{ marginTop: 14, color: '#fff', fontSize: 14, textAlign: 'center' }}>{profile.name}</div>}
+      {onEdit && (
+        <button type="button" onClick={event => { event.stopPropagation(); onEdit() }} style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 16, padding: '10px 16px', border: '1px solid rgba(255,255,255,0.28)', borderRadius: 999, background: 'rgba(255,255,255,0.12)', color: '#fff', fontSize: 12, cursor: 'pointer' }}>
+          <Settings size={15} /> 프로필 수정
+        </button>
+      )}
     </div>
   )
 }

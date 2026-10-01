@@ -22,7 +22,8 @@ describe('textEffectSettings', () => {
 
   it('builds Korean jamo composition frames in place', () => {
     expect(getHangulCompositionParts('한')).toEqual(['ㅎ', '하', '한'])
-    expect(buildTextEffectFrames('한!', DEFAULT_TEXT_EFFECT_SETTINGS)).toEqual(['ㅎ', '하', '한', '한!'])
+    expect(DEFAULT_TEXT_EFFECT_SETTINGS.entryMode).toBe('instant')
+    expect(buildTextEffectFrames('한!', DEFAULT_TEXT_EFFECT_SETTINGS)).toEqual(['한!'])
   })
 
   it('accelerates long messages without exceeding the maximum', () => {
@@ -31,7 +32,7 @@ describe('textEffectSettings', () => {
   })
 
   it('estimates enough time for the presentation effect to finish first', () => {
-    expect(textEffectDurationMs('안녕', DEFAULT_TEXT_EFFECT_SETTINGS)).toBeGreaterThan(100)
+    expect(textEffectDurationMs('안녕', DEFAULT_TEXT_EFFECT_SETTINGS)).toBe(0)
     expect(textEffectDurationMs('안녕', { ...DEFAULT_TEXT_EFFECT_SETTINGS, animate: false })).toBe(0)
   })
 })

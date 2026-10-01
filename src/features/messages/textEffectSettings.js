@@ -2,7 +2,7 @@ export const TEXT_EFFECT_ENTRY_MODES = ['instant', 'jamo', 'syllable', 'decode',
 export const TEXT_EFFECT_MODIFIERS = ['twist', 'runaway', 'disconnect']
 
 export const DEFAULT_TEXT_EFFECT_SETTINGS = Object.freeze({
-  entryMode: 'jamo',
+  entryMode: 'instant',
   entryMotion: 'stationary',
   modifiers: [],
   intensity: 49,
