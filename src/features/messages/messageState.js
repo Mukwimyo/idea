@@ -50,13 +50,11 @@ export const mergeMessages = (current, incoming) => {
   return merged.sort(compareMessages)
 }
 
-export const highestReadableMessage = (messages, userId) =>
+export const highestReadableMessage = messages =>
   [...messages]
     .filter(
       message =>
         message &&
-        message.user_id !== userId &&
-        message.type !== 'chapter' &&
         !String(message.id).startsWith('temp-') &&
         hasSequence(message)
     )

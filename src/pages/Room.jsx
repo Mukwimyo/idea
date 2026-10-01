@@ -170,6 +170,8 @@ export default function Room() {
   const { confirmation, confirm, closeConfirmation } = useConfirmDialog()
   const [room, setRoom] = useState(null)
   const [messages, setMessages] = useState([])
+  const [hasOlderMessages, setHasOlderMessages] = useState(false)
+  const [loadingOlderMessages, setLoadingOlderMessages] = useState(false)
   const [input, setInput] = useState(() => localStorage.getItem(`idea-room-draft:${roomId}`) || '')
   const [mode, setMode] = useState('chat')
   const [myChars, setMyChars] = useState([])
@@ -678,10 +680,11 @@ export default function Room() {
 
     reconcilingMessagesRef.current = true
     try {
-      const [data, cursors] = await Promise.all([
+      const [messagePage, cursors] = await Promise.all([
         fetchRoomMessages(supabase, roomId),
         fetchRoomReadCursors(supabase, roomId),
       ])
+      const data = messagePage.messages
       const ownCursor = cursors.find(cursor => cursor.user_id === userIdRef.current)
       if (!initialScrollDone.current && userIdRef.current) {
         const firstUnread = data.find(
@@ -694,6 +697,7 @@ export default function Room() {
       }
       window.clearTimeout(remoteTypingTimerRef.current)
       setMessages(current => mergeMessages(current, data))
+      setHasOlderMessages(messagePage.hasMore)
       setReadCursors(cursors)
       const dates = [...new Set(data.map(m => new Date(m.created_at).toLocaleDateString('ko-KR')))]
       setAvailableDates(dates)
@@ -708,6 +712,39 @@ export default function Room() {
     }
   }
 
+  const loadOlderMessages = async () => {
+    if (loadingOlderMessages || !hasOlderMessages) return
+    const oldestSequence = messagesRef.current.find(message => Number.isFinite(Number(message.sequence_no)))?.sequence_no
+    if (oldestSequence == null) return
+
+    const list = messageListRef.current
+    const previousScrollHeight = list?.scrollHeight || 0
+    const previousScrollTop = list?.scrollTop || 0
+    setLoadingOlderMessages(true)
+    try {
+      const page = await fetchRoomMessages(supabase, roomId, { beforeSequence: oldestSequence })
+      setMessages(current => mergeMessages(current, page.messages))
+      setHasOlderMessages(page.hasMore)
+      setAvailableDates(current => [
+        ...new Set([
+          ...page.messages.map(message => new Date(message.created_at).toLocaleDateString('ko-KR')),
+          ...current,
+        ]),
+      ])
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => {
+          if (!list) return
+          list.scrollTop = previousScrollTop + (list.scrollHeight - previousScrollHeight)
+        })
+      })
+    } catch (error) {
+      console.error('older message fetch failed:', error.message)
+      showToast('이전 메시지를 불러오지 못했습니다.')
+    } finally {
+      setLoadingOlderMessages(false)
+    }
+  }
+
   const markAsRead = async msgs => {
     if (
       !userIdRef.current ||
@@ -716,7 +753,7 @@ export default function Room() {
       !isAtBottomRef.current
     ) return
 
-    const target = highestReadableMessage(msgs, userIdRef.current)
+    const target = highestReadableMessage(msgs)
     if (!target) return
     const ownCursor = readCursors.find(cursor => cursor.user_id === userIdRef.current)
     if (Number(ownCursor?.last_read_sequence || 0) >= Number(target.sequence_no)) return
@@ -2087,6 +2124,15 @@ export default function Room() {
 
       {/* 메시지 목록 */}
       <div ref={messageListRef} onScroll={handleScroll} className={`chat-scroll${hideScroll ? ' hide-scroll' : ''}`} style={{ position: 'relative', flex: 1, minHeight: 0, padding: `58px 10px ${showCharList && myChars.length > 0 ? 156 : 106}px`, scrollPaddingTop: 58, display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto', background: t.bg, transition: 'padding-bottom 210ms cubic-bezier(0.2, 0.8, 0.2, 1)' }}>
+        {hasOlderMessages && (
+          <button
+            type="button"
+            onClick={loadOlderMessages}
+            disabled={loadingOlderMessages}
+            style={{ alignSelf: 'center', margin: '0 0 4px', padding: '7px 13px', borderRadius: 16, border: `1px solid ${t.border}`, background: t.panel, color: t.subText, fontSize: 11, cursor: loadingOlderMessages ? 'wait' : 'pointer', opacity: loadingOlderMessages ? 0.65 : 1 }}>
+            {loadingOlderMessages ? '불러오는 중…' : '이전 메시지 불러오기'}
+          </button>
+        )}
         {filteredMessages.map((msg, messageIndex) => {
           const isMine = msg.user_id === userId
           const renderKey = messageRenderKey(msg)
