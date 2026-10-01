@@ -6,6 +6,7 @@ import RoomList from './pages/RoomList'
 import Room from './pages/Room'
 import Characters from './pages/Characters'
 import CharacterTextEffects from './pages/CharacterTextEffects'
+import CharacterEdit from './pages/CharacterEdit'
 import Settings from './pages/Settings'
 import Help from './pages/Help'
 import PwaPrompts from './components/PwaPrompts'
@@ -72,6 +73,7 @@ export default function App() {
           <Route path="/room/:roomId" element={session ? <Room /> : <Navigate to="/auth" />} />
           <Route path="/room/:roomId/characters" element={session ? <Characters /> : <Navigate to="/auth" />} />
           <Route path="/characters" element={session ? <Characters /> : <Navigate to="/auth" />} />
+          <Route path="/characters/:characterId/edit" element={session ? <CharacterEdit /> : <Navigate to="/auth" />} />
           <Route path="/characters/:characterId/text-effects" element={session ? <CharacterTextEffects /> : <Navigate to="/auth" />} />
           <Route path="/settings" element={session ? <Settings /> : <Navigate to="/auth" />} />
           <Route path="/help" element={session ? <Help /> : <Navigate to="/auth" />} />

@@ -22,7 +22,7 @@ describe('AnimatedMessageText', () => {
 
   it('continues a long composition after the bubble entrance prop turns off', () => {
     vi.useFakeTimers()
-    const settings = { ...DEFAULT_TEXT_EFFECT_SETTINGS, speed: 0.5 }
+    const settings = { ...DEFAULT_TEXT_EFFECT_SETTINGS, entryMode: 'jamo', speed: 0.5 }
     const props = { text: '긴 문장도 끝까지 차례대로 조합된다', settings, messageId: 'message-2' }
     const { container, rerender } = render(<AnimatedMessageText {...props} animateOnMount />)
     const visibleText = () => container.querySelector('[data-text-effect]')?.textContent || ''
@@ -38,7 +38,7 @@ describe('AnimatedMessageText', () => {
 
   it('does not restart composition when equivalent settings arrive from the server', () => {
     vi.useFakeTimers()
-    const settings = { ...DEFAULT_TEXT_EFFECT_SETTINGS, speed: 4 }
+    const settings = { ...DEFAULT_TEXT_EFFECT_SETTINGS, entryMode: 'jamo', speed: 4 }
     const props = { text: '서버 저장 뒤에도 계속 조합된다', messageId: 'client-message-1' }
     const { container, rerender } = render(
       <AnimatedMessageText {...props} settings={settings} animateOnMount />

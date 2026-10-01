@@ -307,18 +307,6 @@ export default function Characters() {
     if (!error) setTalkingFrames(data || [])
   }
 
-  const startEdit = c => {
-    setEditingChar(c.id)
-    setEditName(c.name)
-    setEditDescription(c.description || '')
-    setEditImagePreview(c.image_url || null)
-    setEditImageFile(null)
-    setTalkingFrames([])
-    setTalkingPreviewPlaying(false)
-    setTalkingPreviewIndex(0)
-    fetchTalkingFrames(c.id)
-  }
-
   const uploadTalkingFrames = async (character, files) => {
     const selected = Array.from(files || []).slice(0, Math.max(0, 4 - talkingFrames.length))
     if (selected.length === 0) return
@@ -727,7 +715,7 @@ export default function Characters() {
                       <GripVertical size={17} color={t.subText} />
                     </button>
                     <div className="squircle-media" role="button" tabIndex={0} aria-label={`${c.name} 프로필 사진 크게 보기`} onClick={() => setProfilePreview({ url: c.image_url || DEFAULT_AVATAR, name: c.name })} onKeyDown={event => (event.key === 'Enter' || event.key === ' ') && setProfilePreview({ url: c.image_url || DEFAULT_AVATAR, name: c.name })} style={{ width: 53, height: 53, background: c.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 500, color: c.text_color, flexShrink: 0, overflow: 'hidden', cursor: 'zoom-in' }}><img src={c.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>
-                    <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => startEdit(c)}>
+                    <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => navigate(`/characters/${c.id}/edit`)}>
                       <div style={{ fontSize: 14, fontWeight: 500, color: t.theirText }}>{c.name}</div>
                       {c.description && <div style={{ fontSize: 11, color: t.subText, marginTop: 2 }}>{c.description}</div>}
                     </div>
