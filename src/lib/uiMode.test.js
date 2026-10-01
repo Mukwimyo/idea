@@ -7,10 +7,10 @@ beforeEach(() => {
 })
 
 describe('ui mode', () => {
-  it('uses classic mode by default and for unknown values', () => {
-    expect(getStoredUiMode()).toBe(UI_MODES.CLASSIC)
+  it('uses modern mode by default and for unknown values', () => {
+    expect(getStoredUiMode()).toBe(UI_MODES.MODERN)
     localStorage.setItem('idea-ui-mode', 'unknown')
-    expect(getStoredUiMode()).toBe(UI_MODES.CLASSIC)
+    expect(getStoredUiMode()).toBe(UI_MODES.MODERN)
   })
 
   it('persists and applies modern mode', () => {
@@ -19,9 +19,14 @@ describe('ui mode', () => {
     expect(document.documentElement.dataset.uiMode).toBe(UI_MODES.MODERN)
   })
 
-  it('applies classic mode to the requested root', () => {
+  it('keeps an explicitly selected classic mode', () => {
+    localStorage.setItem('idea-ui-mode', UI_MODES.CLASSIC)
+    expect(getStoredUiMode()).toBe(UI_MODES.CLASSIC)
+  })
+
+  it('applies modern mode for an invalid value to the requested root', () => {
     const root = { dataset: {} }
-    expect(applyUiMode('invalid', root)).toBe(UI_MODES.CLASSIC)
-    expect(root.dataset.uiMode).toBe(UI_MODES.CLASSIC)
+    expect(applyUiMode('invalid', root)).toBe(UI_MODES.MODERN)
+    expect(root.dataset.uiMode).toBe(UI_MODES.MODERN)
   })
 })
