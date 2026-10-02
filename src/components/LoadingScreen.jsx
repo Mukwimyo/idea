@@ -1,9 +1,5 @@
-import { getTheme } from '../lib/themes'
-
-export default function LoadingScreen({ theme }) {
-  const resolvedTheme = theme || getTheme(localStorage.getItem('idea-theme-id') || 'dark-purple')
-  const logoVariant = resolvedTheme.dark ? 'dark' : 'light'
-  const logo = `${import.meta.env.BASE_URL}branding/idea-logo-launch-${logoVariant}.png`
+export default function LoadingScreen() {
+  const logo = `${import.meta.env.BASE_URL}branding/idea-logo-launch-dark.png`
 
   return (
     <div
@@ -16,10 +12,8 @@ export default function LoadingScreen({ theme }) {
         alignItems: 'center',
         justifyContent: 'center',
         overflow: 'hidden',
-        background: resolvedTheme.bg,
-        transition: 'background 180ms ease',
+        background: '#000000',
       }}>
-      <div aria-hidden="true" style={{ position: 'absolute', width: 280, height: 280, borderRadius: '50%', background: resolvedTheme.point, opacity: resolvedTheme.dark ? 0.09 : 0.06, filter: 'blur(70px)' }} />
       <img
         className="idea-loading-logo"
         src={logo}

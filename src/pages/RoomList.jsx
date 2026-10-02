@@ -1,7 +1,7 @@
 import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { getTheme } from '../lib/themes'
+import { DEFAULT_THEME_ID, getTheme } from '../lib/themes'
 import { Settings, Users, Trash2, CirclePlus, LogIn, Search, ListRestart, GripVertical, X, Star, Clock3, MoreHorizontal, MessageCircle, Folder, FolderPlus, ChevronDown, ChevronRight } from 'lucide-react'
 import { DndContext, PointerSensor, TouchSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core'
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
@@ -84,8 +84,8 @@ export default function RoomList() {
       } = await supabase.auth.getUser()
       setUserId(user.id)
       const { data } = await supabase.from('profiles').select('theme_id').eq('id', user.id).single()
-    const resolvedTheme = getTheme(data?.theme_id || 'dark-purple')
-    localStorage.setItem('idea-theme-id', data?.theme_id || 'dark-purple')
+    const resolvedTheme = getTheme(data?.theme_id || DEFAULT_THEME_ID)
+    localStorage.setItem('idea-theme-id', data?.theme_id || DEFAULT_THEME_ID)
       setTheme(resolvedTheme)
       document.querySelector('meta[name="theme-color"]')?.setAttribute('content', resolvedTheme.panel)
       fetchGroups()

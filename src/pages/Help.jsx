@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowUp, ChevronLeft, ChevronUp, CirclePlus, Copy, DoorOpen, Download, GalleryHorizontal, GripVertical, Images, LogIn, MessageSquare, MoreHorizontal, Paperclip, Phone, Quote, Search, Settings, Sparkles, Star, UserPlus, WifiOff } from 'lucide-react'
 import { supabase } from '../lib/supabase'
-import { getTheme } from '../lib/themes'
+import { DEFAULT_THEME_ID, getTheme } from '../lib/themes'
 
 const Section = ({ title, children, theme }) => (
   <section className="help-section" style={{ marginBottom: 26 }}>
@@ -28,13 +28,13 @@ const IconSample = ({ icon, label, theme, active = false }) => (
 
 export default function Help() {
   const navigate = useNavigate()
-  const [theme, setTheme] = useState(getTheme('dark-purple'))
+  const [theme, setTheme] = useState(() => getTheme(localStorage.getItem('idea-theme-id') || DEFAULT_THEME_ID))
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) return
       const { data } = await supabase.from('profiles').select('theme_id').eq('id', user.id).maybeSingle()
-      setTheme(getTheme(data?.theme_id || 'dark-purple'))
+      setTheme(getTheme(data?.theme_id || DEFAULT_THEME_ID))
     })
   }, [])
 

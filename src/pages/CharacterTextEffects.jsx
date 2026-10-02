@@ -4,7 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import TextEffectConfigurator from '../components/TextEffectConfigurator'
 import LoadingScreen from '../components/LoadingScreen'
 import { supabase } from '../lib/supabase'
-import { getTheme } from '../lib/themes'
+import { DEFAULT_THEME_ID, getTheme } from '../lib/themes'
 import { normalizeTextEffectSettings } from '../features/messages/textEffectSettings'
 
 export default function CharacterTextEffects() {
@@ -26,7 +26,7 @@ export default function CharacterTextEffects() {
         supabase.from('characters').select('*').eq('id', characterId).eq('user_id', user.id).maybeSingle(),
       ])
       if (!active) return
-      setTheme(getTheme(profile?.theme_id || 'dark-purple'))
+      setTheme(getTheme(profile?.theme_id || DEFAULT_THEME_ID))
       if (error || !data) {
         setNotice('캐릭터 정보를 불러오지 못했어요.')
         return

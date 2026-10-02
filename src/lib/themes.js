@@ -1,3 +1,5 @@
+export const DEFAULT_THEME_ID = 'monochrome'
+
 export const THEMES = [
   {
     id: 'dark-purple',
@@ -316,4 +318,4 @@ export const THEMES = [
   },
 ]
 
-export const getTheme = id => THEMES.find(t => t.id === id) || THEMES[0]
+export const getTheme = id => THEMES.find(t => t.id === id) || THEMES.find(t => t.id === DEFAULT_THEME_ID)
