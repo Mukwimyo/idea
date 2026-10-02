@@ -1,7 +1,7 @@
 import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase, uploadFile, validateImageFile } from '../lib/supabase'
-import { THEMES, getTheme } from '../lib/themes'
+import { DEFAULT_THEME_ID, THEMES, getTheme } from '../lib/themes'
 import { ChevronLeft, Settings, Search, Images, ArrowUp, Eye, ArrowDown, ChevronDown, ChevronUp, Quote, RotateCcw, AlertCircle, Minus, Phone, Copy, DoorOpen, Send, Music, Grid2X2, ImagePlus, Star, Bookmark, MapPin, StickyNote, Dices, Crown, Percent, Scissors, Shuffle, Sparkles } from 'lucide-react'
 import ProfileImageModal from '../components/ProfileImageModal'
 import CommunicationSessions from '../components/CommunicationSessions'
@@ -193,9 +193,9 @@ export default function Room() {
   const [readReceipt, setReadReceipt] = useState('text')
   const [actionSize, setActionSize] = useState('small')
   const [theme, setTheme] = useState(null)
-  const [sharedThemeId, setSharedThemeId] = useState('dark-purple')
+  const [sharedThemeId, setSharedThemeId] = useState(DEFAULT_THEME_ID)
   const [followShared, setFollowShared] = useState(true)
-  const [myThemeId, setMyThemeId] = useState('dark-purple')
+  const [myThemeId, setMyThemeId] = useState(() => localStorage.getItem('idea-theme-id') || DEFAULT_THEME_ID)
   const [isOwner, setIsOwner] = useState(false)
   const [showSlot, setShowSlot] = useState(true)
   const [hideScroll, setHideScroll] = useState(false)
@@ -441,10 +441,10 @@ export default function Room() {
       setShowMessageTime(messageDisplaySetting?.show_message_time ?? true)
       setShowEditedLabel(messageDisplaySetting?.show_edited_label ?? true)
       if (!enteringEnabled) setShowSlot(false)
-      const myId = profile?.theme_id || 'dark-purple'
+      const myId = profile?.theme_id || DEFAULT_THEME_ID
       setMyThemeId(myId)
 
-      const sharedId = roomData?.shared_theme_id || 'dark-purple'
+      const sharedId = roomData?.shared_theme_id || DEFAULT_THEME_ID
       const follow = roomData?.theme_follow ?? true
       setSharedThemeId(sharedId)
       setFollowShared(follow)
@@ -1496,7 +1496,7 @@ export default function Room() {
     }
   }
 
-  const t = theme || getTheme('dark-purple')
+  const t = theme || getTheme(DEFAULT_THEME_ID)
 
   const roomTools = [
     { id: 'image', label: '이미지', icon: ImagePlus },
@@ -2123,7 +2123,7 @@ export default function Room() {
       )}
 
       {/* 메시지 목록 */}
-      <div ref={messageListRef} onScroll={handleScroll} className={`chat-scroll${hideScroll ? ' hide-scroll' : ''}`} style={{ position: 'relative', flex: 1, minHeight: 0, padding: `58px 10px ${showCharList && myChars.length > 0 ? 156 : 106}px`, scrollPaddingTop: 58, display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto', background: t.bg, transition: 'padding-bottom 210ms cubic-bezier(0.2, 0.8, 0.2, 1)' }}>
+      <div ref={messageListRef} onScroll={handleScroll} className={`chat-scroll${hideScroll ? ' hide-scroll' : ''}`} style={{ position: 'relative', flex: 1, minHeight: 0, padding: `58px 10px ${showCharList && myChars.length > 0 ? 156 : 106}px`, scrollPaddingTop: 58, display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto', backgroundColor: t.bg, backgroundImage: `url("${import.meta.env.BASE_URL}branding/idea-logo-background-tile-light.png")`, backgroundRepeat: 'repeat', backgroundPosition: 'center top', backgroundSize: '450px 450px', transition: 'padding-bottom 210ms cubic-bezier(0.2, 0.8, 0.2, 1)' }}>
         {hasOlderMessages && (
           <button
             type="button"

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase, uploadFile, validateImageFile } from '../lib/supabase'
-import { getTheme } from '../lib/themes'
+import { DEFAULT_THEME_ID, getTheme } from '../lib/themes'
 import { ChevronLeft, X, RotateCcw, Search, Check, ArrowDownAZ, GripVertical, Play, Pause, Trash2, Sparkles } from 'lucide-react'
 import Cropper from 'react-easy-crop'
 import { DndContext, PointerSensor, TouchSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core'
@@ -113,8 +113,8 @@ export default function Characters() {
     } = await supabase.auth.getUser()
     setUserId(user.id)
     const { data } = await supabase.from('profiles').select('theme_id').eq('id', user.id).single()
-    const resolvedTheme = getTheme(data?.theme_id || 'dark-purple')
-    localStorage.setItem('idea-theme-id', data?.theme_id || 'dark-purple')
+    const resolvedTheme = getTheme(data?.theme_id || DEFAULT_THEME_ID)
+    localStorage.setItem('idea-theme-id', data?.theme_id || DEFAULT_THEME_ID)
     setTheme(resolvedTheme)
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', resolvedTheme.panel)
     if (roomId) {

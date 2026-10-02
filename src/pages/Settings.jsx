@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { THEMES, getTheme } from '../lib/themes'
+import { DEFAULT_THEME_ID, THEMES, getTheme } from '../lib/themes'
 import { ChevronLeft, ChevronRight, LogOut, Users, Bell, BellOff, CircleHelp } from 'lucide-react'
 import { supabase, subscribePush, unsubscribePush } from '../lib/supabase'
 import Toast from '../components/Toast'
@@ -138,7 +138,7 @@ function ThemePreview({ t }) {
 export default function Settings() {
   const navigate = useNavigate()
   const { toast, showToast } = useToast()
-  const [myThemeId, setMyThemeId] = useState('dark-purple')
+  const [myThemeId, setMyThemeId] = useState(() => localStorage.getItem('idea-theme-id') || DEFAULT_THEME_ID)
   const [saving, setSaving] = useState(false)
   const [myFontId, setMyFontId] = useState('sans')
   const [fontScale, setFontScale] = useState(() => Number(localStorage.getItem('idea-font-scale') || 1))
@@ -305,7 +305,7 @@ export default function Settings() {
           {saving && <div style={{ marginLeft: 'auto', fontSize: 11, color: t.subText }}>저장 중...</div>}
         </div>
 
-        <div style={{ marginBottom: 28 }}>
+        <div className="settings-section" style={{ marginBottom: 28 }}>
           <div style={{ fontSize: 11, color: t.subText, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>화면 디자인</div>
           <UiModeToggleCard mode={uiMode} onChange={changeUiMode} theme={t} />
           <div style={{ marginTop: 9, color: t.subText, fontSize: 10, lineHeight: 1.55, opacity: 0.72 }}>
@@ -315,7 +315,7 @@ export default function Settings() {
 
         <div style={{ height: 0.5, background: t.border, marginBottom: 28 }} />
 
-        <div style={{ marginBottom: 28 }}>
+        <div className="settings-section" style={{ marginBottom: 28 }}>
           <div
             style={{
               fontSize: 11,
@@ -345,7 +345,7 @@ export default function Settings() {
             }}>
             다크
           </div>
-          <div
+          <div className="settings-theme-grid"
             style={{
               display: 'flex',
               gap: 10,
@@ -393,7 +393,7 @@ export default function Settings() {
             }}>
             라이트
           </div>
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <div className="settings-theme-grid" style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             {lightThemes.map(th => (
               <div
                 key={th.id}
@@ -429,7 +429,7 @@ export default function Settings() {
 
         <div style={{ height: 0.5, background: t.border, marginBottom: 28 }} />
 
-        <div style={{ marginBottom: 28 }}>
+        <div className="settings-section" style={{ marginBottom: 28 }}>
           <div
             style={{
               fontSize: 11,
@@ -442,7 +442,7 @@ export default function Settings() {
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {FONTS.map(f => (
-              <div
+              <div className="settings-row"
                 key={f.id}
                 onClick={() => saveFont(f.id)}
                 style={{
@@ -474,7 +474,7 @@ export default function Settings() {
               </div>
             ))}
           </div>
-          <div style={{ marginTop: 12, padding: '12px 14px', borderRadius: 12, border: `0.5px solid ${t.border}`, background: t.panel }}>
+          <div className="settings-row" style={{ marginTop: 12, padding: '12px 14px', borderRadius: 12, border: `0.5px solid ${t.border}`, background: t.panel }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 10 }}>
               <div style={{ fontSize: 13, color: t.theirText }}>채팅 글자 크기</div>
               <div style={{ fontSize: 12, color: t.subText }}>{Math.round(fontScale * 100)}%</div>
@@ -499,7 +499,7 @@ export default function Settings() {
           </div>
         </div>
 
-        <div style={{ marginBottom: 28 }}>
+        <div className="settings-section" style={{ marginBottom: 28 }}>
           <div
             style={{
               fontSize: 11,
@@ -510,7 +510,7 @@ export default function Settings() {
             }}>
             알림
           </div>
-          <div
+          <div className="settings-row"
             style={{
               background: t.panel,
               border: `0.5px solid ${t.border}`,
@@ -552,9 +552,9 @@ export default function Settings() {
             </div>
           </div>
         </div>
-        <div style={{ marginBottom: 28 }}>
+        <div className="settings-section" style={{ marginBottom: 28 }}>
           <div style={{ fontSize: 11, color: t.subText, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>채팅방</div>
-          <div style={{ background: t.panel, border: `0.5px solid ${t.border}`, borderRadius: 12, padding: '12px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div className="settings-row" style={{ background: t.panel, border: `0.5px solid ${t.border}`, borderRadius: 12, padding: '12px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ fontSize: 13, color: t.theirText }}>입장 룰렛 애니메이션</div>
             <div
               onClick={async () => {
@@ -570,7 +570,7 @@ export default function Settings() {
               <div style={{ position: 'absolute', top: 3, left: showEntering ? 20 : 3, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
             </div>
           </div>
-          <div style={{ background: t.panel, border: `0.5px solid ${t.border}`, borderRadius: 12, padding: '12px 14px', marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div className="settings-row" style={{ background: t.panel, border: `0.5px solid ${t.border}`, borderRadius: 12, padding: '12px 14px', marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
               <div style={{ fontSize: 13, color: t.theirText }}>메시지 시간 표시</div>
               <div style={{ fontSize: 10, color: t.subText, marginTop: 2 }}>같은 분의 마지막 메시지에만 표시돼요.</div>
@@ -589,7 +589,7 @@ export default function Settings() {
               <div style={{ position: 'absolute', top: 3, left: showMessageTime ? 20 : 3, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
             </div>
           </div>
-          <div style={{ background: t.panel, border: `0.5px solid ${t.border}`, borderRadius: 12, padding: '12px 14px', marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div className="settings-row" style={{ background: t.panel, border: `0.5px solid ${t.border}`, borderRadius: 12, padding: '12px 14px', marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
               <div style={{ fontSize: 13, color: t.theirText }}>수정됨 표시</div>
               <div style={{ fontSize: 10, color: t.subText, marginTop: 2 }}>편집한 메시지 옆의 수정 이력을 표시해요.</div>

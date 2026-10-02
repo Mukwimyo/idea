@@ -3,7 +3,7 @@ import { ChevronLeft, ImagePlus, Sparkles, Trash2 } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
 import LoadingScreen from '../components/LoadingScreen'
 import { supabase, uploadFile, validateImageFile } from '../lib/supabase'
-import { getTheme } from '../lib/themes'
+import { DEFAULT_THEME_ID, getTheme } from '../lib/themes'
 
 const DEFAULT_AVATAR = `${import.meta.env.BASE_URL}default-avatar.png`
 
@@ -37,7 +37,7 @@ export default function CharacterEdit() {
         supabase.from('characters').select('*').eq('id', characterId).eq('user_id', user.id).maybeSingle(),
       ])
       if (!active) return
-      setTheme(getTheme(profile?.theme_id || 'dark-purple'))
+      setTheme(getTheme(profile?.theme_id || DEFAULT_THEME_ID))
       setUserId(user.id)
       if (!found) {
         setNotice('캐릭터를 찾을 수 없어요.')
