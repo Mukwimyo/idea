@@ -378,6 +378,10 @@ export default function Room() {
     }
   }
 
+  const preserveComposerFocus = event => {
+    if (document.activeElement === inputRef.current) event.preventDefault()
+  }
+
   const toggleTopCharacterPicker = () => {
     const nextOpen = !showTopCharacterPicker
     setShowTopCharacterPicker(nextOpen)
@@ -1817,7 +1821,7 @@ export default function Room() {
           <div role="group" aria-label="캐릭터 선택" className="character-strip" style={{ display: 'flex', alignItems: 'center', gap: 7, flex: 1, minWidth: 0, flexWrap: 'nowrap', overflowX: 'auto', overflowY: 'hidden', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', touchAction: 'pan-x', padding: '3px 1px' }}>
             {myChars.length ? myChars.map(character => {
               const selected = activeChar?.id === character.id && mode === 'chat'
-              return <button key={character.id} onMouseDown={event => event.preventDefault()} onClick={() => chooseCharacter(character)} aria-label={`${character.name} 선택`} aria-pressed={selected} title={character.name} style={{ width: 36, height: 36, padding: 0, borderRadius: '50%', flex: '0 0 36px', overflow: 'hidden', cursor: 'pointer', background: character.color || t.point, border: `${selected ? 2 : 1}px solid ${selected ? t.point : t.border}`, boxShadow: selected ? `0 0 0 2px color-mix(in srgb, ${t.point} 24%, transparent)` : 'none' }}>
+              return <button key={character.id} onMouseDown={event => event.preventDefault()} onPointerDown={preserveComposerFocus} onClick={() => chooseCharacter(character)} aria-label={`${character.name} 선택`} aria-pressed={selected} title={character.name} style={{ width: 36, height: 36, padding: 0, borderRadius: '50%', flex: '0 0 36px', overflow: 'hidden', cursor: 'pointer', background: character.color || t.point, border: `${selected ? 2 : 1}px solid ${selected ? t.point : t.border}`, boxShadow: selected ? `0 0 0 2px color-mix(in srgb, ${t.point} 24%, transparent)` : 'none' }}>
                 <img src={character.image_url || DEFAULT_AVATAR} alt="" style={{ display: 'block', width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
               </button>
             }) : <span style={{ color: t.subText, fontSize: 11, whiteSpace: 'nowrap' }}>캐릭터 없음</span>}
@@ -1845,14 +1849,14 @@ export default function Room() {
             aria-label="중요 대사 북마크">
             <Bookmark size={15} color={showBookmarks ? t.point : t.subText} fill={showBookmarks ? 'currentColor' : 'none'} />
           </button>}
-          {topCharacterPickerEnabled && !showTopCharacterPicker && <button {...iconBtn(toggleTopCharacterPicker, null, false)} aria-label="캐릭터 선택" aria-expanded={false}>
+          {topCharacterPickerEnabled && !showTopCharacterPicker && <button {...iconBtn(toggleTopCharacterPicker, null, false)} onPointerDown={preserveComposerFocus} aria-label="캐릭터 선택" aria-expanded={false}>
             <UserRound size={17} color={t.subText} />
           </button>}
           <button {...iconBtn(() => (showTheme ? closeThemePanel() : openPanel('theme')), null, showTheme)} aria-label="채팅방 설정">
             <Settings size={15} color={showTheme ? t.point : t.subText} />
           </button>
         </>}
-        {topCharacterPickerEnabled && showTopCharacterPicker && <button {...iconBtn(toggleTopCharacterPicker, null, true)} aria-label="캐릭터 목록 닫기" aria-expanded={true}>
+        {topCharacterPickerEnabled && showTopCharacterPicker && <button {...iconBtn(toggleTopCharacterPicker, null, true)} onPointerDown={preserveComposerFocus} aria-label="캐릭터 목록 닫기" aria-expanded={true}>
           <UserRound size={17} color={t.point} />
         </button>}
       </div>
@@ -2606,6 +2610,7 @@ export default function Room() {
             className="composer-identity"
             onMouseDown={e => e.preventDefault()}
             onPointerDown={event => {
+              preserveComposerFocus(event)
               profileGestureStartRef.current = event.clientY
               profileGestureHandledRef.current = false
               event.currentTarget.setPointerCapture?.(event.pointerId)
@@ -2659,6 +2664,7 @@ export default function Room() {
                 <button
                   key={c.id}
                   onMouseDown={e => e.preventDefault()}
+                  onPointerDown={preserveComposerFocus}
                   onClick={() => chooseCharacter(c)}
                   style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, padding: '3px 8px 3px 4px', borderRadius: 20, border: activeChar?.id === c.id && mode === 'chat' ? `1.5px solid ${c.color || t.point}` : `1px solid ${t.border}`, background: activeChar?.id === c.id && mode === 'chat' ? c.color + '22' : 'none', cursor: 'pointer' }}>
                   <div style={{ width: 22, height: 22, background: c.color || t.point, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, color: c.text_color || '#fff', overflow: 'hidden', flexShrink: 0 }}><img className="squircle-media" src={c.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>
