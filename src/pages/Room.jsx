@@ -2760,7 +2760,7 @@ export default function Room() {
         )}
         {showRoleplayMenu && (
           <div style={{ transform: `translateY(${toolSheetOffset}px)`, transition: draggingToolSheet ? 'none' : 'transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1)', pointerEvents: 'auto', willChange: 'transform' }}>
-          <div className={`room-tool-sheet${closingRoleplayMenu ? ' is-closing' : ''}`} style={{ maxHeight: '58vh', overflowY: 'auto', marginBottom: 7, padding: '4px 10px 10px', borderRadius: '20px 20px 14px 14px', background: `color-mix(in srgb, ${t.panel} 94%, transparent)`, backdropFilter: 'blur(22px)', WebkitBackdropFilter: 'blur(22px)', border: `1px solid ${t.border}`, boxShadow: '0 -12px 38px rgba(0,0,0,0.2)', pointerEvents: closingRoleplayMenu ? 'none' : 'auto' }}>
+          <div className={`room-tool-sheet${closingRoleplayMenu ? ' is-closing' : ''}`} style={{ maxHeight: '58vh', overflowY: 'auto', marginBottom: 0, padding: '4px 12px 12px', borderRadius: '20px 20px 0 0', background: `color-mix(in srgb, ${t.panel} 88%, transparent)`, backdropFilter: 'blur(22px)', WebkitBackdropFilter: 'blur(22px)', border: `1px solid color-mix(in srgb, ${t.border} 65%, transparent)`, borderBottom: 0, boxShadow: '0 -6px 20px rgba(0,0,0,0.12)', pointerEvents: closingRoleplayMenu ? 'none' : 'auto' }}>
             <button
               aria-label="아래로 끌어 도구 메뉴 닫기"
               onPointerDown={startToolSheetDrag}
@@ -2784,21 +2784,22 @@ export default function Room() {
               />
             ) : <>
             {roomToolGroups.map((group, groupIndex) => (
-              <section key={group.id} style={{ marginTop: groupIndex === 0 ? 0 : 12 }}>
-                <div style={{ margin: '0 3px 6px', color: t.subText, fontSize: 11, fontWeight: 600 }}>{group.label}</div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8 }}>
+              <section key={group.id} style={{ marginTop: groupIndex === 0 ? 0 : 10, paddingTop: groupIndex === 0 ? 0 : 8, borderTop: groupIndex === 0 ? 0 : `1px solid color-mix(in srgb, ${t.border} 52%, transparent)` }}>
+                <div style={{ margin: '0 5px 4px', color: t.subText, fontSize: 10, fontWeight: 600, letterSpacing: '0.035em' }}>{group.label}</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 3 }}>
                   {group.tools.map(toolId => roomTools.find(tool => tool.id === toolId)).filter(Boolean).map(tool => {
                     const ToolIcon = tool.icon
                     const selected = favoriteTools.includes(tool.id)
                     const active = (tool.id === 'narration' && isNarrActive) || (tool.id === 'effects' && Boolean(selectedMessageEffect))
                     return (
-                      <div key={tool.id} style={{ position: 'relative', minWidth: 0 }}>
+                      <div key={tool.id} style={{ minWidth: 0, minHeight: 42, display: 'flex', alignItems: 'center', borderRadius: 11, background: active ? `color-mix(in srgb, ${t.point} 13%, transparent)` : 'transparent', transition: 'background 150ms ease' }}>
                         <button
                           onMouseDown={event => event.preventDefault()}
                           onClick={() => runRoomTool(tool.id)}
-                          style={{ width: '100%', minHeight: 72, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '10px 4px', borderRadius: 14, border: `1px solid ${active ? t.point : t.border}`, background: active ? `${t.point}22` : `color-mix(in srgb, ${t.bg} 66%, transparent)`, color: active ? t.point : t.theirText, cursor: 'pointer' }}>
-                          <ToolIcon size={20} />
-                          <span style={{ maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 12 }}>{tool.label}</span>
+                          aria-pressed={active}
+                          style={{ flex: 1, minWidth: 0, minHeight: 42, display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 9, padding: '5px 6px 5px 9px', border: 0, borderRadius: 11, background: 'transparent', color: active ? t.point : t.theirText, textAlign: 'left', cursor: 'pointer' }}>
+                          <ToolIcon size={17} style={{ flexShrink: 0, opacity: active ? 1 : 0.82 }} />
+                          <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 11 }}>{tool.label}</span>
                         </button>
                         <button
                           onMouseDown={event => event.preventDefault()}
@@ -2807,7 +2808,7 @@ export default function Room() {
                             toggleQuickToolFavorite(tool.id)
                           }}
                           aria-label={`${tool.label} 즐겨찾기 ${selected ? '해제' : '추가'}`}
-                          style={{ position: 'absolute', top: 4, right: 4, width: 28, height: 28, display: 'grid', placeItems: 'center', padding: 0, border: 0, borderRadius: '50%', background: selected ? `${t.point}33` : 'transparent', color: selected ? t.point : t.subText, cursor: 'pointer' }}>
+                          style={{ width: 30, height: 34, flexShrink: 0, display: 'grid', placeItems: 'center', padding: 0, border: 0, borderRadius: 9, background: selected ? `color-mix(in srgb, ${t.point} 13%, transparent)` : 'transparent', color: selected ? t.point : t.subText, cursor: 'pointer' }}>
                           <Star size={13} fill={selected ? 'currentColor' : 'none'} />
                         </button>
                       </div>
@@ -2858,7 +2859,7 @@ export default function Room() {
         {showQuickToolPicker && (
           <QuickToolPicker tools={favoriteRoomTools} activeId={quickTool} theme={t} onSelect={selectQuickTool} />
         )}
-        <div style={{ position: 'relative', display: 'flex', gap: 2, alignItems: 'center', width: '100%', height: 42, minHeight: 42, padding: '0 2px', borderRadius: 22, background: `color-mix(in srgb, ${t.panel} 86%, transparent)`, backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)', border: `1px solid ${t.border}`, boxShadow: '0 8px 24px rgba(0,0,0,0.22)', pointerEvents: 'auto' }}>
+        <div style={{ position: 'relative', display: 'flex', gap: 2, alignItems: 'center', width: '100%', height: 42, minHeight: 42, padding: '0 2px', borderRadius: showRoleplayMenu ? '0 0 22px 22px' : 22, background: `color-mix(in srgb, ${t.panel} 88%, transparent)`, backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)', border: `1px solid color-mix(in srgb, ${t.border} 65%, transparent)`, borderTop: showRoleplayMenu ? 0 : `1px solid color-mix(in srgb, ${t.border} 65%, transparent)`, boxShadow: showRoleplayMenu ? '0 8px 20px rgba(0,0,0,0.12)' : '0 8px 24px rgba(0,0,0,0.22)', pointerEvents: 'auto' }}>
           <button className="ui-touch-target" onMouseDown={e => e.preventDefault()} onClick={() => { setShowQuickToolPicker(false); if (showRoleplayMenu) closeRoleplayMenu(); else openRoleplayMenu() }} aria-label="대화 도구 메뉴" aria-expanded={showRoleplayMenu} style={{ width: 44, height: 44, padding: 0, border: 0, background: 'transparent', cursor: 'pointer', flexShrink: 0, display: 'grid', placeItems: 'center' }}>
             <span style={{ width: 34, height: 34, display: 'grid', placeItems: 'center', borderRadius: '50%', border: `1px solid ${showRoleplayMenu ? t.point : 'transparent'}`, background: showRoleplayMenu ? `${t.point}2f` : `${t.border}66` }}><Grid2X2 size={16} color={showRoleplayMenu ? t.point : t.subText} /></span>
           </button>
