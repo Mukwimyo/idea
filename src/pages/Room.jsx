@@ -227,6 +227,7 @@ export default function Room() {
   const [draggingToolSheet, setDraggingToolSheet] = useState(false)
   const [quickToolPreferences, setQuickToolPreferences] = useState(() => readQuickToolPreferences(window.localStorage))
   const [showQuickToolPicker, setShowQuickToolPicker] = useState(false)
+  const [showSendActionMenu, setShowSendActionMenu] = useState(false)
   const [toolPanel, setToolPanel] = useState(null)
   const [selectedMessageEffect, setSelectedMessageEffect] = useState(null)
   const [showRoomInvitePicker, setShowRoomInvitePicker] = useState(false)
@@ -251,6 +252,9 @@ export default function Room() {
   const profileGestureHandledRef = useRef(false)
   const quickToolGestureRef = useRef(null)
   const quickToolGestureHandledRef = useRef(false)
+  const sendPressTimerRef = useRef(null)
+  const sendPressStartRef = useRef(null)
+  const sendPressTriggeredRef = useRef(false)
   const fileInputRef = useRef(null)
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
@@ -646,6 +650,18 @@ export default function Room() {
   }, [messageMenuId, imageMenuTarget])
 
   useEffect(() => {
+    if (!showSendActionMenu) return undefined
+    const closeSendActionMenu = event => {
+      if (event.target.closest?.('[data-send-action-menu="true"]')) return
+      setShowSendActionMenu(false)
+    }
+    document.addEventListener('pointerdown', closeSendActionMenu)
+    return () => document.removeEventListener('pointerdown', closeSendActionMenu)
+  }, [showSendActionMenu])
+
+  useEffect(() => () => window.clearTimeout(sendPressTimerRef.current), [])
+
+  useEffect(() => {
     if (isAtBottomRef.current) {
       const behavior = messages.length > 0 && !initialScrollDone.current ? 'instant' : 'smooth'
       messagesEndRef.current?.scrollIntoView({ behavior })
@@ -1029,6 +1045,63 @@ export default function Room() {
     clearTimeout(longPressTimerRef.current)
     longPressTimerRef.current = null
     longPressStartRef.current = null
+  }
+
+  const startSendButtonPress = event => {
+    if (event.pointerType === 'mouse' && event.button !== 0) return
+    window.clearTimeout(sendPressTimerRef.current)
+    sendPressTriggeredRef.current = false
+    sendPressStartRef.current = { x: event.clientX, y: event.clientY }
+    event.currentTarget.setPointerCapture?.(event.pointerId)
+    sendPressTimerRef.current = window.setTimeout(() => {
+      sendPressTriggeredRef.current = true
+      setShowQuickToolPicker(false)
+      setShowSendActionMenu(true)
+      sendPressTimerRef.current = null
+    }, 500)
+  }
+
+  const moveSendButtonPress = event => {
+    const start = sendPressStartRef.current
+    if (!start || sendPressTriggeredRef.current) return
+    if (Math.abs(event.clientX - start.x) > 10 || Math.abs(event.clientY - start.y) > 10) {
+      window.clearTimeout(sendPressTimerRef.current)
+      sendPressTimerRef.current = null
+      sendPressStartRef.current = null
+    }
+  }
+
+  const finishSendButtonPress = event => {
+    window.clearTimeout(sendPressTimerRef.current)
+    sendPressTimerRef.current = null
+    sendPressStartRef.current = null
+    if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId)
+    }
+  }
+
+  const cancelSendButtonPress = () => {
+    window.clearTimeout(sendPressTimerRef.current)
+    sendPressTimerRef.current = null
+    sendPressStartRef.current = null
+    sendPressTriggeredRef.current = false
+  }
+
+  const handleSendButtonClick = () => {
+    if (sendPressTriggeredRef.current) {
+      sendPressTriggeredRef.current = false
+      return
+    }
+    setShowSendActionMenu(false)
+    setShowQuickToolPicker(false)
+    sendMessage()
+  }
+
+  const openMessageEffectPicker = () => {
+    setShowSendActionMenu(false)
+    setShowQuickToolPicker(false)
+    setToolPanel('effects')
+    openRoleplayMenu({ preserveComposerFocus: true })
   }
 
   const startLongPress = (event, msg) => {
@@ -2785,7 +2858,7 @@ export default function Room() {
         {showQuickToolPicker && (
           <QuickToolPicker tools={favoriteRoomTools} activeId={quickTool} theme={t} onSelect={selectQuickTool} />
         )}
-        <div style={{ display: 'flex', gap: 2, alignItems: 'center', width: '100%', height: 42, minHeight: 42, padding: '0 2px', borderRadius: 22, background: `color-mix(in srgb, ${t.panel} 86%, transparent)`, backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)', border: `1px solid ${t.border}`, boxShadow: '0 8px 24px rgba(0,0,0,0.22)', pointerEvents: 'auto' }}>
+        <div style={{ position: 'relative', display: 'flex', gap: 2, alignItems: 'center', width: '100%', height: 42, minHeight: 42, padding: '0 2px', borderRadius: 22, background: `color-mix(in srgb, ${t.panel} 86%, transparent)`, backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)', border: `1px solid ${t.border}`, boxShadow: '0 8px 24px rgba(0,0,0,0.22)', pointerEvents: 'auto' }}>
           <button className="ui-touch-target" onMouseDown={e => e.preventDefault()} onClick={() => { setShowQuickToolPicker(false); if (showRoleplayMenu) closeRoleplayMenu(); else openRoleplayMenu() }} aria-label="대화 도구 메뉴" aria-expanded={showRoleplayMenu} style={{ width: 44, height: 44, padding: 0, border: 0, background: 'transparent', cursor: 'pointer', flexShrink: 0, display: 'grid', placeItems: 'center' }}>
             <span style={{ width: 34, height: 34, display: 'grid', placeItems: 'center', borderRadius: '50%', border: `1px solid ${showRoleplayMenu ? t.point : 'transparent'}`, background: showRoleplayMenu ? `${t.point}2f` : `${t.border}66` }}><Grid2X2 size={16} color={showRoleplayMenu ? t.point : t.subText} /></span>
           </button>
@@ -2880,7 +2953,32 @@ export default function Room() {
                 </button>
               )
             })()}
-          <button className="ui-touch-target" disabled={!input.trim() || (!activeChar && !isNarrActive)} onMouseDown={e => e.preventDefault()} onClick={() => { setShowQuickToolPicker(false); sendMessage() }} aria-label="전송" style={{ width: 44, height: 44, padding: 0, border: 'none', background: 'transparent', cursor: 'pointer', flexShrink: 0, display: 'grid', placeItems: 'center' }}>
+          {showSendActionMenu && <div data-send-action-menu="true" role="menu" aria-label="전송 옵션" onKeyDown={event => event.key === 'Escape' && setShowSendActionMenu(false)} style={{ position: 'absolute', right: 0, bottom: 51, width: 210, padding: 7, borderRadius: 16, background: `color-mix(in srgb, ${t.panel} 96%, transparent)`, backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', border: `1px solid ${t.border}`, boxShadow: '0 10px 28px rgba(0,0,0,0.35)', zIndex: 30 }}>
+            <button role="menuitem" onMouseDown={event => event.preventDefault()} onPointerDown={preserveComposerFocus} onClick={openMessageEffectPicker} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 11, padding: '11px 12px', border: 0, borderRadius: 10, background: 'transparent', color: t.theirText, textAlign: 'left', cursor: 'pointer' }}>
+              <Sparkles size={17} color={t.point} />
+              <span style={{ minWidth: 0 }}>
+                <span style={{ display: 'block', fontSize: 13, fontWeight: 600 }}>대사 연출</span>
+                <span style={{ display: 'block', marginTop: 2, fontSize: 10, color: t.subText }}>{selectedMessageEffect ? '연출을 바꾸거나 해제해요.' : '보낼 대사에 효과를 적용해요.'}</span>
+              </span>
+            </button>
+          </div>}
+          <button
+            className="ui-touch-target"
+            disabled={!input.trim() || (!activeChar && !isNarrActive)}
+            onMouseDown={event => event.preventDefault()}
+            onPointerDown={event => {
+              preserveComposerFocus(event)
+              startSendButtonPress(event)
+            }}
+            onPointerMove={moveSendButtonPress}
+            onPointerUp={finishSendButtonPress}
+            onPointerCancel={cancelSendButtonPress}
+            onContextMenu={event => event.preventDefault()}
+            onClick={handleSendButtonClick}
+            aria-label="전송. 길게 눌러 추가 옵션 열기"
+            aria-haspopup="menu"
+            aria-expanded={showSendActionMenu}
+            style={{ width: 44, height: 44, padding: 0, border: 'none', background: 'transparent', cursor: 'pointer', flexShrink: 0, display: 'grid', placeItems: 'center', touchAction: 'none' }}>
             <span style={{ width: 34, height: 34, display: 'grid', placeItems: 'center', borderRadius: '50%', background: t.point }}><ArrowUp size={18} color="#fff" strokeWidth={2.5} /></span>
           </button>
         </div>
