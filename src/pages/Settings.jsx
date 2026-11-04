@@ -146,6 +146,7 @@ export default function Settings() {
   const [showEntering, setShowEntering] = useState(true)
   const [showMessageTime, setShowMessageTime] = useState(true)
   const [showEditedLabel, setShowEditedLabel] = useState(true)
+  const [topCharacterPicker, setTopCharacterPicker] = useState(false)
   const [uiMode, setUiMode] = useState(getStoredUiMode)
   const [pushLoading, setPushLoading] = useState(false)
   const [closing, setClosing] = useState(false)
@@ -160,7 +161,7 @@ export default function Settings() {
     } = await supabase.auth.getUser()
     const [{ data }, { data: messageDisplaySetting }] = await Promise.all([
       supabase.from('profiles').select('theme_id, font_id, font_scale, show_entering').eq('id', user.id).single(),
-      supabase.from('profiles').select('show_message_time, show_edited_label').eq('id', user.id).maybeSingle(),
+      supabase.from('profiles').select('show_message_time, show_edited_label, top_character_picker').eq('id', user.id).maybeSingle(),
     ])
     if (data?.theme_id) setMyThemeId(data.theme_id)
     if (data?.font_id) setMyFontId(data.font_id)
@@ -173,6 +174,7 @@ export default function Settings() {
     if (data?.show_entering !== undefined) setShowEntering(data.show_entering)
     if (messageDisplaySetting?.show_message_time !== undefined) setShowMessageTime(messageDisplaySetting.show_message_time)
     if (messageDisplaySetting?.show_edited_label !== undefined) setShowEditedLabel(messageDisplaySetting.show_edited_label)
+    if (messageDisplaySetting?.top_character_picker !== undefined) setTopCharacterPicker(messageDisplaySetting.top_character_picker)
 
     if ('serviceWorker' in navigator) {
       const registration = await navigator.serviceWorker.getRegistration('/idea/sw.js')
@@ -568,6 +570,34 @@ export default function Settings() {
               }}
               style={{ width: 40, height: 22, borderRadius: 11, cursor: 'pointer', transition: 'background 0.2s', background: showEntering ? t.point : t.border, position: 'relative', flexShrink: 0 }}>
               <div style={{ position: 'absolute', top: 3, left: showEntering ? 20 : 3, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
+            </div>
+          </div>
+          <div className="settings-row" style={{ background: t.panel, border: `0.5px solid ${t.border}`, borderRadius: 12, padding: '12px 14px', marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+            <div>
+              <div style={{ fontSize: 13, color: t.theirText }}>캐릭터 선택 위치</div>
+              <div style={{ fontSize: 10, color: t.subText, marginTop: 2 }}>켜면 채팅방 상단 사람 아이콘에서 바꿔요. 끄면 기존 하단 버튼을 사용해요.</div>
+            </div>
+            <div
+              role="switch"
+              aria-label="상단바 캐릭터 선택 사용"
+              aria-checked={topCharacterPicker}
+              tabIndex={0}
+              onClick={async () => {
+                const next = !topCharacterPicker
+                setTopCharacterPicker(next)
+                const { data: { user } } = await supabase.auth.getUser()
+                const { error } = await supabase.from('profiles').update({ top_character_picker: next }).eq('id', user.id)
+                showToast(error ? '캐릭터 선택 위치를 저장하지 못했어요.' : '캐릭터 선택 위치가 저장됐어요.', error ? 'error' : 'success')
+                if (error) setTopCharacterPicker(!next)
+              }}
+              onKeyDown={event => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault()
+                  event.currentTarget.click()
+                }
+              }}
+              style={{ width: 40, height: 22, borderRadius: 11, cursor: 'pointer', transition: 'background 0.2s', background: topCharacterPicker ? t.point : t.border, position: 'relative', flexShrink: 0 }}>
+              <div style={{ position: 'absolute', top: 3, left: topCharacterPicker ? 20 : 3, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
             </div>
           </div>
           <div className="settings-row" style={{ background: t.panel, border: `0.5px solid ${t.border}`, borderRadius: 12, padding: '12px 14px', marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>

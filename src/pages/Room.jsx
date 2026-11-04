@@ -2,7 +2,7 @@ import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase, uploadFile, validateImageFile } from '../lib/supabase'
 import { DEFAULT_THEME_ID, THEMES, getTheme } from '../lib/themes'
-import { ChevronLeft, Settings, Search, Images, ArrowUp, Eye, ArrowDown, ChevronDown, ChevronUp, Quote, RotateCcw, AlertCircle, Minus, Phone, Copy, DoorOpen, Send, Music, Grid2X2, ImagePlus, Star, Bookmark, MapPin, StickyNote, Dices, Crown, Percent, Scissors, Shuffle, Sparkles } from 'lucide-react'
+import { ChevronLeft, Settings, Search, Images, ArrowUp, Eye, ArrowDown, ChevronDown, ChevronUp, Quote, RotateCcw, AlertCircle, Minus, Phone, Copy, DoorOpen, Send, Music, Grid2X2, ImagePlus, Star, Bookmark, MapPin, StickyNote, Dices, Crown, Percent, Scissors, Shuffle, Sparkles, UserRound } from 'lucide-react'
 import ProfileImageModal from '../components/ProfileImageModal'
 import CommunicationSessions from '../components/CommunicationSessions'
 import CommunicationRecord from '../components/CommunicationRecord'
@@ -186,6 +186,8 @@ export default function Room() {
   const [closingGallery, setClosingGallery] = useState(false)
   const [showBookmarks, setShowBookmarks] = useState(false)
   const [closingBookmarks, setClosingBookmarks] = useState(false)
+  const [topCharacterPickerEnabled, setTopCharacterPickerEnabled] = useState(false)
+  const [showTopCharacterPicker, setShowTopCharacterPicker] = useState(false)
   const [showSearch, setShowSearch] = useState(false)
   const [showCalendar, setShowCalendar] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -367,6 +369,26 @@ export default function Room() {
     }, 190)
   }
 
+  const chooseCharacter = async character => {
+    setActiveChar(character)
+    setMode('chat')
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      await supabase.from('room_members').update({ last_char_id: character.id }).eq('room_id', roomId).eq('user_id', user.id)
+    }
+  }
+
+  const toggleTopCharacterPicker = () => {
+    const nextOpen = !showTopCharacterPicker
+    setShowTopCharacterPicker(nextOpen)
+    if (nextOpen) {
+      setShowSearch(false)
+      setShowGallery(false)
+      setShowTheme(false)
+      if (showBookmarks) closeBookmarksPanel()
+    }
+  }
+
   const openRoleplayMenu = ({ preserveComposerFocus = false } = {}) => {
     if (!preserveComposerFocus) inputRef.current?.blur()
     setToolSheetOffset(0)
@@ -434,12 +456,13 @@ export default function Room() {
 
       const [{ data: profile }, { data: messageDisplaySetting }] = await Promise.all([
         supabase.from('profiles').select('theme_id, last_char_id, show_entering').eq('id', user.id).single(),
-        supabase.from('profiles').select('show_message_time, show_edited_label').eq('id', user.id).maybeSingle(),
+        supabase.from('profiles').select('show_message_time, show_edited_label, top_character_picker').eq('id', user.id).maybeSingle(),
       ])
       const enteringEnabled = profile?.show_entering ?? true
       setShowEntering(enteringEnabled)
       setShowMessageTime(messageDisplaySetting?.show_message_time ?? true)
       setShowEditedLabel(messageDisplaySetting?.show_edited_label ?? true)
+      setTopCharacterPickerEnabled(messageDisplaySetting?.top_character_picker ?? false)
       if (!enteringEnabled) setShowSlot(false)
       const myId = profile?.theme_id || DEFAULT_THEME_ID
       setMyThemeId(myId)
@@ -1493,6 +1516,15 @@ export default function Room() {
     if (toolId === 'random') {
       if (showRoleplayMenu) closeRoleplayMenu()
       setShowRandomTools(true)
+      return
+    }
+    if (toolId === 'bookmarks') {
+      if (showRoleplayMenu) closeRoleplayMenu()
+      setShowSearch(false)
+      setShowGallery(false)
+      setShowTheme(false)
+      setClosingBookmarks(false)
+      setShowBookmarks(true)
     }
   }
 
@@ -1509,11 +1541,12 @@ export default function Room() {
     { id: 'locations', label: '장소·장면', icon: MapPin },
     { id: 'notes', label: '공유 메모', icon: StickyNote },
     { id: 'random', label: '랜덤 도구', icon: Dices },
+    { id: 'bookmarks', label: '중요 대사', icon: Bookmark },
   ]
   const roomToolGroups = [
     { id: 'conversation', label: '대화', tools: ['image', 'narration', 'divider', 'communication'] },
     { id: 'direction', label: '연출', tools: ['effects', 'audio', 'locations', 'random'] },
-    { id: 'room', label: '방 관리', tools: ['invite', 'notes'] },
+    { id: 'room', label: '방 관리', tools: ['invite', 'notes', 'bookmarks'] },
   ]
   const selectedQuickTool = roomTools.find(tool => tool.id === quickTool) || roomTools[1]
   const favoriteRoomTools = favoriteTools.map(toolId => roomTools.find(tool => tool.id === toolId)).filter(Boolean)
@@ -1777,34 +1810,51 @@ export default function Room() {
         <button className="ui-touch-target" aria-label="채팅방 목록으로 돌아가기" onClick={() => navigate('/')} style={{ width: 44, height: 44, flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <ChevronLeft size={22} color={t.subText} />
         </button>
-        <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ flex: 1, minWidth: showTopCharacterPicker && topCharacterPickerEnabled ? 40 : 0 }}>
           <div style={{ fontSize: 15, fontWeight: 600, color: t.theirText, lineHeight: 1.3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{room?.name}</div>
         </div>
-        <button {...iconBtn(() => openPanel(showSearch ? null : 'search'), null, showSearch)}>
-          <Search size={15} color={showSearch ? t.point : t.subText} />
-        </button>
-        <button
-          {...iconBtn(() => (showGallery ? closeGalleryPanel() : openPanel('gallery')), null, showGallery)}
-          aria-label="대화방 갤러리">
-          <Images size={15} color={showGallery ? t.point : t.subText} />
-        </button>
-        <button
-          {...iconBtn(() => {
-            if (showBookmarks) closeBookmarksPanel()
-            else {
-              setShowSearch(false)
-              setShowGallery(false)
-              setShowTheme(false)
-              setClosingBookmarks(false)
-              setShowBookmarks(true)
-            }
-          }, null, showBookmarks)}
-          aria-label="중요 대사 북마크">
-          <Bookmark size={15} color={showBookmarks ? t.point : t.subText} fill={showBookmarks ? 'currentColor' : 'none'} />
-        </button>
-        <button {...iconBtn(() => (showTheme ? closeThemePanel() : openPanel('theme')), null, showTheme)}>
-          <Settings size={15} color={showTheme ? t.point : t.subText} />
-        </button>
+        {topCharacterPickerEnabled && showTopCharacterPicker ? (
+          <div role="group" aria-label="캐릭터 선택" className="character-strip" style={{ display: 'flex', alignItems: 'center', gap: 7, flex: 1, minWidth: 0, flexWrap: 'nowrap', overflowX: 'auto', overflowY: 'hidden', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', touchAction: 'pan-x', padding: '3px 1px' }}>
+            {myChars.length ? myChars.map(character => {
+              const selected = activeChar?.id === character.id && mode === 'chat'
+              return <button key={character.id} onMouseDown={event => event.preventDefault()} onClick={() => chooseCharacter(character)} aria-label={`${character.name} 선택`} aria-pressed={selected} title={character.name} style={{ width: 36, height: 36, padding: 0, borderRadius: '50%', flex: '0 0 36px', overflow: 'hidden', cursor: 'pointer', background: character.color || t.point, border: `${selected ? 2 : 1}px solid ${selected ? t.point : t.border}`, boxShadow: selected ? `0 0 0 2px color-mix(in srgb, ${t.point} 24%, transparent)` : 'none' }}>
+                <img src={character.image_url || DEFAULT_AVATAR} alt="" style={{ display: 'block', width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+              </button>
+            }) : <span style={{ color: t.subText, fontSize: 11, whiteSpace: 'nowrap' }}>캐릭터 없음</span>}
+          </div>
+        ) : <>
+          <button {...iconBtn(() => openPanel(showSearch ? null : 'search'), null, showSearch)} aria-label="대화 검색">
+            <Search size={15} color={showSearch ? t.point : t.subText} />
+          </button>
+          <button
+            {...iconBtn(() => (showGallery ? closeGalleryPanel() : openPanel('gallery')), null, showGallery)}
+            aria-label="대화방 갤러리">
+            <Images size={15} color={showGallery ? t.point : t.subText} />
+          </button>
+          {!topCharacterPickerEnabled && <button
+            {...iconBtn(() => {
+              if (showBookmarks) closeBookmarksPanel()
+              else {
+                setShowSearch(false)
+                setShowGallery(false)
+                setShowTheme(false)
+                setClosingBookmarks(false)
+                setShowBookmarks(true)
+              }
+            }, null, showBookmarks)}
+            aria-label="중요 대사 북마크">
+            <Bookmark size={15} color={showBookmarks ? t.point : t.subText} fill={showBookmarks ? 'currentColor' : 'none'} />
+          </button>}
+          {topCharacterPickerEnabled && !showTopCharacterPicker && <button {...iconBtn(toggleTopCharacterPicker, null, false)} aria-label="캐릭터 선택" aria-expanded={false}>
+            <UserRound size={17} color={t.subText} />
+          </button>}
+          <button {...iconBtn(() => (showTheme ? closeThemePanel() : openPanel('theme')), null, showTheme)} aria-label="채팅방 설정">
+            <Settings size={15} color={showTheme ? t.point : t.subText} />
+          </button>
+        </>}
+        {topCharacterPickerEnabled && showTopCharacterPicker && <button {...iconBtn(toggleTopCharacterPicker, null, true)} aria-label="캐릭터 목록 닫기" aria-expanded={true}>
+          <UserRound size={17} color={t.point} />
+        </button>}
       </div>
 
       {/* 초대 코드 패널 */}
@@ -2550,9 +2600,9 @@ export default function Room() {
             pointerEvents: 'none',
           }}
         />
-        {(myChars.length > 0 || selectedMessageEffect) && (
+        {((myChars.length > 0 && !topCharacterPickerEnabled) || selectedMessageEffect) && (
           <div className="composer-context-row">
-          {myChars.length > 0 && <button
+          {myChars.length > 0 && !topCharacterPickerEnabled && <button
             className="composer-identity"
             onMouseDown={e => e.preventDefault()}
             onPointerDown={event => {
@@ -2601,7 +2651,7 @@ export default function Room() {
           <MessageEffectChip effectKey={selectedMessageEffect} onClear={() => setSelectedMessageEffect(null)} theme={t} />
           </div>
         )}
-        {myChars.length > 0 && showCharList && (
+        {myChars.length > 0 && !topCharacterPickerEnabled && showCharList && (
           <div className={`profile-picker-reveal${closingCharList ? ' is-closing' : ''}`} style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, marginBottom: 7, padding: '7px 9px', borderRadius: 14, background: `color-mix(in srgb, ${t.panel} 76%, transparent)`, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: `1px solid ${t.border}`, boxShadow: '0 8px 24px rgba(0,0,0,0.16)', pointerEvents: closingCharList ? 'none' : 'auto' }}>
             <span style={{ fontSize: 10, color: t.subText, flexShrink: 0 }}>나</span>
             <div className="character-strip" style={{ display: 'flex', gap: 5, flex: 1, minWidth: 0, flexWrap: 'nowrap', overflowX: 'auto', overflowY: 'hidden', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', touchAction: 'pan-x', paddingBottom: 2 }}>
@@ -2609,14 +2659,7 @@ export default function Room() {
                 <button
                   key={c.id}
                   onMouseDown={e => e.preventDefault()}
-                  onClick={async () => {
-                    setActiveChar(c)
-                    setMode('chat')
-                    const {
-                      data: { user },
-                    } = await supabase.auth.getUser()
-                    await supabase.from('room_members').update({ last_char_id: c.id }).eq('room_id', roomId).eq('user_id', user.id)
-                  }}
+                  onClick={() => chooseCharacter(c)}
                   style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, padding: '3px 8px 3px 4px', borderRadius: 20, border: activeChar?.id === c.id && mode === 'chat' ? `1.5px solid ${c.color || t.point}` : `1px solid ${t.border}`, background: activeChar?.id === c.id && mode === 'chat' ? c.color + '22' : 'none', cursor: 'pointer' }}>
                   <div style={{ width: 22, height: 22, background: c.color || t.point, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, color: c.text_color || '#fff', overflow: 'hidden', flexShrink: 0 }}><img className="squircle-media" src={c.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>
                   <span style={{ fontSize: 11, color: activeChar?.id === c.id && mode === 'chat' ? t.theirText : t.subText }}>{c.name}</span>
@@ -2631,7 +2674,7 @@ export default function Room() {
             </button>
           </div>
         )}
-        {myChars.length === 0 && (
+        {myChars.length === 0 && !topCharacterPickerEnabled && (
           <button onClick={() => navigate('/characters')} style={{ width: '100%', background: `color-mix(in srgb, ${t.panel} 76%, transparent)`, backdropFilter: 'blur(16px)', border: `0.5px dashed ${t.border}`, borderRadius: 12, padding: '8px', color: t.subText, fontSize: 12, cursor: 'pointer', marginBottom: 8, pointerEvents: 'auto' }}>
             + 캐릭터 추가하기
           </button>
