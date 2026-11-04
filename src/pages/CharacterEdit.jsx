@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { ChevronLeft, ImagePlus, Sparkles, Trash2 } from 'lucide-react'
+import Cropper from 'react-easy-crop'
 import { useNavigate, useParams } from 'react-router-dom'
 import LoadingScreen from '../components/LoadingScreen'
 import { supabase, uploadFile, validateImageFile } from '../lib/supabase'
@@ -17,6 +18,11 @@ export default function CharacterEdit() {
   const [description, setDescription] = useState('')
   const [imageFile, setImageFile] = useState(null)
   const [imagePreview, setImagePreview] = useState(null)
+  const [cropSrc, setCropSrc] = useState(null)
+  const [showCropper, setShowCropper] = useState(false)
+  const [crop, setCrop] = useState({ x: 0, y: 0 })
+  const [zoom, setZoom] = useState(1)
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState(null)
   const [frames, setFrames] = useState([])
   const [saving, setSaving] = useState(false)
   const [frameLoading, setFrameLoading] = useState(false)
@@ -57,6 +63,7 @@ export default function CharacterEdit() {
 
   const chooseImage = event => {
     const file = event.target.files?.[0]
+    event.target.value = ''
     if (!file) return
     const error = validateImageFile(file)
     if (error) {
@@ -64,9 +71,44 @@ export default function CharacterEdit() {
       event.target.value = ''
       return
     }
-    setImageFile(file)
-    setImagePreview(URL.createObjectURL(file))
+    const reader = new FileReader()
+    reader.onload = () => {
+      setCropSrc(reader.result)
+      setCrop({ x: 0, y: 0 })
+      setZoom(1)
+      setCroppedAreaPixels(null)
+      setShowCropper(true)
+    }
+    reader.readAsDataURL(file)
   }
+
+  const confirmCrop = async () => {
+    if (!cropSrc || !croppedAreaPixels) return
+    try {
+      const blob = await getCroppedBlob(cropSrc, croppedAreaPixels)
+      setImageFile(new File([blob], 'cropped.jpg', { type: 'image/jpeg' }))
+      setImagePreview(URL.createObjectURL(blob))
+      setShowCropper(false)
+    } catch (error) {
+      console.error('character image crop failed:', error)
+      setNotice('이미지를 자르지 못했어요. 다른 이미지를 선택해 주세요.')
+    }
+  }
+
+  const getCroppedBlob = (imageSrc, pixelCrop) => new Promise((resolve, reject) => {
+    const image = new Image()
+    image.onload = () => {
+      const canvas = document.createElement('canvas')
+      canvas.width = pixelCrop.width
+      canvas.height = pixelCrop.height
+      const context = canvas.getContext('2d')
+      if (!context) return reject(new Error('Canvas is unavailable'))
+      context.drawImage(image, pixelCrop.x, pixelCrop.y, pixelCrop.width, pixelCrop.height, 0, 0, pixelCrop.width, pixelCrop.height)
+      canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Could not create cropped image')), 'image/jpeg', 0.92)
+    }
+    image.onerror = () => reject(new Error('Could not load image'))
+    image.src = imageSrc
+  })
 
   const save = async () => {
     if (!name.trim() || !character) return
@@ -154,6 +196,22 @@ export default function CharacterEdit() {
         </>}
         {notice && <div role="status" style={{ marginTop: 18, color: notice.includes('못') ? '#f87171' : t.subText, fontSize: 11 }}>{notice}</div>}
       </main>
+      {showCropper && <div role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setShowCropper(false) }} style={{ position: 'fixed', inset: 0, zIndex: 30, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, padding: 20, background: 'rgba(0,0,0,.82)' }}>
+        <section role="dialog" aria-modal="true" aria-labelledby="profile-crop-title" style={{ display: 'grid', justifyItems: 'center', gap: 16, width: 'min(100%, 360px)', color: '#fff' }}>
+          <h2 id="profile-crop-title" style={{ margin: 0, fontSize: 15, fontWeight: 650 }}>프로필 사진 영역 선택</h2>
+          <div style={{ position: 'relative', width: 'min(78vw, 320px)', height: 'min(78vw, 320px)', overflow: 'hidden', borderRadius: 12, background: '#111' }}>
+            <Cropper image={cropSrc} crop={crop} zoom={zoom} aspect={1} cropShape="rect" onCropChange={setCrop} onZoomChange={setZoom} onCropComplete={(_, pixels) => setCroppedAreaPixels(pixels)} />
+          </div>
+          <label style={{ display: 'grid', justifyItems: 'center', gap: 8, width: 'min(78vw, 320px)', color: '#ddd', fontSize: 11 }}>
+            확대 조절
+            <input aria-label="사진 확대" type="range" min={1} max={3} step={0.1} value={zoom} onChange={event => setZoom(Number(event.target.value))} style={{ width: '100%', accentColor: t.point }} />
+          </label>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button onClick={() => setShowCropper(false)} style={{ border: '1px solid #ffffff66', borderRadius: 8, padding: '9px 18px', background: 'transparent', color: '#fff' }}>취소</button>
+            <button onClick={confirmCrop} style={{ border: 0, borderRadius: 8, padding: '9px 20px', background: t.point, color: '#fff', fontWeight: 650 }}>적용</button>
+          </div>
+        </section>
+      </div>}
     </div>
   )
 }
