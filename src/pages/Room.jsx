@@ -1887,9 +1887,9 @@ export default function Room() {
         <button className="ui-touch-target" aria-label="채팅방 목록으로 돌아가기" onClick={() => navigate('/')} style={{ width: 44, height: 44, flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <ChevronLeft size={22} color={t.subText} />
         </button>
-        <div style={{ flex: 1, minWidth: showTopCharacterPicker && topCharacterPickerEnabled ? 40 : 0 }}>
+        {!(topCharacterPickerEnabled && showTopCharacterPicker) && <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 15, fontWeight: 600, color: t.theirText, lineHeight: 1.3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{room?.name}</div>
-        </div>
+        </div>}
         {topCharacterPickerEnabled && showTopCharacterPicker ? (
           <div role="group" aria-label="캐릭터 선택" className="character-strip" style={{ display: 'flex', alignItems: 'center', gap: 7, flex: 1, minWidth: 0, flexWrap: 'nowrap', overflowX: 'auto', overflowY: 'hidden', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', touchAction: 'pan-x', padding: '3px 1px' }}>
             {myChars.length ? myChars.map(character => {
@@ -2731,17 +2731,18 @@ export default function Room() {
         )}
         {myChars.length > 0 && !topCharacterPickerEnabled && showCharList && (
           <div className={`profile-picker-reveal${closingCharList ? ' is-closing' : ''}`} style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, marginBottom: 7, padding: '7px 9px', borderRadius: 14, background: `color-mix(in srgb, ${t.panel} 76%, transparent)`, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: `1px solid ${t.border}`, boxShadow: '0 8px 24px rgba(0,0,0,0.16)', pointerEvents: closingCharList ? 'none' : 'auto' }}>
-            <span style={{ fontSize: 10, color: t.subText, flexShrink: 0 }}>나</span>
-            <div className="character-strip" style={{ display: 'flex', gap: 5, flex: 1, minWidth: 0, flexWrap: 'nowrap', overflowX: 'auto', overflowY: 'hidden', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', touchAction: 'pan-x', paddingBottom: 2 }}>
+            <div role="group" aria-label="캐릭터 선택" className="character-strip" style={{ display: 'flex', alignItems: 'center', gap: 7, flex: 1, minWidth: 0, flexWrap: 'nowrap', overflowX: 'auto', overflowY: 'hidden', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', touchAction: 'pan-x', padding: '2px 1px' }}>
               {myChars.map(c => (
                 <button
                   key={c.id}
                   onMouseDown={e => e.preventDefault()}
                   onPointerDown={preserveComposerFocus}
                   onClick={() => chooseCharacter(c)}
-                  style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, padding: '3px 8px 3px 4px', borderRadius: 20, border: activeChar?.id === c.id && mode === 'chat' ? `1.5px solid ${c.color || t.point}` : `1px solid ${t.border}`, background: activeChar?.id === c.id && mode === 'chat' ? c.color + '22' : 'none', cursor: 'pointer' }}>
-                  <div style={{ width: 22, height: 22, background: c.color || t.point, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, color: c.text_color || '#fff', overflow: 'hidden', flexShrink: 0 }}><img className="squircle-media" src={c.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>
-                  <span style={{ fontSize: 11, color: activeChar?.id === c.id && mode === 'chat' ? t.theirText : t.subText }}>{c.name}</span>
+                  aria-label={`${c.name} 선택`}
+                  aria-pressed={activeChar?.id === c.id && mode === 'chat'}
+                  title={c.name}
+                  style={{ width: 36, height: 36, padding: 0, borderRadius: '50%', flex: '0 0 36px', overflow: 'hidden', cursor: 'pointer', background: c.color || t.point, border: `${activeChar?.id === c.id && mode === 'chat' ? 2 : 1}px solid ${activeChar?.id === c.id && mode === 'chat' ? t.point : t.border}`, boxShadow: activeChar?.id === c.id && mode === 'chat' ? `0 0 0 2px color-mix(in srgb, ${t.point} 24%, transparent)` : 'none' }}>
+                  <img src={c.image_url || DEFAULT_AVATAR} alt="" style={{ display: 'block', width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
                 </button>
               ))}
             </div>
