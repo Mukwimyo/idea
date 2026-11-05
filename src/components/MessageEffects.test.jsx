@@ -12,7 +12,7 @@ const theme = {
 }
 
 describe('MessageEffectPicker', () => {
-  it('exposes an immediate selection action and a way back to the tool menu', () => {
+  it('exposes an immediate selection action and a way back to the chat', () => {
     const onSelect = vi.fn()
     const onBack = vi.fn()
     render(
@@ -25,7 +25,7 @@ describe('MessageEffectPicker', () => {
     )
 
     fireEvent.click(screen.getByRole('button', { name: /충격/ }))
-    fireEvent.click(screen.getByRole('button', { name: '대화 도구로 돌아가기' }))
+    fireEvent.click(screen.getByRole('button', { name: '대화 화면으로 돌아가기' }))
 
     expect(onSelect).toHaveBeenCalledWith('impact')
     expect(onBack).toHaveBeenCalledOnce()

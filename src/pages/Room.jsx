@@ -2,7 +2,7 @@ import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase, uploadFile, validateImageFile } from '../lib/supabase'
 import { DEFAULT_THEME_ID, THEMES, getTheme } from '../lib/themes'
-import { ChevronLeft, Settings, Search, Images, ArrowUp, Eye, ArrowDown, ChevronDown, ChevronUp, Quote, RotateCcw, AlertCircle, Minus, Phone, Copy, DoorOpen, Send, Music, Grid2X2, ImagePlus, Star, Bookmark, MapPin, StickyNote, Dices, Crown, Percent, Scissors, Shuffle, Sparkles, UserRound } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Settings, Search, Images, ArrowUp, Eye, ArrowDown, ChevronDown, ChevronUp, Quote, RotateCcw, AlertCircle, Minus, Phone, Copy, DoorOpen, Send, Music, Grid2X2, ImagePlus, Star, Bookmark, MapPin, StickyNote, Dices, Crown, Percent, Scissors, Shuffle, Sparkles, UserRound, UsersRound, X } from 'lucide-react'
 import ProfileImageModal from '../components/ProfileImageModal'
 import CommunicationSessions from '../components/CommunicationSessions'
 import CommunicationRecord from '../components/CommunicationRecord'
@@ -1951,33 +1951,44 @@ export default function Room() {
       {/* 테마 패널 */}
       {showTheme && (
         <div className={`top-panel-backdrop${closingTheme ? ' settings-backdrop-closing' : ''}`} style={{ position: 'fixed', inset: 0, zIndex: 80, display: 'flex', justifyContent: 'flex-end', background: 'rgba(0,0,0,0.24)' }} onClick={closeThemePanel}>
-          <div className={`top-panel-sheet settings-page-drawer${closingTheme ? ' is-closing' : ''}`} style={{ background: t.panel, padding: '14px', borderLeft: `0.5px solid ${t.border}`, maxWidth: 480, marginLeft: 'auto', width: '100%', height: '100%', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 14 }}>
-              <div style={{ flex: 1, fontSize: 15, color: t.theirText }}>대화방 설정</div>
-              <button onClick={closeThemePanel} style={{ border: `1px solid ${t.border}`, borderRadius: 9, background: 'none', color: t.subText, padding: '6px 10px' }}>닫기</button>
+          <div className={`top-panel-sheet settings-page-drawer${closingTheme ? ' is-closing' : ''}`} style={{ background: t.bg, padding: 'max(20px, env(safe-area-inset-top)) 18px calc(26px + env(safe-area-inset-bottom))', borderLeft: `1px solid color-mix(in srgb, ${t.border} 55%, transparent)`, maxWidth: 480, marginLeft: 'auto', width: '100%', height: '100%', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 17, fontWeight: 600, color: t.theirText }}>대화방 설정</div>
+                <div style={{ marginTop: 3, overflow: 'hidden', color: t.subText, fontSize: 11, textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{room?.name}</div>
+              </div>
+              <button onClick={closeThemePanel} aria-label="설정 닫기" style={{ width: 38, height: 38, display: 'grid', placeItems: 'center', flexShrink: 0, border: 0, borderRadius: '50%', background: `color-mix(in srgb, ${t.panel} 74%, transparent)`, color: t.subText, cursor: 'pointer' }}><X size={17} /></button>
             </div>
-            <div style={{ marginBottom: 14, padding: 10, borderRadius: 10, background: t.bg, border: `1px solid ${t.border}` }}>
+            <div style={{ marginBottom: 20, padding: '13px 14px', borderRadius: 14, background: `color-mix(in srgb, ${t.panel} 62%, transparent)` }}>
               <div style={{ fontSize: 10, color: t.subText }}>초대 코드</div>
               <button onClick={copyInviteCode} style={{ marginTop: 3, display: 'flex', alignItems: 'center', gap: 7, padding: 0, border: 0, background: 'none', color: t.point, letterSpacing: 2, cursor: 'pointer' }}>
                 {room?.invite_code}
                 <Copy size={13} />
               </button>
             </div>
-            <div style={{ display: 'flex', gap: 7, marginBottom: 14 }}>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
               <button
                 onClick={() => {
                   closeThemePanel()
                   setShowCalendar(true)
                 }}
-                style={{ flex: 1, padding: '8px 10px', borderRadius: 9, border: `1px solid ${t.border}`, background: 'none', color: t.theirText }}>
+                style={{ flex: 1, minHeight: 42, padding: '10px 12px', borderRadius: 12, border: 0, background: `color-mix(in srgb, ${t.panel} 62%, transparent)`, color: t.theirText, cursor: 'pointer' }}>
                 날짜로 이동
               </button>
-              <button onClick={exportChat} style={{ flex: 1, padding: '8px 10px', borderRadius: 9, border: `1px solid ${t.border}`, background: 'none', color: t.theirText }}>
+              <button onClick={exportChat} style={{ flex: 1, minHeight: 42, padding: '10px 12px', borderRadius: 12, border: 0, background: `color-mix(in srgb, ${t.panel} 62%, transparent)`, color: t.theirText, cursor: 'pointer' }}>
                 채팅 내보내기
               </button>
             </div>
-            <div style={{ fontSize: 11, color: t.subText, marginBottom: 10 }}>채팅방 테마 설정</div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, padding: '8px 10px', background: t.bg, borderRadius: 8, border: `0.5px solid ${t.border}` }}>
+            <button onClick={() => { closeThemePanel(); navigate(`/room/${roomId}/characters`) }} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, marginBottom: 26, padding: '13px 14px', border: 0, borderRadius: 14, background: `color-mix(in srgb, ${t.panel} 62%, transparent)`, color: t.theirText, textAlign: 'left', cursor: 'pointer' }}>
+              <span style={{ width: 34, height: 34, display: 'grid', placeItems: 'center', flexShrink: 0, borderRadius: 11, background: `color-mix(in srgb, ${t.point} 16%, transparent)`, color: t.point }}><UsersRound size={17} /></span>
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ display: 'block', fontSize: 13, fontWeight: 600 }}>방 캐릭터 목록</span>
+                <span style={{ display: 'block', marginTop: 3, color: t.subText, fontSize: 10 }}>이 방에서 사용할 캐릭터와 순서를 관리해요.</span>
+              </span>
+              <ChevronRight size={16} color={t.subText} />
+            </button>
+            <div style={{ marginBottom: 14, color: t.subText, fontSize: 11, fontWeight: 600 }}>화면과 대화</div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, padding: '13px 14px', background: `color-mix(in srgb, ${t.panel} 54%, transparent)`, borderRadius: 14 }}>
               <div>
                 <div style={{ fontSize: 12, color: t.theirText }}>공유 테마 따라가기</div>
                 <div style={{ fontSize: 10, color: t.subText, marginTop: 2 }}>방장이 설정한 테마로 보기</div>
@@ -1987,27 +1998,27 @@ export default function Room() {
               </div>
             </div>
             {isOwner && (
-              <div style={{ marginBottom: 12 }}>
-                <div style={{ fontSize: 11, color: t.subText, marginBottom: 8 }}>
+              <div style={{ marginBottom: 22 }}>
+                <div style={{ fontSize: 11, color: t.subText, marginBottom: 10 }}>
                   공유 테마 <span style={{ fontSize: 10, opacity: 0.6 }}>(방장만 변경 가능)</span>
                 </div>
                 <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
                   {THEMES.map(th => (
-                    <div key={th.id} onClick={() => saveSharedTheme(th.id)} style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-                      <div style={{ width: 44, height: 44, borderRadius: 10, overflow: 'hidden', border: sharedThemeId === th.id ? `2px solid ${th.point}` : `1px solid ${th.border}` }}>
+                    <div key={th.id} onClick={() => saveSharedTheme(th.id)} style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                      <div style={{ width: 48, height: 48, borderRadius: 13, overflow: 'hidden', border: sharedThemeId === th.id ? `2px solid ${th.point}` : `1px solid color-mix(in srgb, ${th.border} 65%, transparent)` }}>
                         <div style={{ height: '40%', background: th.panel, borderBottom: `0.5px solid ${th.border}` }} />
                         <div style={{ height: '60%', background: th.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
                           <div style={{ width: 10, height: 8, borderRadius: '1px 5px 5px 5px', background: th.theirBubble, border: `0.5px solid ${th.theirBorder}` }} />
                           <div style={{ width: 10, height: 8, borderRadius: '5px 1px 5px 5px', background: th.myBubble }} />
                         </div>
                       </div>
-                      <div style={{ fontSize: 9, color: sharedThemeId === th.id ? th.point : t.subText, whiteSpace: 'nowrap' }}>{th.name}</div>
+                      <div style={{ fontSize: 10, color: sharedThemeId === th.id ? th.point : t.subText, whiteSpace: 'nowrap' }}>{th.name}</div>
                     </div>
                   ))}
                 </div>
               </div>
             )}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 14, padding: '11px 13px', borderRadius: 13, background: `color-mix(in srgb, ${t.panel} 54%, transparent)` }}>
               <div style={{ fontSize: 12, color: t.subText, width: 70 }}>읽음 확인</div>
               <div style={{ display: 'flex', gap: 6 }}>
                 {['text', 'number', 'none'].map(s => (
@@ -2018,13 +2029,13 @@ export default function Room() {
                       const { error } = await supabase.from('rooms').update({ read_receipt_style: s }).eq('id', roomId)
                       showToast(error ? '읽음 확인 설정을 저장하지 못했어요.' : '읽음 확인 설정이 저장됐어요.', error ? 'error' : 'success')
                     }}
-                    style={{ padding: '3px 9px', borderRadius: 10, fontSize: 11, cursor: 'pointer', border: readReceipt === s ? `1.5px solid ${t.point}` : `0.5px solid ${t.border}`, background: readReceipt === s ? t.point + '22' : 'none', color: readReceipt === s ? t.point : t.subText }}>
+                    style={{ minHeight: 34, padding: '6px 11px', borderRadius: 10, fontSize: 11, cursor: 'pointer', border: 0, background: readReceipt === s ? `color-mix(in srgb, ${t.point} 17%, transparent)` : 'transparent', color: readReceipt === s ? t.point : t.subText }}>
                     {s === 'text' ? '읽음' : s === 'number' ? '1' : '없음'}
                   </button>
                 ))}
               </div>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12, padding: '11px 13px', borderRadius: 13, background: `color-mix(in srgb, ${t.panel} 54%, transparent)` }}>
               <div style={{ fontSize: 12, color: t.subText, width: 70 }}>지문 크기</div>
               <div style={{ display: 'flex', gap: 6 }}>
                 {[
@@ -2038,13 +2049,13 @@ export default function Room() {
                       const { error } = await supabase.from('rooms').update({ action_style: s.val }).eq('id', roomId)
                       showToast(error ? '지문 크기를 저장하지 못했어요.' : '지문 크기가 저장됐어요.', error ? 'error' : 'success')
                     }}
-                    style={{ minHeight: 36, padding: '3px 12px', borderRadius: 10, fontSize: 11, cursor: 'pointer', border: actionSize === s.val ? `1.5px solid ${t.point}` : `0.5px solid ${t.border}`, background: actionSize === s.val ? t.point + '22' : 'none', color: actionSize === s.val ? t.point : t.subText }}>
+                    style={{ minHeight: 36, padding: '5px 13px', borderRadius: 10, fontSize: 11, cursor: 'pointer', border: 0, background: actionSize === s.val ? `color-mix(in srgb, ${t.point} 17%, transparent)` : 'transparent', color: actionSize === s.val ? t.point : t.subText }}>
                     {s.label}
                   </button>
                 ))}
               </div>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 10, padding: '8px 10px', background: t.bg, borderRadius: 8, border: `0.5px solid ${t.border}` }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginTop: 12, padding: '13px 14px', background: `color-mix(in srgb, ${t.panel} 54%, transparent)`, borderRadius: 14 }}>
               <div>
                 <div style={{ fontSize: 12, color: t.theirText }}>입력 중 표시</div>
                 <div style={{ marginTop: 2, fontSize: 10, color: t.subText }}>{isOwner ? '이 방에서 작성 중 상태를 표시합니다.' : '방장만 변경할 수 있습니다.'}</div>
@@ -2068,19 +2079,19 @@ export default function Room() {
               </button>
             </div>
             {isOwner && (
-              <div style={{ marginTop: 10 }}>
-                <div style={{ fontSize: 12, color: t.subText, marginBottom: 6 }}>방 이름</div>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <input value={roomNameText} onChange={e => setRoomNameText(e.target.value)} onFocus={() => setRoomNameText(room?.name || '')} onKeyDown={e => e.key === 'Enter' && saveRoomName()} placeholder={room?.name} style={{ flex: 1, background: t.bg, border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '5px 10px', color: t.inputText, fontSize: 12, outline: 'none' }} />
-                  <button onClick={saveRoomName} style={{ background: t.point, border: 'none', borderRadius: 8, padding: '5px 12px', color: '#fff', fontSize: 12, cursor: 'pointer' }}>
+              <div style={{ marginTop: 22, paddingTop: 20, borderTop: `1px solid color-mix(in srgb, ${t.border} 60%, transparent)` }}>
+                <div style={{ fontSize: 12, color: t.subText, marginBottom: 10 }}>방 이름</div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input value={roomNameText} onChange={e => setRoomNameText(e.target.value)} onFocus={() => setRoomNameText(room?.name || '')} onKeyDown={e => e.key === 'Enter' && saveRoomName()} placeholder={room?.name} style={{ flex: 1, minHeight: 40, background: `color-mix(in srgb, ${t.panel} 65%, transparent)`, border: 0, borderRadius: 12, padding: '8px 12px', color: t.inputText, fontSize: 13, outline: 'none' }} />
+                  <button onClick={saveRoomName} style={{ background: t.point, border: 'none', borderRadius: 12, padding: '8px 15px', color: '#fff', fontSize: 12, cursor: 'pointer' }}>
                     저장
                   </button>
                 </div>
-                <div style={{ marginTop: 10 }}>
-                  <div style={{ fontSize: 12, color: t.subText, marginBottom: 6 }}>대표 이미지</div>
+                <div style={{ marginTop: 20 }}>
+                  <div style={{ fontSize: 12, color: t.subText, marginBottom: 10 }}>대표 이미지</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <div className="squircle-media" style={{ width: 53, height: 53, background: t.bg, border: `0.5px solid ${t.border}`, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, color: t.subText, flexShrink: 0 }}>{room?.cover_image ? <img src={room.cover_image} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '✦'}</div>
-                    <label style={{ flex: 1, background: t.bg, border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '5px 12px', color: t.subText, fontSize: 12, cursor: 'pointer', textAlign: 'center' }}>
+                    <label style={{ flex: 1, minHeight: 40, display: 'grid', placeItems: 'center', background: `color-mix(in srgb, ${t.panel} 65%, transparent)`, border: 0, borderRadius: 12, padding: '8px 12px', color: t.subText, fontSize: 12, cursor: 'pointer', textAlign: 'center' }}>
                       이미지 선택
                       <input
                         type="file"
@@ -2776,7 +2787,7 @@ export default function Room() {
               <MessageEffectPicker
                 selectedEffect={selectedMessageEffect}
                 theme={t}
-                onBack={() => setToolPanel(null)}
+                onBack={() => closeRoleplayMenu()}
                 onSelect={effectKey => {
                   setSelectedMessageEffect(effectKey)
                   closeRoleplayMenu()

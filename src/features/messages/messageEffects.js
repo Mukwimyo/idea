@@ -1,11 +1,11 @@
 export const MESSAGE_EFFECTS = Object.freeze([
-  { key: 'whisper', label: '속삭임', description: '작고 흐리게 스며들기' },
   { key: 'shout', label: '외침', description: '크고 굵게 튀어나오기' },
-  { key: 'tremble', label: '떨림', description: '조금 길게 떨리는 긴장감' },
   { key: 'impact', label: '충격', description: '화면까지 흔드는 충격' },
 ])
 
 const LEGACY_MESSAGE_EFFECTS = Object.freeze([
+  { key: 'whisper', label: '속삭임', description: '작고 흐리게 스며들기' },
+  { key: 'tremble', label: '떨림', description: '조금 길게 떨리는 긴장감' },
   { key: 'monologue', label: '독백', description: '천천히 떠오르는 내면의 말' },
 ])
 
