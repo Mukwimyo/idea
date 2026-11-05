@@ -31,7 +31,7 @@ export function MessageEffectPicker({ selectedEffect, onSelect, onBack, theme })
         {onBack && (
           <button
             type="button"
-            aria-label="대화 도구로 돌아가기"
+            aria-label="대화 화면으로 돌아가기"
             onMouseDown={event => event.preventDefault()}
             onClick={onBack}
             style={{ color: theme.subText }}>

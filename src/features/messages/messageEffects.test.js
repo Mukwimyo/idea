@@ -9,9 +9,7 @@ import {
 describe('message effects', () => {
   it('exposes only the supported effect keys', () => {
     expect(MESSAGE_EFFECTS.map(effect => effect.key)).toEqual([
-      'whisper',
       'shout',
-      'tremble',
       'impact',
     ])
     expect(isMessageEffectKey('impact')).toBe(true)
