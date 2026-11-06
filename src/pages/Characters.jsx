@@ -9,6 +9,7 @@ import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy, r
 import { CSS } from '@dnd-kit/utilities'
 import ProfileImageModal from '../components/ProfileImageModal'
 import LoadingScreen from '../components/LoadingScreen'
+import { cropProfileImage } from '../lib/profileImageCrop'
 import {
   getRoomCharacterPoolErrorMessage,
   replaceRoomCharacterPool,
@@ -73,15 +74,23 @@ export default function Characters() {
 
   const [showCropper, setShowCropper] = useState(false)
   const [cropSrc, setCropSrc] = useState(null)
+  const [cropFile, setCropFile] = useState(null)
   const [crop, setCrop] = useState({ x: 0, y: 0 })
   const [zoom, setZoom] = useState(1)
   const [croppedAreaPixels, setCroppedAreaPixels] = useState(null)
+  const [cropProgress, setCropProgress] = useState(0)
+  const [cropError, setCropError] = useState('')
+  const [cropProcessing, setCropProcessing] = useState(false)
   // 편집 중인 캐릭터용도 추가
   const [editShowCropper, setEditShowCropper] = useState(false)
   const [editCropSrc, setEditCropSrc] = useState(null)
+  const [editCropFile, setEditCropFile] = useState(null)
   const [editCrop, setEditCrop] = useState({ x: 0, y: 0 })
   const [editZoom, setEditZoom] = useState(1)
   const [editCroppedAreaPixels, setEditCroppedAreaPixels] = useState(null)
+  const [editCropProgress, setEditCropProgress] = useState(0)
+  const [editCropError, setEditCropError] = useState('')
+  const [editCropProcessing, setEditCropProcessing] = useState(false)
 
   const navigate = useNavigate()
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }), useSensor(TouchSensor, { activationConstraint: { delay: 220, tolerance: 6 } }))
@@ -218,7 +227,8 @@ export default function Characters() {
   }
 
   const handleImageChange = e => {
-    const file = e.target.files[0]
+    const file = e.target.files?.[0]
+    e.target.value = ''
     if (!file) return
     const validationError = validateImageFile(file)
     if (validationError) {
@@ -226,6 +236,12 @@ export default function Characters() {
       e.target.value = ''
       return
     }
+    setCropFile(file)
+    setCropError('')
+    setCropProgress(0)
+    setCrop({ x: 0, y: 0 })
+    setZoom(1)
+    setCroppedAreaPixels(null)
     const reader = new FileReader()
     reader.onload = () => {
       setCropSrc(reader.result)
@@ -235,7 +251,8 @@ export default function Characters() {
   }
 
   const handleEditImageChange = e => {
-    const file = e.target.files[0]
+    const file = e.target.files?.[0]
+    e.target.value = ''
     if (!file) return
     const validationError = validateImageFile(file)
     if (validationError) {
@@ -243,6 +260,12 @@ export default function Characters() {
       e.target.value = ''
       return
     }
+    setEditCropFile(file)
+    setEditCropError('')
+    setEditCropProgress(0)
+    setEditCrop({ x: 0, y: 0 })
+    setEditZoom(1)
+    setEditCroppedAreaPixels(null)
     const reader = new FileReader()
     reader.onload = () => {
       setEditCropSrc(reader.result)
@@ -252,19 +275,43 @@ export default function Characters() {
   }
 
   const confirmCrop = async () => {
-    const blob = await getCroppedBlob(cropSrc, croppedAreaPixels)
-    const file = new File([blob], 'cropped.jpg', { type: 'image/jpeg' })
-    setImageFile(file)
-    setImagePreview(URL.createObjectURL(blob))
-    setShowCropper(false)
+    if (!cropFile || !cropSrc || !croppedAreaPixels) return
+    setCropProcessing(true)
+    setCropError('')
+    try {
+      const file = await cropProfileImage(cropFile, cropSrc, croppedAreaPixels, setCropProgress)
+      const validationError = validateImageFile(file)
+      if (validationError) throw new Error(validationError)
+      setImageFile(file)
+      setImagePreview(URL.createObjectURL(file))
+      setCropFile(null)
+      setShowCropper(false)
+    } catch (error) {
+      console.error('character image crop failed:', error)
+      setCropError(error?.message || '이미지를 자르지 못했어요. 다른 이미지를 선택해 주세요.')
+    } finally {
+      setCropProcessing(false)
+    }
   }
 
   const confirmEditCrop = async () => {
-    const blob = await getCroppedBlob(editCropSrc, editCroppedAreaPixels)
-    const file = new File([blob], 'cropped.jpg', { type: 'image/jpeg' })
-    setEditImageFile(file)
-    setEditImagePreview(URL.createObjectURL(blob))
-    setEditShowCropper(false)
+    if (!editCropFile || !editCropSrc || !editCroppedAreaPixels) return
+    setEditCropProcessing(true)
+    setEditCropError('')
+    try {
+      const file = await cropProfileImage(editCropFile, editCropSrc, editCroppedAreaPixels, setEditCropProgress)
+      const validationError = validateImageFile(file)
+      if (validationError) throw new Error(validationError)
+      setEditImageFile(file)
+      setEditImagePreview(URL.createObjectURL(file))
+      setEditCropFile(null)
+      setEditShowCropper(false)
+    } catch (error) {
+      console.error('character edit image crop failed:', error)
+      setEditCropError(error?.message || '이미지를 자르지 못했어요. 다른 이미지를 선택해 주세요.')
+    } finally {
+      setEditCropProcessing(false)
+    }
   }
 
   const addChar = async () => {
@@ -391,20 +438,6 @@ export default function Characters() {
     fetchChars()
   }
 
-  const getCroppedBlob = (imageSrc, pixelCrop) =>
-    new Promise(resolve => {
-      const image = new Image()
-      image.src = imageSrc
-      image.onload = () => {
-        const canvas = document.createElement('canvas')
-        canvas.width = pixelCrop.width
-        canvas.height = pixelCrop.height
-        const ctx = canvas.getContext('2d')
-        ctx.drawImage(image, pixelCrop.x, pixelCrop.y, pixelCrop.width, pixelCrop.height, 0, 0, pixelCrop.width, pixelCrop.height)
-        canvas.toBlob(resolve, 'image/jpeg')
-      }
-    })
-
   const deleteChar = async id => {
     if (!confirm('이 캐릭터를 보관함으로 이동할까요?\n과거 대사는 그대로 보존돼요.')) return
     await supabase.from('characters').update({ is_archived: true }).eq('id', id)
@@ -525,11 +558,13 @@ export default function Characters() {
             <Cropper image={cropSrc} crop={crop} zoom={zoom} aspect={1} cropShape="rect" onCropChange={setCrop} onZoomChange={setZoom} onCropComplete={(_, p) => setCroppedAreaPixels(p)} />
           </div>
           <input type="range" min={1} max={3} step={0.1} value={zoom} onChange={e => setZoom(Number(e.target.value))} style={{ width: 200 }} />
+          {cropFile?.type === 'image/gif' && <div style={{ maxWidth: 300, color: t.subText, fontSize: 10, lineHeight: 1.5, textAlign: 'center' }}>선택 영역을 원본 해상도로 자르고 GIF 움직임을 유지해요. 잘라낸 파일도 5MB 이하여야 해요.</div>}
+          {cropError && <div role="alert" style={{ maxWidth: 300, color: '#fca5a5', fontSize: 11, textAlign: 'center' }}>{cropError}</div>}
           <div style={{ display: 'flex', gap: 10 }}>
-            <button onClick={confirmCrop} style={{ background: t.point, border: 'none', borderRadius: 8, padding: '8px 20px', color: '#fff', cursor: 'pointer' }}>
-              확인
+            <button onClick={confirmCrop} disabled={cropProcessing} style={{ background: t.point, border: 'none', borderRadius: 8, padding: '8px 20px', color: '#fff', cursor: cropProcessing ? 'wait' : 'pointer', opacity: cropProcessing ? 0.65 : 1 }}>
+              {cropProcessing ? `${cropFile?.type === 'image/gif' ? 'GIF' : '사진'} 처리 중 ${cropProgress}%` : '확인'}
             </button>
-            <button onClick={() => setShowCropper(false)} style={{ background: 'none', border: `1px solid ${t.border}`, borderRadius: 8, padding: '8px 20px', color: t.subText, cursor: 'pointer' }}>
+            <button onClick={() => { if (!cropProcessing) { setShowCropper(false); setCropFile(null); setCropError('') } }} disabled={cropProcessing} style={{ background: 'none', border: `1px solid ${t.border}`, borderRadius: 8, padding: '8px 20px', color: t.subText, cursor: cropProcessing ? 'default' : 'pointer', opacity: cropProcessing ? 0.5 : 1 }}>
               취소
             </button>
           </div>
@@ -543,11 +578,13 @@ export default function Characters() {
             <Cropper image={editCropSrc} crop={editCrop} zoom={editZoom} aspect={1} cropShape="rect" onCropChange={setEditCrop} onZoomChange={setEditZoom} onCropComplete={(_, p) => setEditCroppedAreaPixels(p)} />
           </div>
           <input type="range" min={1} max={3} step={0.1} value={editZoom} onChange={e => setEditZoom(Number(e.target.value))} style={{ width: 200 }} />
+          {editCropFile?.type === 'image/gif' && <div style={{ maxWidth: 300, color: t.subText, fontSize: 10, lineHeight: 1.5, textAlign: 'center' }}>선택 영역을 원본 해상도로 자르고 GIF 움직임을 유지해요. 잘라낸 파일도 5MB 이하여야 해요.</div>}
+          {editCropError && <div role="alert" style={{ maxWidth: 300, color: '#fca5a5', fontSize: 11, textAlign: 'center' }}>{editCropError}</div>}
           <div style={{ display: 'flex', gap: 10 }}>
-            <button onClick={confirmEditCrop} style={{ background: t.point, border: 'none', borderRadius: 8, padding: '8px 20px', color: '#fff', cursor: 'pointer' }}>
-              확인
+            <button onClick={confirmEditCrop} disabled={editCropProcessing} style={{ background: t.point, border: 'none', borderRadius: 8, padding: '8px 20px', color: '#fff', cursor: editCropProcessing ? 'wait' : 'pointer', opacity: editCropProcessing ? 0.65 : 1 }}>
+              {editCropProcessing ? `${editCropFile?.type === 'image/gif' ? 'GIF' : '사진'} 처리 중 ${editCropProgress}%` : '확인'}
             </button>
-            <button onClick={() => setEditShowCropper(false)} style={{ background: 'none', border: `1px solid ${t.border}`, borderRadius: 8, padding: '8px 20px', color: t.subText, cursor: 'pointer' }}>
+            <button onClick={() => { if (!editCropProcessing) { setEditShowCropper(false); setEditCropFile(null); setEditCropError('') } }} disabled={editCropProcessing} style={{ background: 'none', border: `1px solid ${t.border}`, borderRadius: 8, padding: '8px 20px', color: t.subText, cursor: editCropProcessing ? 'default' : 'pointer', opacity: editCropProcessing ? 0.5 : 1 }}>
               취소
             </button>
           </div>
@@ -613,6 +650,7 @@ export default function Characters() {
                     setShowAdd(false)
                     setImagePreview(null)
                     setImageFile(null)
+                  setCropFile(null)
                   }}
                   style={{ flex: 1, background: 'none', border: `0.5px solid ${t.border}`, borderRadius: 8, padding: 9, color: t.subText, fontSize: 12, cursor: 'pointer' }}>
                   취소
