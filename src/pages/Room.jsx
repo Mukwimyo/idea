@@ -2728,7 +2728,7 @@ export default function Room() {
             }}
             aria-label={`현재 화자 ${isNarrActive ? '나레이션' : activeChar?.name || '미선택'}. 눌러서 변경`}
             aria-expanded={showCharList}
-            style={{ background: `color-mix(in srgb, ${t.panel} 88%, transparent)`, backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)', borderColor: isNarrActive ? t.narrColor : activeChar?.color || t.border, color: t.theirText, touchAction: 'none' }}>
+            style={{ background: 'transparent', border: 0, color: isNarrActive ? t.narrColor : t.theirText, touchAction: 'none' }}>
             <span className="composer-identity__avatar" style={{ background: activeChar?.color || t.point }}>
               <img src={activeChar?.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             </span>
@@ -2741,7 +2741,7 @@ export default function Room() {
           </div>
         )}
         {myChars.length > 0 && !topCharacterPickerEnabled && showCharList && (
-          <div className={`profile-picker-reveal${closingCharList ? ' is-closing' : ''}`} style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, marginBottom: 7, padding: '7px 9px', borderRadius: 14, background: `color-mix(in srgb, ${t.panel} 76%, transparent)`, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: `1px solid ${t.border}`, boxShadow: '0 8px 24px rgba(0,0,0,0.16)', pointerEvents: closingCharList ? 'none' : 'auto' }}>
+          <div className={`profile-picker-reveal${closingCharList ? ' is-closing' : ''}`} style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, marginBottom: 9, padding: '2px 4px', pointerEvents: closingCharList ? 'none' : 'auto' }}>
             <div role="group" aria-label="캐릭터 선택" className="character-strip" style={{ display: 'flex', alignItems: 'center', gap: 7, flex: 1, minWidth: 0, flexWrap: 'nowrap', overflowX: 'auto', overflowY: 'hidden', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', touchAction: 'pan-x', padding: '2px 1px' }}>
               {myChars.map(c => (
                 <button
@@ -2760,7 +2760,7 @@ export default function Room() {
             <button
               onMouseDown={e => e.preventDefault()}
               onClick={() => navigate(`/room/${roomId}/characters`)}
-              style={{ flexShrink: 0, background: 'none', border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '4px 7px', color: t.subText, fontSize: 10, cursor: 'pointer' }}>
+              style={{ flexShrink: 0, background: 'transparent', border: 0, borderRadius: 0, padding: '5px 4px', color: t.subText, fontSize: 10, cursor: 'pointer' }}>
               설정
             </button>
           </div>

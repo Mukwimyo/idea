@@ -708,9 +708,9 @@ body {
     max-width: calc(100% - 24px);
     min-height: 32px;
     margin: 0;
-    padding: 3px 9px 3px 4px;
-    border: 1px solid;
-    border-radius: 17px;
+    padding: 0 2px;
+    border: 0;
+    border-radius: 0;
     cursor: pointer;
     pointer-events: auto;
 }
@@ -752,11 +752,11 @@ body {
 }
 
 .composer-identity__avatar {
-    width: 24px;
-    height: 24px;
-    flex: 0 0 24px;
+    width: 20px;
+    height: 20px;
+    flex: 0 0 20px;
     overflow: hidden;
-    border-radius: 8px;
+    border-radius: 50%;
 }
 
 .composer-identity__text {
