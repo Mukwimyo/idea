@@ -212,6 +212,7 @@ export default function Room() {
   const [showEntering, setShowEntering] = useState(true)
   const [showMessageTime, setShowMessageTime] = useState(true)
   const [showEditedLabel, setShowEditedLabel] = useState(true)
+  const [hideMessageBubbles, setHideMessageBubbles] = useState(false)
   const [messageMenuId, setMessageMenuId] = useState(null)
   const [imageMenuTarget, setImageMenuTarget] = useState(null)
   const [deletingMessageId, setDeletingMessageId] = useState(null)
@@ -464,13 +465,14 @@ export default function Room() {
 
       const [{ data: profile }, { data: messageDisplaySetting }] = await Promise.all([
         supabase.from('profiles').select('theme_id, last_char_id, show_entering').eq('id', user.id).single(),
-        supabase.from('profiles').select('show_message_time, show_edited_label, top_character_picker').eq('id', user.id).maybeSingle(),
+        supabase.from('profiles').select('show_message_time, show_edited_label, top_character_picker, hide_message_bubbles').eq('id', user.id).maybeSingle(),
       ])
       const enteringEnabled = profile?.show_entering ?? true
       setShowEntering(enteringEnabled)
       setShowMessageTime(messageDisplaySetting?.show_message_time ?? true)
       setShowEditedLabel(messageDisplaySetting?.show_edited_label ?? true)
       setTopCharacterPickerEnabled(messageDisplaySetting?.top_character_picker ?? false)
+      setHideMessageBubbles(messageDisplaySetting?.hide_message_bubbles ?? false)
       if (!enteringEnabled) setShowSlot(false)
       const myId = profile?.theme_id || DEFAULT_THEME_ID
       setMyThemeId(myId)
@@ -2630,7 +2632,7 @@ export default function Room() {
                     canReplay={allowMessageEffectReplay}
                     onEffectPlay={playMessageStageEffect}
                     indicatorSide={isMine ? 'left' : 'right'}
-                    style={{ background: bubbleBg, color: bubbleColor, padding: '8px 12px', borderRadius: 13, fontSize: 'calc(14px * var(--idea-font-scale, 1))', lineHeight: 1.55, border: 'none', cursor: msg.effect_key || isMine ? 'pointer' : 'default' }}>
+                    style={{ background: hideMessageBubbles ? 'transparent' : bubbleBg, color: bubbleColor, padding: hideMessageBubbles ? '3px 0' : '8px 12px', borderRadius: hideMessageBubbles ? 0 : 13, fontSize: 'calc(14px * var(--idea-font-scale, 1))', lineHeight: 1.55, border: 'none', cursor: msg.effect_key || isMine ? 'pointer' : 'default' }}>
                     <AnimatedMessageText
                       text={msg.content}
                       settings={msg.text_effect_settings}

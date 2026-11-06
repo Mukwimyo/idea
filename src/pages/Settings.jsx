@@ -147,6 +147,7 @@ export default function Settings() {
   const [showMessageTime, setShowMessageTime] = useState(true)
   const [showEditedLabel, setShowEditedLabel] = useState(true)
   const [topCharacterPicker, setTopCharacterPicker] = useState(false)
+  const [hideMessageBubbles, setHideMessageBubbles] = useState(false)
   const [uiMode, setUiMode] = useState(getStoredUiMode)
   const [pushLoading, setPushLoading] = useState(false)
   const [closing, setClosing] = useState(false)
@@ -161,7 +162,7 @@ export default function Settings() {
     } = await supabase.auth.getUser()
     const [{ data }, { data: messageDisplaySetting }] = await Promise.all([
       supabase.from('profiles').select('theme_id, font_id, font_scale, show_entering').eq('id', user.id).single(),
-      supabase.from('profiles').select('show_message_time, show_edited_label, top_character_picker').eq('id', user.id).maybeSingle(),
+      supabase.from('profiles').select('show_message_time, show_edited_label, top_character_picker, hide_message_bubbles').eq('id', user.id).maybeSingle(),
     ])
     if (data?.theme_id) setMyThemeId(data.theme_id)
     if (data?.font_id) setMyFontId(data.font_id)
@@ -175,6 +176,7 @@ export default function Settings() {
     if (messageDisplaySetting?.show_message_time !== undefined) setShowMessageTime(messageDisplaySetting.show_message_time)
     if (messageDisplaySetting?.show_edited_label !== undefined) setShowEditedLabel(messageDisplaySetting.show_edited_label)
     if (messageDisplaySetting?.top_character_picker !== undefined) setTopCharacterPicker(messageDisplaySetting.top_character_picker)
+    if (messageDisplaySetting?.hide_message_bubbles !== undefined) setHideMessageBubbles(messageDisplaySetting.hide_message_bubbles)
 
     if ('serviceWorker' in navigator) {
       const registration = await navigator.serviceWorker.getRegistration('/idea/sw.js')
@@ -642,6 +644,34 @@ export default function Settings() {
               }}
               style={{ width: 40, height: 22, borderRadius: 11, cursor: 'pointer', transition: 'background 0.2s', background: showEditedLabel ? t.point : t.border, position: 'relative', flexShrink: 0 }}>
               <div style={{ position: 'absolute', top: 3, left: showEditedLabel ? 20 : 3, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
+            </div>
+          </div>
+          <div className="settings-row" style={{ background: t.panel, border: `0.5px solid ${t.border}`, borderRadius: 12, padding: '12px 14px', marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+            <div>
+              <div style={{ fontSize: 13, color: t.theirText }}>말풍선 배경 숨기기</div>
+              <div style={{ fontSize: 10, color: t.subText, marginTop: 2 }}>켜면 모든 대화방에서 말풍선 배경색을 투명하게 표시해요.</div>
+            </div>
+            <div
+              role="switch"
+              aria-label="말풍선 배경 숨기기"
+              aria-checked={hideMessageBubbles}
+              tabIndex={0}
+              onClick={async () => {
+                const next = !hideMessageBubbles
+                setHideMessageBubbles(next)
+                const { data: { user } } = await supabase.auth.getUser()
+                const { error } = await supabase.from('profiles').update({ hide_message_bubbles: next }).eq('id', user.id)
+                showToast(error ? '말풍선 설정을 저장하지 못했어요.' : '말풍선 설정이 저장됐어요.', error ? 'error' : 'success')
+                if (error) setHideMessageBubbles(!next)
+              }}
+              onKeyDown={event => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault()
+                  event.currentTarget.click()
+                }
+              }}
+              style={{ width: 40, height: 22, borderRadius: 11, cursor: 'pointer', transition: 'background 0.2s', background: hideMessageBubbles ? t.point : t.border, position: 'relative', flexShrink: 0 }}>
+              <div style={{ position: 'absolute', top: 3, left: hideMessageBubbles ? 20 : 3, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
             </div>
           </div>
         </div>
