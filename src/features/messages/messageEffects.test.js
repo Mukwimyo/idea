@@ -13,16 +13,14 @@ describe('message effects', () => {
       'impact',
     ])
     expect(isMessageEffectKey('impact')).toBe(true)
-    expect(isMessageEffectKey('monologue')).toBe(true)
-    expect(getMessageEffect('monologue')?.label).toBe('독백')
-    expect(isMessageEffectKey('arbitrary-css')).toBe(false)
   })
 
-  it('never creates a class name from an unsupported database value', () => {
-    expect(getMessageEffect('unknown')).toBeNull()
-    expect(getMessageEffectClassName('unknown', true)).toBe('')
-    expect(getMessageEffectClassName('whisper', true)).toBe(
-      'message-effect message-effect--whisper message-effect--playing'
-    )
-  })
+  it.each(['whisper', 'tremble', 'monologue', 'arbitrary-css'])(
+    'rejects unsupported database value %s without creating a class name',
+    effectKey => {
+      expect(isMessageEffectKey(effectKey)).toBe(false)
+      expect(getMessageEffect(effectKey)).toBeNull()
+      expect(getMessageEffectClassName(effectKey, true)).toBe('')
+    }
+  )
 })

@@ -19,9 +19,10 @@ describe('ui mode', () => {
     expect(document.documentElement.dataset.uiMode).toBe(UI_MODES.MODERN)
   })
 
-  it('keeps an explicitly selected classic mode', () => {
+  it('resolves a previously stored classic mode to modern', () => {
     localStorage.setItem('idea-ui-mode', UI_MODES.CLASSIC)
-    expect(getStoredUiMode()).toBe(UI_MODES.CLASSIC)
+    expect(getStoredUiMode()).toBe(UI_MODES.MODERN)
+    expect(applyUiMode(UI_MODES.CLASSIC, { dataset: {} })).toBe(UI_MODES.MODERN)
   })
 
   it('applies modern mode for an invalid value to the requested root', () => {

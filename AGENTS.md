@@ -26,6 +26,7 @@
 - UI 문구는 한국어
 - 기존 스타일은 대부분 인라인 `style={{}}`이며 테마 객체(`t`/`th`)에서 색을 받는다. 새 스타일은 가능하면 `index.css` 클래스 + CSS 변수로 작성
 - 디자인 작업은 `docs/design-improvements.md`의 ID(A1, B2 등) 기준으로 진행
+- 기능 위치는 `docs/FEATURE_MAP.md` 참고. 기능을 추가·삭제하면 같은 PR에서 이 파일도 갱신
 
 ## 배포
 

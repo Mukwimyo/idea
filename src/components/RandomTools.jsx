@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Check, Crown, Dices, Percent, Scissors, Shuffle, Sparkles, X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { Button, Card, IconButton, TextInput } from './ui'
 
 function randomInt(max) {
   if (max <= 1) return 0
@@ -30,7 +31,7 @@ const TOOL_TABS = [
   ['rps', '가위바위보', Scissors],
 ]
 
-export default function RandomTools({ open, roomId, theme, onClose, onShare }) {
+export default function RandomTools({ open, roomId, onClose, onShare }) {
   const [tab, setTab] = useState('dice')
   const [characters, setCharacters] = useState([])
   const [selectedIds, setSelectedIds] = useState(new Set())
@@ -40,7 +41,6 @@ export default function RandomTools({ open, roomId, theme, onClose, onShare }) {
   const [lastCharacterId, setLastCharacterId] = useState(null)
   const [kingCommand, setKingCommand] = useState('')
   const [error, setError] = useState('')
-  const t = theme
 
   useEffect(() => {
     if (!open) return undefined
@@ -128,39 +128,89 @@ export default function RandomTools({ open, roomId, theme, onClose, onShare }) {
   }
 
   const characterPicker = (
-    <div style={{ display: 'grid', gap: 7 }}>
-      <div style={{ minHeight: 32, display: 'flex', alignItems: 'center', gap: 6 }}>
-        <strong style={{ flex: 1, color: t.theirText, fontSize: 12 }}>참여 캐릭터 <span style={{ color: t.point }}>{selectedCharacters.length}/{characters.length}</span></strong>
-        <button disabled={characters.length === 0 || selectedIds.size === characters.length} onClick={() => setSelectedIds(new Set(characters.map(character => character.id)))} style={{ minHeight: 30, padding: '0 8px', borderRadius: 8, border: `1px solid ${t.border}`, background: 'transparent', color: t.subText, fontSize: 10 }}>전체 선택</button>
-        <button disabled={selectedIds.size === 0} onClick={() => setSelectedIds(new Set())} style={{ minHeight: 30, padding: '0 8px', borderRadius: 8, border: `1px solid ${t.border}`, background: 'transparent', color: t.subText, fontSize: 10 }}>선택 해제</button>
+    <div className="room-panel-stack">
+      <div className="room-panel-row random-tools__selection">
+        <strong>참여 캐릭터 <span>{selectedCharacters.length}/{characters.length}</span></strong>
+        <Button variant="secondary" className="random-tools__selection-action" disabled={characters.length === 0 || selectedIds.size === characters.length} onClick={() => setSelectedIds(new Set(characters.map(character => character.id)))}>전체 선택</Button>
+        <Button variant="secondary" className="random-tools__selection-action" disabled={selectedIds.size === 0} onClick={() => setSelectedIds(new Set())}>선택 해제</Button>
       </div>
       {characters.length === 0 ? (
-        <div style={{ padding: '18px 12px', border: `1px dashed ${t.border}`, borderRadius: 11, color: t.subText, textAlign: 'center', fontSize: 11, lineHeight: 1.6 }}>이 방에 등록되었거나 대화에 등장한 캐릭터가 없어요.</div>
-      ) : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 6 }}>
-        {characters.map(character => {
-          const selected = selectedIds.has(character.id)
-          return <button key={character.id} onClick={() => toggleCharacter(character.id)} aria-pressed={selected} style={{ minHeight: 44, display: 'flex', alignItems: 'center', gap: 7, minWidth: 0, padding: 7, borderRadius: 10, border: `1px solid ${selected ? t.point : t.border}`, background: selected ? `${t.point}18` : t.bg, color: t.theirText }}>
-            <img src={character.image_url || `${import.meta.env.BASE_URL}default-avatar.png`} alt="" className="squircle-media" style={{ width: 30, height: 30, flexShrink: 0, objectFit: 'cover' }} />
-            <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'left', fontSize: 12 }}>{character.name}</span>
-            {selected && <Check size={14} color={t.point} />}
-          </button>
-        })}
-      </div>}
+        <div className="room-panel-empty random-tools__empty">이 방에 등록되었거나 대화에 등장한 캐릭터가 없어요.</div>
+      ) : (
+        <div className="room-panel-tabs">
+          {characters.map(character => {
+            const selected = selectedIds.has(character.id)
+            return (
+              <Button key={character.id} variant="secondary" onClick={() => toggleCharacter(character.id)} aria-pressed={selected} className="random-tools__character">
+                <img src={character.image_url || `${import.meta.env.BASE_URL}default-avatar.png`} alt="" className="squircle-media" />
+                <span>{character.name}</span>
+                {selected && <Check size={14} />}
+              </Button>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 
-  return <div onPointerDown={event => event.target === event.currentTarget && onClose()} style={{ position: 'fixed', inset: 0, zIndex: 175, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', background: 'rgba(0,0,0,.3)' }}>
-    <section className="ui-slide-up" style={{ width: '100%', maxWidth: 480, maxHeight: '84vh', overflowY: 'auto', padding: '14px 14px calc(18px + env(safe-area-inset-bottom))', borderRadius: '22px 22px 0 0', border: `1px solid ${t.border}`, background: t.panel, boxShadow: '0 -18px 48px rgba(0,0,0,.3)' }}>
-      <header style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Sparkles size={18} color={t.point} /><strong style={{ flex: 1, color: t.theirText, fontSize: 14 }}>랜덤 도구</strong><button onClick={onClose} style={{ width: 34, height: 34, border: 0, background: 'transparent', color: t.subText }}><X size={18} /></button></header>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: 4, margin: '9px 0 13px' }}>{TOOL_TABS.map(([id, label, Icon]) => <button key={id} onClick={() => { setTab(id); setError('') }} style={{ display: 'grid', placeItems: 'center', gap: 5, padding: '8px 1px', borderRadius: 9, border: `1px solid ${tab === id ? t.point : t.border}`, background: tab === id ? `${t.point}20` : t.bg, color: tab === id ? t.point : t.subText, fontSize: 8 }}><Icon size={15} />{label}</button>)}</div>
+  return (
+    <div onPointerDown={event => event.target === event.currentTarget && onClose()} className="room-sheet-backdrop random-tools-backdrop">
+      <Card as="section" className="room-sheet random-tools">
+        <header className="room-panel-header">
+          <Sparkles size={18} />
+          <strong className="room-panel-title">랜덤 도구</strong>
+          <IconButton type="button" label="닫기" className="room-panel-icon" onClick={onClose}><X size={18} /></IconButton>
+        </header>
+        <div className="room-panel-tabs random-tools__tabs">
+          {TOOL_TABS.map(([id, label, Icon]) => (
+            <Button key={id} variant="secondary" className="room-panel-tab" data-selected={tab === id} onClick={() => { setTab(id); setError('') }}>
+              <Icon size={15} />{label}
+            </Button>
+          ))}
+        </div>
 
-      {tab === 'dice' && <div style={{ display: 'grid', gap: 9 }}><div style={{ color: t.subText, fontSize: 11 }}>D6 주사위 개수</div><div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><input type="range" min="1" max="10" value={diceCount} onChange={event => setDiceCount(Number(event.target.value))} style={{ flex: 1, accentColor: t.point }} /><strong style={{ width: 34, color: t.theirText, textAlign: 'center' }}>{diceCount}개</strong></div></div>}
-      {tab === 'chance' && <div style={{ display: 'grid', gap: 9 }}><div style={{ color: t.subText, fontSize: 11 }}>성공 확률</div><div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><input type="range" min="0" max="100" step="5" value={successChance} onChange={event => setSuccessChance(Number(event.target.value))} style={{ flex: 1, accentColor: t.point }} /><strong style={{ width: 42, color: t.theirText, textAlign: 'right' }}>{successChance}%</strong></div></div>}
-      {tab === 'character' && <div style={{ display: 'grid', gap: 9 }}>{characterPicker}<label style={{ display: 'flex', alignItems: 'center', gap: 7, color: t.subText, fontSize: 10 }}><input type="checkbox" checked={avoidRepeat} onChange={event => setAvoidRepeat(event.target.checked)} />같은 캐릭터 연속 당첨 방지</label></div>}
-      {tab === 'king' && <div style={{ display: 'grid', gap: 9 }}>{characterPicker}<input value={kingCommand} onChange={event => setKingCommand(event.target.value)} placeholder="왕의 명령 (선택)" maxLength={160} style={{ padding: 9, borderRadius: 9, border: `1px solid ${t.border}`, background: t.bg, color: t.inputText, outline: 'none' }} /></div>}
-      {tab === 'rps' && <div style={{ display: 'grid', gap: 9 }}>{characterPicker}<div style={{ color: t.subText, fontSize: 10 }}>선택한 캐릭터마다 가위·바위·보를 무작위로 배정해 승자를 정해요.</div></div>}
-      {error && <div style={{ marginTop: 9, color: '#f87171', fontSize: 10 }}>{error}</div>}
-      <button onClick={shareNow} style={{ width: '100%', marginTop: 13, padding: 10, borderRadius: 10, border: 0, background: t.point, color: '#fff' }}>결과 공유</button>
-    </section>
-  </div>
+        {tab === 'dice' && (
+          <div className="room-panel-stack">
+            <div className="room-panel-caption">D6 주사위 개수</div>
+            <div className="room-panel-row random-tools__range-row">
+              <input className="room-panel-range" type="range" min="1" max="10" value={diceCount} onChange={event => setDiceCount(Number(event.target.value))} />
+              <strong>{diceCount}개</strong>
+            </div>
+          </div>
+        )}
+        {tab === 'chance' && (
+          <div className="room-panel-stack">
+            <div className="room-panel-caption">성공 확률</div>
+            <div className="room-panel-row random-tools__range-row">
+              <input className="room-panel-range" type="range" min="0" max="100" step="5" value={successChance} onChange={event => setSuccessChance(Number(event.target.value))} />
+              <strong className="random-tools__chance">{successChance}%</strong>
+            </div>
+          </div>
+        )}
+        {tab === 'character' && (
+          <div className="room-panel-stack">
+            {characterPicker}
+            <label className="random-tools__repeat">
+              <input type="checkbox" checked={avoidRepeat} onChange={event => setAvoidRepeat(event.target.checked)} />
+              같은 캐릭터 연속 당첨 방지
+            </label>
+          </div>
+        )}
+        {tab === 'king' && (
+          <div className="room-panel-stack">
+            {characterPicker}
+            <TextInput value={kingCommand} onChange={event => setKingCommand(event.target.value)} placeholder="왕의 명령 (선택)" maxLength={160} />
+          </div>
+        )}
+        {tab === 'rps' && (
+          <div className="room-panel-stack">
+            {characterPicker}
+            <div className="room-panel-caption">선택한 캐릭터마다 가위·바위·보를 무작위로 배정해 승자를 정해요.</div>
+          </div>
+        )}
+        {error && <div className="room-panel-error random-tools__error">{error}</div>}
+        <Button block className="random-tools__share" onClick={shareNow}>결과 공유</Button>
+      </Card>
+    </div>
+  )
 }

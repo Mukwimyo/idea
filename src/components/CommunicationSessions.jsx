@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { MessageSquare, Phone, PhoneOff, Send, X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { prefersReducedMotion } from '../lib/motion'
 import { createClientMessageId, sendRoomMessage } from '../features/messages/messageApi'
+import { Button, Card, IconButton, TextInput } from './ui'
 
 const DEFAULT_AVATAR = `${import.meta.env.BASE_URL}default-avatar.png`
 
@@ -12,7 +14,7 @@ function durationLabel(startedAt, endedAt, now) {
   return `${String(Math.floor(displayedSeconds / 60)).padStart(2, '0')}:${String(displayedSeconds % 60).padStart(2, '0')}`
 }
 
-export default function CommunicationSessions({ roomId, userId, myChars, theme, open, onClose }) {
+export default function CommunicationSessions({ roomId, userId, myChars, open, onClose }) {
   const [kind, setKind] = useState('call')
   const [characters, setCharacters] = useState([])
   const [senderId, setSenderId] = useState(myChars[0]?.id || '')
@@ -35,7 +37,6 @@ export default function CommunicationSessions({ roomId, userId, myChars, theme, 
   const typingStopTimerRef = useRef(null)
   const lastTypingBroadcastRef = useRef(0)
   const sessionIdsRef = useRef(new Set())
-  const t = theme
 
   const activeSession = sessions.find(session => ['ringing', 'active'].includes(session.status))
   const characterById = useMemo(() => Object.fromEntries(characters.map(character => [character.id, character])), [characters])
@@ -156,7 +157,10 @@ export default function CommunicationSessions({ roomId, userId, myChars, theme, 
   useEffect(() => {
     const list = messageListRef.current
     if (!activeSessionId || !list || !isNearMessageBottomRef.current) return
-    window.requestAnimationFrame(() => list.scrollTo({ top: list.scrollHeight, behavior: 'smooth' }))
+    window.requestAnimationFrame(() => list.scrollTo({
+      top: list.scrollHeight,
+      behavior: prefersReducedMotion() ? 'auto' : 'smooth',
+    }))
   }, [activeSessionId, activeSessionMessageCount, remoteTypingExpiresAt])
 
   useEffect(() => {
@@ -359,95 +363,103 @@ export default function CommunicationSessions({ roomId, userId, myChars, theme, 
   if (!visible) return null
 
   return (
-    <div style={{ position: 'fixed', top: viewportOffsetTop, left: 0, right: 0, width: '100%', height: viewportHeight, zIndex: 120, overflow: 'hidden', background: `${t.bg}f2`, display: 'flex', flexDirection: 'column', maxWidth: 480, margin: '0 auto' }}>
-      <header style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: t.panel, borderBottom: `1px solid ${t.border}` }}>
-        <strong style={{ flex: 1, color: t.theirText }}>전화 · 문자</strong>
-        <button
+    <div className="communication-sessions" style={{ top: viewportOffsetTop, height: viewportHeight }}>
+      <header className="room-panel-header communication-sessions__header">
+        <strong className="room-panel-title">전화 · 문자</strong>
+        <IconButton
+          type="button"
+          label="본 채팅방으로 돌아가기"
+          className="communication-sessions__close"
           onClick={() => {
             if (activeSession) setHiddenSessionId(activeSession.id)
             onClose()
-          }}
-          aria-label="본 채팅방으로 돌아가기"
-          title="본 채팅방으로 돌아가기"
-          style={{ width: 36, height: 36, borderRadius: '50%', border: `1px solid ${t.border}`, background: 'none', color: t.subText, display: 'grid', placeItems: 'center' }}>
+          }}>
           <X size={17} />
-        </button>
+        </IconButton>
       </header>
 
-      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 14, display: 'flex', flexDirection: 'column' }}>
+      <div className="communication-sessions__body">
         {!activeSession && (
-          <section style={{ padding: 14, borderRadius: 18, background: t.panel, border: `1px solid ${t.border}` }}>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-              <button onClick={() => setKind('call')} style={{ flex: 1, padding: 9, borderRadius: 12, border: `1px solid ${kind === 'call' ? t.point : t.border}`, background: kind === 'call' ? `${t.point}22` : 'none', color: kind === 'call' ? t.point : t.subText }}><Phone size={15} /> 전화</button>
-              <button onClick={() => setKind('text')} style={{ flex: 1, padding: 9, borderRadius: 12, border: `1px solid ${kind === 'text' ? t.point : t.border}`, background: kind === 'text' ? `${t.point}22` : 'none', color: kind === 'text' ? t.point : t.subText }}><MessageSquare size={15} /> 문자</button>
+          <Card as="section">
+            <div className="room-panel-tabs communication-sessions__tabs">
+              <Button variant="secondary" className="room-panel-tab" data-selected={kind === 'call'} onClick={() => setKind('call')}><Phone size={15} /> 전화</Button>
+              <Button variant="secondary" className="room-panel-tab" data-selected={kind === 'text'} onClick={() => setKind('text')}><MessageSquare size={15} /> 문자</Button>
             </div>
-            <label style={{ display: 'block', color: t.subText, fontSize: 12, marginBottom: 10 }}>발신인
-              <span style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 5, padding: '5px 8px', borderRadius: 10, background: t.bg, border: `1px solid ${t.border}` }}>
-                <img className="squircle-media" src={selectedSender?.image_url || DEFAULT_AVATAR} alt="" style={{ width: 36, height: 36, objectFit: 'cover', flexShrink: 0 }} />
-                <select value={effectiveSenderId} onChange={event => setSenderId(event.target.value)} style={{ flex: 1, minWidth: 0, padding: 4, border: 0, outline: 'none', background: t.bg, color: t.inputText }}>
+            <label className="communication-sessions__person">발신인
+              <span className="room-panel-row communication-sessions__field">
+                <img className="squircle-media" src={selectedSender?.image_url || DEFAULT_AVATAR} alt="" />
+                <select className="ui-input" value={effectiveSenderId} onChange={event => setSenderId(event.target.value)}>
                   {myChars.map(character => <option key={character.id} value={character.id}>{character.name}</option>)}
                 </select>
               </span>
             </label>
-            <label style={{ display: 'block', color: t.subText, fontSize: 12 }}>수신인
-              <span style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 5, padding: '5px 8px', borderRadius: 10, background: t.bg, border: `1px solid ${t.border}` }}>
-                <img className="squircle-media" src={selectedReceiver?.image_url || DEFAULT_AVATAR} alt="" style={{ width: 36, height: 36, objectFit: 'cover', flexShrink: 0 }} />
-                <select value={receiverId} onChange={event => setReceiverId(event.target.value)} style={{ flex: 1, minWidth: 0, padding: 4, border: 0, outline: 'none', background: t.bg, color: t.inputText }}>
+            <label className="communication-sessions__person">수신인
+              <span className="room-panel-row communication-sessions__field">
+                <img className="squircle-media" src={selectedReceiver?.image_url || DEFAULT_AVATAR} alt="" />
+                <select className="ui-input" value={receiverId} onChange={event => setReceiverId(event.target.value)}>
                   {receiverOptions.length === 0 && <option value="">선택 가능한 상대 캐릭터 없음</option>}
                   {receiverOptions.map(character => <option key={character.id} value={character.id}>{character.name}</option>)}
                 </select>
               </span>
             </label>
-            {characterLoadError && <div role="status" style={{ marginTop: 8, color: t.subText, fontSize: 11, lineHeight: 1.5 }}>{characterLoadError}</div>}
-            <button onClick={createSession} disabled={!effectiveSenderId || !receiverId} style={{ width: '100%', marginTop: 14, padding: 11, border: 0, borderRadius: 12, background: t.point, color: '#fff', opacity: !effectiveSenderId || !receiverId ? 0.45 : 1 }}>연락하기</button>
-          </section>
+            {characterLoadError && <div role="status" className="room-panel-caption communication-sessions__load-error">{characterLoadError}</div>}
+            <Button block className="communication-sessions__start" onClick={createSession} disabled={!effectiveSenderId || !receiverId}>연락하기</Button>
+          </Card>
         )}
 
         {activeSession?.status === 'ringing' && (
-          <section style={{ flex: 1, minHeight: 0, paddingTop: 32, textAlign: 'center', display: 'flex', flexDirection: 'column' }}>
-            <img className="squircle-media" src={counterpartCharacter(activeSession)?.image_url || DEFAULT_AVATAR} alt="" style={{ width: 91, height: 91, objectFit: 'cover' }} />
-            <div style={{ marginTop: 10, fontSize: 12, color: t.subText }}>{activeSession.kind === 'call' ? '수신 전화' : '새 문자'}</div>
-            <h2 style={{ color: t.theirText }}>{isReceiver(activeSession) ? `${counterpartCharacter(activeSession)?.name || '상대방'}에게 ${activeSession.kind === 'call' ? '전화가' : '문자가'} 왔습니다` : `${counterpartCharacter(activeSession)?.name || '상대방'}의 응답을 기다리는 중…`}</h2>
+          <section className="communication-sessions__ringing">
+            <img className="squircle-media" src={counterpartCharacter(activeSession)?.image_url || DEFAULT_AVATAR} alt="" />
+            <div className="communication-sessions__ringing-kind">{activeSession.kind === 'call' ? '수신 전화' : '새 문자'}</div>
+            <h2>{isReceiver(activeSession) ? `${counterpartCharacter(activeSession)?.name || '상대방'}에게 ${activeSession.kind === 'call' ? '전화가' : '문자가'} 왔습니다` : `${counterpartCharacter(activeSession)?.name || '상대방'}의 응답을 기다리는 중…`}</h2>
             {isReceiver(activeSession) ? activeSession.kind === 'call' ? (
-              <div style={{ display: 'flex', justifyContent: 'center', gap: 72, marginTop: 'auto', paddingTop: 28, paddingBottom: 'calc(18px + env(safe-area-inset-bottom))' }}>
-                <label style={{ display: 'grid', gap: 8, color: t.theirText }}><button onClick={() => updateSession(activeSession, 'active')} aria-label="받기" style={{ width: 66, height: 66, border: 0, borderRadius: '50%', background: '#26a65b', color: '#fff' }}><Phone size={27} /></button>받기</label>
-                <label style={{ display: 'grid', gap: 8, color: t.theirText }}><button onClick={() => updateSession(activeSession, 'declined')} aria-label="거절" style={{ width: 66, height: 66, border: 0, borderRadius: '50%', background: '#e5484d', color: '#fff' }}><PhoneOff size={27} /></button>거절</label>
+              <div className="communication-sessions__answer communication-sessions__answer--call">
+                <label>
+                  <IconButton type="button" label="받기" className="communication-sessions__receive" onClick={() => updateSession(activeSession, 'active')}><Phone size={27} /></IconButton>
+                  받기
+                </label>
+                <label>
+                  <IconButton type="button" label="거절" className="communication-sessions__decline" onClick={() => updateSession(activeSession, 'declined')}><PhoneOff size={27} /></IconButton>
+                  거절
+                </label>
               </div>
             ) : (
-              <div style={{ display: 'flex', justifyContent: 'center', gap: 10, marginTop: 'auto', paddingTop: 24, paddingBottom: 'calc(18px + env(safe-area-inset-bottom))' }}>
-                <button onClick={() => updateSession(activeSession, 'active')} style={{ padding: '10px 22px', border: 0, borderRadius: 12, background: t.point, color: '#fff' }}>입장</button>
-                <button onClick={() => updateSession(activeSession, 'left')} style={{ padding: '10px 22px', borderRadius: 12, border: `1px solid ${t.border}`, background: 'none', color: t.subText }}>나가기</button>
+              <div className="communication-sessions__answer">
+                <Button onClick={() => updateSession(activeSession, 'active')}>입장</Button>
+                <Button variant="secondary" onClick={() => updateSession(activeSession, 'left')}>나가기</Button>
               </div>
-            ) : <div style={{ marginTop: 24, color: t.subText }}>{counterpartCharacter(activeSession)?.name || '상대방'}의 응답을 기다리는 중…</div>}
+            ) : <div className="communication-sessions__waiting">{counterpartCharacter(activeSession)?.name || '상대방'}의 응답을 기다리는 중…</div>}
           </section>
         )}
 
         {activeSession?.status === 'active' && (
-          <section style={{ flex: 1, minHeight: 0, borderRadius: 22, overflow: 'hidden', background: t.panel, border: `1px solid ${t.border}`, display: 'flex', flexDirection: 'column' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '9px 14px', borderBottom: `1px solid ${t.border}`, color: t.subText, fontSize: 11 }}><span>IDEA</span><span>●●● 87%</span></div>
-            <div style={{ padding: 14, textAlign: 'center', borderBottom: `1px solid ${t.border}` }}>
-              <div style={{ fontSize: 11, color: t.subText }}>{activeSession.kind === 'call' ? `통화 중 · ${durationLabel(activeSession.started_at, null, now)}` : '문자 대화'}</div>
-              <strong style={{ color: t.theirText }}>{sessionTitle(activeSession)}</strong>
+          <Card as="section" className="communication-sessions__active">
+            <div className="room-panel-caption communication-sessions__status"><span>IDEA</span><span>●●● 87%</span></div>
+            <div className="communication-sessions__conversation">
+              <div className="room-panel-caption">{activeSession.kind === 'call' ? `통화 중 · ${durationLabel(activeSession.started_at, null, now)}` : '문자 대화'}</div>
+              <strong>{sessionTitle(activeSession)}</strong>
             </div>
-            <div ref={messageListRef} onScroll={event => {
+            <div className="communication-sessions__messages" ref={messageListRef} onScroll={event => {
               const node = event.currentTarget
               isNearMessageBottomRef.current = node.scrollHeight - node.scrollTop - node.clientHeight < 80
-            }} style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 14 }}>
-              {(messages[activeSession.id] || []).map(message => <div key={message.id} style={{ width: 'fit-content', maxWidth: '75%', margin: message.user_id === userId ? '0 0 9px auto' : '0 auto 9px 0', padding: '8px 11px', borderRadius: 12, background: message.user_id === userId ? t.myBubble : t.theirBubble, color: message.user_id === userId ? t.myText : t.theirText }}>{message.content}</div>)}
+            }}>
+              {(messages[activeSession.id] || []).map(message => (
+                <div key={message.id} className="message-bubble communication-sessions__bubble" data-mine={message.user_id === userId}>{message.content}</div>
+              ))}
               {remoteTyping?.sessionId === activeSession.id && remoteTyping.expiresAt > now && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '4px 0 8px', color: t.subText, fontSize: 10 }}>
-                  <span style={{ letterSpacing: 2 }}>•••</span>
+                <div className="room-panel-caption communication-sessions__typing">
+                  <span>•••</span>
                   {remoteTyping.characterName} · {activeSession.kind === 'call' ? '말하는 중…' : '입력 중…'}
                 </div>
               )}
             </div>
-            {sendError && <div role="alert" style={{ padding: '7px 12px 0', color: '#ef7777', fontSize: 10, lineHeight: 1.45 }}>{sendError}</div>}
-            <div style={{ flexShrink: 0, display: 'flex', gap: 7, padding: '10px 10px calc(10px + env(safe-area-inset-bottom))', borderTop: `1px solid ${t.border}` }}>
-              <input ref={messageInputRef} value={draft} onChange={event => { setDraft(event.target.value); broadcastTyping(activeSession, event.target.value); if (sendError) setSendError('') }} onKeyDown={event => { if (event.key === 'Enter' && !event.nativeEvent.isComposing) { event.preventDefault(); sendMessage(activeSession) } }} placeholder="대화를 입력…" style={{ flex: 1, minWidth: 0, padding: 9, borderRadius: 10, background: t.bg, color: t.inputText, border: `1px solid ${sendError ? '#ef7777' : t.border}` }} />
-              <button disabled={sendingSessionId === activeSession.id} onPointerDown={event => event.preventDefault()} onClick={() => sendMessage(activeSession)} aria-label={sendingSessionId === activeSession.id ? '전송 중' : '전송'} style={{ width: 40, border: 0, borderRadius: 10, background: t.point, color: '#fff', opacity: sendingSessionId === activeSession.id ? 0.5 : 1 }}><Send size={16} /></button>
-              <button disabled={sendingSessionId === activeSession.id} onClick={() => updateSession(activeSession, 'ended')} aria-label="종료" style={{ width: 40, borderRadius: 10, border: `1px solid ${t.border}`, background: 'none', color: t.subText, opacity: sendingSessionId === activeSession.id ? 0.4 : 1 }}><PhoneOff size={16} /></button>
+            {sendError && <div role="alert" className="room-panel-error communication-sessions__send-error">{sendError}</div>}
+            <div className="room-panel-row communication-sessions__composer">
+              <TextInput ref={messageInputRef} value={draft} onChange={event => { setDraft(event.target.value); broadcastTyping(activeSession, event.target.value); if (sendError) setSendError('') }} onKeyDown={event => { if (event.key === 'Enter' && !event.nativeEvent.isComposing) { event.preventDefault(); sendMessage(activeSession) } }} placeholder="대화를 입력…" data-error={Boolean(sendError)} />
+              <IconButton type="button" className="communication-sessions__send" disabled={sendingSessionId === activeSession.id} onPointerDown={event => event.preventDefault()} onClick={() => sendMessage(activeSession)} label={sendingSessionId === activeSession.id ? '전송 중' : '전송'}><Send size={16} /></IconButton>
+              <IconButton type="button" disabled={sendingSessionId === activeSession.id} onClick={() => updateSession(activeSession, 'ended')} label="종료"><PhoneOff size={16} /></IconButton>
             </div>
-          </section>
+          </Card>
         )}
       </div>
     </div>

@@ -2,13 +2,15 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase, uploadFile, validateImageFile } from '../lib/supabase'
 import { DEFAULT_THEME_ID, getTheme } from '../lib/themes'
+import { useThemeVars } from '../lib/themeVars'
 import { ChevronLeft, X, RotateCcw, Search, Check, ArrowDownAZ, GripVertical, Play, Pause, Trash2, Sparkles } from 'lucide-react'
 import Cropper from 'react-easy-crop'
 import { DndContext, PointerSensor, TouchSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core'
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy, rectSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import ProfileImageModal from '../components/ProfileImageModal'
-import LoadingScreen from '../components/LoadingScreen'
+import { CharacterListSkeleton } from '../components/Skeletons'
+import { Button, Card, IconButton, TextArea, TextInput } from '../components/ui'
 import { cropProfileImage } from '../lib/profileImageCrop'
 import {
   getRoomCharacterPoolErrorMessage,
@@ -25,7 +27,8 @@ function SortableCard({ id, disabled, children }) {
   return (
     <div
       ref={setNodeRef}
-      style={{ transform: CSS.Transform.toString(transform), transition, position: 'relative', zIndex: isDragging ? 2 : 1, opacity: isDragging ? 0.72 : 1 }}
+      className="character-sortable-card"
+      style={{ transform: CSS.Transform.toString(transform), transition, zIndex: isDragging ? 2 : 1, opacity: isDragging ? 0.72 : 1 }}
       {...attributes}>
       {children({ listeners })}
     </div>
@@ -35,7 +38,12 @@ function SortableCard({ id, disabled, children }) {
 function SortableFrame({ frame, children }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: frame.id })
   return (
-    <div ref={setNodeRef} {...attributes} {...listeners} style={{ position: 'relative', aspectRatio: '1 / 1', transform: CSS.Transform.toString(transform), transition, zIndex: isDragging ? 3 : 1, opacity: isDragging ? 0.7 : 1, touchAction: 'none' }}>
+    <div
+      ref={setNodeRef}
+      {...attributes}
+      {...listeners}
+      className="character-frame character-sortable-frame"
+      style={{ transform: CSS.Transform.toString(transform), transition, zIndex: isDragging ? 3 : 1, opacity: isDragging ? 0.7 : 1 }}>
       {children}
     </div>
   )
@@ -444,10 +452,11 @@ export default function Characters() {
     fetchChars()
   }
 
-  if (!theme)
-    return <LoadingScreen />
+  useThemeVars(theme)
 
-  const t = theme
+  if (!theme)
+    return <CharacterListSkeleton room={Boolean(roomId)} />
+
   const normalizedSearch = searchQuery.trim().toLocaleLowerCase('ko-KR')
   const filteredChars = chars.filter(character => character.name.toLocaleLowerCase('ko-KR').includes(normalizedSearch))
   const visibleChars = alphabeticalView ? [...filteredChars].sort((a, b) => a.name.localeCompare(b.name, 'ko-KR')) : filteredChars
@@ -461,55 +470,55 @@ export default function Characters() {
     return (
       <>
       <ProfileImageModal profile={profilePreview} onClose={() => setProfilePreview(null)} />
-      <div className="modern-surface-page characters-page" style={{ minHeight: '100vh', background: t.bg, padding: 16 }}>
-        <div className="modern-page-shell" style={{ maxWidth: 400, margin: '0 auto' }}>
-          <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16, paddingTop: 8 }}>
-            <button onClick={() => navigate(-1)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 4px', marginRight: 8, display: 'flex', alignItems: 'center' }}>
-              <ChevronLeft size={22} color={t.subText} />
-            </button>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 16, color: t.theirText, fontWeight: 500 }}>방 캐릭터 설정</div>
-              <div style={{ fontSize: 10, color: t.subText, marginTop: 2 }}>{roomName}</div>
+      <div className="characters-page">
+        <div className="character-shell">
+          <div className="character-header character-header--room">
+            <IconButton label="뒤로" onClick={() => navigate(-1)} className="character-back">
+              <ChevronLeft size={22} />
+            </IconButton>
+            <div className="character-grow">
+              <div className="character-title">방 캐릭터 설정</div>
+              <div className="character-room-name">{roomName}</div>
             </div>
-            <button onClick={saveRoomCharacterPool} disabled={roomPoolSaving} style={{ background: t.point, border: 'none', borderRadius: 8, padding: '7px 14px', color: '#fff', fontSize: 12, cursor: 'pointer', opacity: roomPoolSaving ? 0.6 : 1 }}>
+            <Button size="sm" onClick={saveRoomCharacterPool} disabled={roomPoolSaving}>
               {roomPoolSaving ? '저장 중...' : roomPoolSaved ? '저장됨' : '저장'}
-            </button>
+            </Button>
           </div>
 
-          <div style={{ position: 'relative', marginBottom: 18 }}>
-            <Search size={15} color={t.subText} style={{ position: 'absolute', left: 11, top: 10 }} />
-            <input value={searchQuery} onChange={event => setSearchQuery(event.target.value)} placeholder="캐릭터 이름 검색" style={{ width: '100%', boxSizing: 'border-box', background: t.panel, border: `1px solid ${t.border}`, borderRadius: 10, padding: '9px 12px 9px 34px', color: t.inputText, fontSize: 12, outline: 'none' }} />
+          <div className="character-search character-search--room">
+            <Search size={15} className="character-search-icon" aria-hidden="true" />
+            <TextInput value={searchQuery} onChange={event => setSearchQuery(event.target.value)} aria-label="캐릭터 이름 검색" placeholder="캐릭터 이름 검색" className="character-search-input" />
           </div>
 
-          <button
+          <Button variant="secondary" size="sm"
             onClick={() => setAlphabeticalView(current => !current)}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '-8px 0 14px auto', background: alphabeticalView ? `${t.point}22` : 'none', border: `1px solid ${alphabeticalView ? t.point : t.border}`, borderRadius: 8, padding: '6px 9px', color: alphabeticalView ? t.point : t.subText, fontSize: 11, cursor: 'pointer' }}>
+            className={`character-sort${alphabeticalView ? ' is-active' : ''}`}>
             <ArrowDownAZ size={14} />
             가나다순 보기
-          </button>
+          </Button>
 
-          <div style={{ fontSize: 11, color: t.subText, marginBottom: 8 }}>이 방에서 사용할 캐릭터 · {selectedCharacters.length}명</div>
+          <div className="character-section-label">이 방에서 사용할 캐릭터 · {selectedCharacters.length}명</div>
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleRoomDragEnd}>
             <SortableContext items={visibleSelectedCharacters.map(character => character.id)} strategy={verticalListSortingStrategy}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginBottom: 22 }}>
+              <div className="character-list character-list--selected">
                 {visibleSelectedCharacters.map(character => {
                 return (
                 <SortableCard key={character.id} id={character.id} disabled={alphabeticalView}>
-                  {({ listeners }) => <div className="character-list-item" style={{ display: 'flex', alignItems: 'center', gap: 10, background: t.panel, border: `1px solid ${t.border}`, borderRadius: 11, padding: '10px 11px' }}>
-                  <button {...listeners} disabled={alphabeticalView} aria-label={`${character.name} 순서 이동`} style={{ display: 'flex', background: 'none', border: 0, padding: 2, cursor: alphabeticalView ? 'default' : 'grab', touchAction: 'none', opacity: alphabeticalView ? 0.25 : 0.65 }}>
-                    <GripVertical size={16} color={t.subText} />
-                  </button>
-                  <button onClick={() => toggleRoomCharacter(character.id)} style={{ width: 24, height: 24, borderRadius: 7, border: 0, background: t.point, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-                    <Check size={15} color="#fff" />
-                  </button>
-                  <div role="button" tabIndex={0} aria-label={`${character.name} 프로필 사진 크게 보기`} onClick={() => setProfilePreview({ url: character.image_url || DEFAULT_AVATAR, name: character.name })} onKeyDown={event => (event.key === 'Enter' || event.key === ' ') && setProfilePreview({ url: character.image_url || DEFAULT_AVATAR, name: character.name })} style={{ width: 43, height: 43, borderRadius: 12, background: character.color, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', color: character.text_color, flexShrink: 0, cursor: 'zoom-in' }}>
-                    <img className="squircle-media" src={character.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  {({ listeners }) => <Card className="character-list-item character-row character-row--room">
+                  <IconButton {...listeners} disabled={alphabeticalView} label={`${character.name} 순서 이동`} className="character-drag">
+                    <GripVertical size={16} />
+                  </IconButton>
+                  <IconButton label={`${character.name} 방 캐릭터에서 제외`} onClick={() => toggleRoomCharacter(character.id)} className="character-selected-check">
+                    <Check size={15} />
+                  </IconButton>
+                  <div role="button" tabIndex={0} aria-label={`${character.name} 프로필 사진 크게 보기`} onClick={() => setProfilePreview({ url: character.image_url || DEFAULT_AVATAR, name: character.name })} onKeyDown={event => (event.key === 'Enter' || event.key === ' ') && setProfilePreview({ url: character.image_url || DEFAULT_AVATAR, name: character.name })} className="character-avatar character-avatar--room" style={{ background: character.color, color: character.text_color }}>
+                    <img src={character.image_url || DEFAULT_AVATAR} alt="" className="squircle-media character-media" />
                   </div>
-                  <div style={{ flex: 1, color: t.theirText, fontSize: 13 }}>{character.name}</div>
-                  <button onClick={() => navigate(`/characters/${character.id}/text-effects`)} aria-label={`${character.name} 대사 연출 설정`} style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, padding: '6px 8px', border: `1px solid ${t.border}`, borderRadius: 8, background: `${t.point}18`, color: t.theirText, fontSize: 10, cursor: 'pointer' }}>
-                    <Sparkles size={13} color={t.point} /> 연출
-                  </button>
-                  </div>}
+                  <div className="character-name character-grow">{character.name}</div>
+                  <Button variant="secondary" size="sm" onClick={() => navigate(`/characters/${character.id}/text-effects`)} aria-label={`${character.name} 대사 연출 설정`} className="character-effects">
+                    <Sparkles size={13} className="character-accent-icon" /> 연출
+                  </Button>
+                  </Card>}
                 </SortableCard>
                 )
               })}
@@ -517,18 +526,18 @@ export default function Characters() {
             </SortableContext>
           </DndContext>
 
-          <div style={{ fontSize: 11, color: t.subText, marginBottom: 8 }}>전체 풀에서 추가</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+          <div className="character-section-label">전체 풀에서 추가</div>
+          <div className="character-list">
             {availableCharacters.map(character => (
-              <button className="character-list-item" key={character.id} onClick={() => toggleRoomCharacter(character.id)} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', background: t.panel, border: `1px solid ${t.border}`, borderRadius: 11, padding: '10px 11px', cursor: 'pointer', textAlign: 'left' }}>
-                <div style={{ width: 24, height: 24, borderRadius: 7, border: `1px solid ${t.border}`, flexShrink: 0 }} />
-                <div role="button" tabIndex={0} aria-label={`${character.name} 프로필 사진 크게 보기`} onClick={event => { event.stopPropagation(); setProfilePreview({ url: character.image_url || DEFAULT_AVATAR, name: character.name }) }} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); setProfilePreview({ url: character.image_url || DEFAULT_AVATAR, name: character.name }) } }} style={{ width: 43, height: 43, borderRadius: 12, background: character.color, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', color: character.text_color, flexShrink: 0, cursor: 'zoom-in' }}>
-                  <img className="squircle-media" src={character.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              <Button variant="ghost" key={character.id} onClick={() => toggleRoomCharacter(character.id)} className="character-list-item character-row character-row--room character-available">
+                <div className="character-empty-check" />
+                <div role="button" tabIndex={0} aria-label={`${character.name} 프로필 사진 크게 보기`} onClick={event => { event.stopPropagation(); setProfilePreview({ url: character.image_url || DEFAULT_AVATAR, name: character.name }) }} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); setProfilePreview({ url: character.image_url || DEFAULT_AVATAR, name: character.name }) } }} className="character-avatar character-avatar--room" style={{ background: character.color, color: character.text_color }}>
+                  <img src={character.image_url || DEFAULT_AVATAR} alt="" className="squircle-media character-media" />
                 </div>
-                <div style={{ color: t.theirText, fontSize: 13 }}>{character.name}</div>
-              </button>
+                <div className="character-name">{character.name}</div>
+              </Button>
             ))}
-            {availableCharacters.length === 0 && <div style={{ textAlign: 'center', color: t.subText, fontSize: 12, opacity: 0.55, padding: 20 }}>추가할 캐릭터가 없어요.</div>}
+            {availableCharacters.length === 0 && <div className="character-empty character-empty--available">추가할 캐릭터가 없어요.</div>}
           </div>
         </div>
       </div>
@@ -539,233 +548,204 @@ export default function Characters() {
   return (
     <>
       <ProfileImageModal profile={profilePreview} onClose={() => setProfilePreview(null)} />
-      <style>{`
-        @keyframes character-card-expand {
-          from {
-            opacity: 0;
-            transform: translateY(-10px) scaleY(0.94);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0) scaleY(1);
-          }
-        }
-      `}</style>
       {/* 크롭 모달 - 새 캐릭터 */}
       {showCropper && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 200, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
-          <div style={{ position: 'relative', width: 300, height: 300 }}>
-            <Cropper image={cropSrc} crop={crop} zoom={zoom} aspect={1} cropShape="rect" onCropChange={setCrop} onZoomChange={setZoom} onCropComplete={(_, p) => setCroppedAreaPixels(p)} />
-          </div>
-          <input type="range" min={1} max={3} step={0.1} value={zoom} onChange={e => setZoom(Number(e.target.value))} style={{ width: 200 }} />
-          {cropFile?.type === 'image/gif' && <div style={{ maxWidth: 300, color: t.subText, fontSize: 10, lineHeight: 1.5, textAlign: 'center' }}>선택 영역을 원본 해상도로 자르고 GIF 움직임을 유지해요. 잘라낸 파일도 5MB 이하여야 해요.</div>}
-          {cropError && <div role="alert" style={{ maxWidth: 300, color: '#fca5a5', fontSize: 11, textAlign: 'center' }}>{cropError}</div>}
-          <div style={{ display: 'flex', gap: 10 }}>
-            <button onClick={confirmCrop} disabled={cropProcessing} style={{ background: t.point, border: 'none', borderRadius: 8, padding: '8px 20px', color: '#fff', cursor: cropProcessing ? 'wait' : 'pointer', opacity: cropProcessing ? 0.65 : 1 }}>
-              {cropProcessing ? `${cropFile?.type === 'image/gif' ? 'GIF' : '사진'} 처리 중 ${cropProgress}%` : '확인'}
-            </button>
-            <button onClick={() => { if (!cropProcessing) { setShowCropper(false); setCropFile(null); setCropError('') } }} disabled={cropProcessing} style={{ background: 'none', border: `1px solid ${t.border}`, borderRadius: 8, padding: '8px 20px', color: t.subText, cursor: cropProcessing ? 'default' : 'pointer', opacity: cropProcessing ? 0.5 : 1 }}>
-              취소
-            </button>
+        <div className="character-crop-backdrop character-crop-backdrop--list">
+          <div className="character-crop-panel">
+            <div className="character-crop-media character-crop-media--list">
+              <Cropper image={cropSrc} crop={crop} zoom={zoom} aspect={1} cropShape="rect" onCropChange={setCrop} onZoomChange={setZoom} onCropComplete={(_, p) => setCroppedAreaPixels(p)} />
+            </div>
+            <input type="range" min={1} max={3} step={0.1} value={zoom} onChange={e => setZoom(Number(e.target.value))} className="character-crop-range character-crop-range--list" />
+            {cropFile?.type === 'image/gif' && <div className="character-crop-copy">선택 영역을 원본 해상도로 자르고 GIF 움직임을 유지해요. 잘라낸 파일도 5MB 이하여야 해요.</div>}
+            {cropError && <div role="alert" className="character-crop-error">{cropError}</div>}
+            <div className="character-actions">
+              <Button onClick={confirmCrop} disabled={cropProcessing} className="character-crop-confirm">
+                {cropProcessing ? `${cropFile?.type === 'image/gif' ? 'GIF' : '사진'} 처리 중 ${cropProgress}%` : '확인'}
+              </Button>
+              <Button variant="secondary" onClick={() => { if (!cropProcessing) { setShowCropper(false); setCropFile(null); setCropError('') } }} disabled={cropProcessing}>
+                취소
+              </Button>
+            </div>
           </div>
         </div>
       )}
 
       {/* 크롭 모달 - 편집 */}
       {editShowCropper && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 200, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
-          <div style={{ position: 'relative', width: 300, height: 300 }}>
-            <Cropper image={editCropSrc} crop={editCrop} zoom={editZoom} aspect={1} cropShape="rect" onCropChange={setEditCrop} onZoomChange={setEditZoom} onCropComplete={(_, p) => setEditCroppedAreaPixels(p)} />
-          </div>
-          <input type="range" min={1} max={3} step={0.1} value={editZoom} onChange={e => setEditZoom(Number(e.target.value))} style={{ width: 200 }} />
-          {editCropFile?.type === 'image/gif' && <div style={{ maxWidth: 300, color: t.subText, fontSize: 10, lineHeight: 1.5, textAlign: 'center' }}>선택 영역을 원본 해상도로 자르고 GIF 움직임을 유지해요. 잘라낸 파일도 5MB 이하여야 해요.</div>}
-          {editCropError && <div role="alert" style={{ maxWidth: 300, color: '#fca5a5', fontSize: 11, textAlign: 'center' }}>{editCropError}</div>}
-          <div style={{ display: 'flex', gap: 10 }}>
-            <button onClick={confirmEditCrop} disabled={editCropProcessing} style={{ background: t.point, border: 'none', borderRadius: 8, padding: '8px 20px', color: '#fff', cursor: editCropProcessing ? 'wait' : 'pointer', opacity: editCropProcessing ? 0.65 : 1 }}>
-              {editCropProcessing ? `${editCropFile?.type === 'image/gif' ? 'GIF' : '사진'} 처리 중 ${editCropProgress}%` : '확인'}
-            </button>
-            <button onClick={() => { if (!editCropProcessing) { setEditShowCropper(false); setEditCropFile(null); setEditCropError('') } }} disabled={editCropProcessing} style={{ background: 'none', border: `1px solid ${t.border}`, borderRadius: 8, padding: '8px 20px', color: t.subText, cursor: editCropProcessing ? 'default' : 'pointer', opacity: editCropProcessing ? 0.5 : 1 }}>
-              취소
-            </button>
+        <div className="character-crop-backdrop character-crop-backdrop--list">
+          <div className="character-crop-panel">
+            <div className="character-crop-media character-crop-media--list">
+              <Cropper image={editCropSrc} crop={editCrop} zoom={editZoom} aspect={1} cropShape="rect" onCropChange={setEditCrop} onZoomChange={setEditZoom} onCropComplete={(_, p) => setEditCroppedAreaPixels(p)} />
+            </div>
+            <input type="range" min={1} max={3} step={0.1} value={editZoom} onChange={e => setEditZoom(Number(e.target.value))} className="character-crop-range character-crop-range--list" />
+            {editCropFile?.type === 'image/gif' && <div className="character-crop-copy">선택 영역을 원본 해상도로 자르고 GIF 움직임을 유지해요. 잘라낸 파일도 5MB 이하여야 해요.</div>}
+            {editCropError && <div role="alert" className="character-crop-error">{editCropError}</div>}
+            <div className="character-actions">
+              <Button onClick={confirmEditCrop} disabled={editCropProcessing} className="character-crop-confirm">
+                {editCropProcessing ? `${editCropFile?.type === 'image/gif' ? 'GIF' : '사진'} 처리 중 ${editCropProgress}%` : '확인'}
+              </Button>
+              <Button variant="secondary" onClick={() => { if (!editCropProcessing) { setEditShowCropper(false); setEditCropFile(null); setEditCropError('') } }} disabled={editCropProcessing}>
+                취소
+              </Button>
+            </div>
           </div>
         </div>
       )}
-      <div className="modern-surface-page characters-page" style={{ minHeight: '100vh', background: t.bg, padding: 16 }}>
-        <div className="modern-page-shell" style={{ maxWidth: 400, margin: '0 auto' }}>
-          <div style={{ display: 'flex', alignItems: 'center', marginBottom: 20, paddingTop: 8 }}>
-            <button onClick={() => navigate(-1)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 4px', marginRight: 8, display: 'flex', alignItems: 'center' }}>
-              <ChevronLeft size={22} color={t.subText} />
-            </button>
-            <div style={{ fontSize: 16, color: t.theirText, fontWeight: 500, flex: 1 }}>내 캐릭터</div>
-            <button
+      <div className="characters-page">
+        <div className="character-shell">
+          <div className="character-header">
+            <IconButton label="뒤로" onClick={() => navigate(-1)} className="character-back">
+              <ChevronLeft size={22} />
+            </IconButton>
+            <div className="character-title character-grow">내 캐릭터</div>
+            <Button variant="secondary" size="sm"
               onClick={() => {
                 setShowArchive(!showArchive)
                 fetchArchived()
-              }}
-              style={{
-                background: 'none',
-                border: `0.5px solid ${t.border}`,
-                borderRadius: 8,
-                padding: '6px 14px',
-                color: t.subText,
-                fontSize: 12,
-                cursor: 'pointer',
               }}>
               보관함
-            </button>
-            <button
-              onClick={() => setShowAdd(true)}
-              style={{
-                marginLeft: 8,
-                background: t.point,
-                border: 'none',
-                borderRadius: 8,
-                padding: '6px 14px',
-                color: '#fff',
-                fontSize: 12,
-                cursor: 'pointer',
-              }}>
+            </Button>
+            <Button size="sm" onClick={() => setShowAdd(true)}>
               + 추가
-            </button>
+            </Button>
           </div>
 
           {showAdd && (
-            <div className="character-editor-panel" style={{ background: t.panel, borderRadius: 14, padding: 16, marginBottom: 14, border: `0.5px solid ${t.border}` }}>
-              <div style={{ fontSize: 13, color: t.subText, marginBottom: 10 }}>새 캐릭터</div>
-              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
-                <label style={{ cursor: 'pointer' }}>
-                  <div className="squircle-media" style={{ width: 86, height: 86, background: imagePreview ? 'transparent' : t.bg, border: `0.5px dashed ${t.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>{imagePreview ? <img src={imagePreview} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 24, color: t.border }}>+</span>}</div>
-                  <div style={{ fontSize: 10, color: t.subText, textAlign: 'center', marginTop: 4 }}>프로필 이미지</div>
-                  <input type="file" accept="image/*" onChange={handleImageChange} style={{ display: 'none' }} />
+            <Card className="character-editor-panel">
+              <div className="character-editor-label">새 캐릭터</div>
+              <div className="character-photo-field">
+                <label className="character-photo-label">
+                  <div className="squircle-media character-photo-placeholder">{imagePreview ? <img src={imagePreview} className="character-media" /> : <span className="character-photo-plus">+</span>}</div>
+                  <div className="character-photo-caption">프로필 이미지</div>
+                  <input type="file" accept="image/*" onChange={handleImageChange} />
                 </label>
               </div>
-              <input value={name} onChange={e => setName(e.target.value)} placeholder="캐릭터 이름 *" style={{ width: '100%', background: t.bg, border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '9px 12px', color: t.inputText, fontSize: 13, outline: 'none', boxSizing: 'border-box', marginBottom: 8 }} />
-              <textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="캐릭터 설명 (선택)" style={{ width: '100%', background: t.bg, border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '9px 12px', color: t.inputText, fontSize: 13, outline: 'none', boxSizing: 'border-box', resize: 'none', height: 70, marginBottom: 10 }} />
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button onClick={addChar} disabled={loading} style={{ flex: 1, background: t.point, border: 'none', borderRadius: 8, padding: 9, color: '#fff', fontSize: 12, cursor: 'pointer' }}>
+              <TextInput value={name} onChange={e => setName(e.target.value)} placeholder="캐릭터 이름 *" className="character-form-input" />
+              <TextArea value={description} onChange={e => setDescription(e.target.value)} placeholder="캐릭터 설명 (선택)" className="character-form-description" />
+              <div className="character-actions">
+                <Button onClick={addChar} disabled={loading} className="character-action-fill">
                   {loading ? '...' : '추가'}
-                </button>
-                <button
+                </Button>
+                <Button variant="secondary"
                   onClick={() => {
                     setShowAdd(false)
                     setImagePreview(null)
                     setImageFile(null)
-                  setCropFile(null)
+                    setCropFile(null)
                   }}
-                  style={{ flex: 1, background: 'none', border: `0.5px solid ${t.border}`, borderRadius: 8, padding: 9, color: t.subText, fontSize: 12, cursor: 'pointer' }}>
+                  className="character-action-fill">
                   취소
-                </button>
+                </Button>
               </div>
-            </div>
+            </Card>
           )}
 
-          <div style={{ position: 'relative', marginBottom: 12 }}>
-            <Search size={16} color={t.subText} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
-            <input
+          <div className="character-search">
+            <Search size={16} className="character-search-icon" aria-hidden="true" />
+            <TextInput
               value={searchQuery}
               onChange={event => setSearchQuery(event.target.value)}
               placeholder="캐릭터 이름 검색"
               aria-label="캐릭터 이름 검색"
-              style={{ width: '100%', boxSizing: 'border-box', background: t.panel, border: `0.5px solid ${t.border}`, borderRadius: 10, padding: '10px 36px', color: t.inputText, fontSize: 13, outline: 'none' }}
-            />
+              className="character-search-input character-search-input--clearable" />
             {searchQuery && (
-              <button onClick={() => setSearchQuery('')} aria-label="검색어 지우기" style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', display: 'flex', padding: 4, border: 0, background: 'none', cursor: 'pointer' }}>
-                <X size={14} color={t.subText} />
-              </button>
+              <IconButton onClick={() => setSearchQuery('')} label="검색어 지우기" className="character-search-clear">
+                <X size={14} />
+              </IconButton>
             )}
           </div>
 
-          <button
+          <Button variant="secondary" size="sm"
             onClick={() => setAlphabeticalView(current => !current)}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '0 0 12px auto', background: alphabeticalView ? `${t.point}22` : 'none', border: `1px solid ${alphabeticalView ? t.point : t.border}`, borderRadius: 8, padding: '6px 9px', color: alphabeticalView ? t.point : t.subText, fontSize: 11, cursor: 'pointer' }}>
+            className={`character-sort${alphabeticalView ? ' is-active' : ''}`}>
             <ArrowDownAZ size={14} />
             가나다순 보기
-          </button>
+          </Button>
 
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleGlobalDragEnd}>
             <SortableContext items={visibleChars.map(character => character.id)} strategy={verticalListSortingStrategy}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {chars.length === 0 && !showAdd && <div style={{ textAlign: 'center', color: t.subText, fontSize: 13, marginTop: 40, opacity: 0.5 }}>캐릭터가 없어요</div>}
-                {chars.length > 0 && filteredChars.length === 0 && <div style={{ textAlign: 'center', color: t.subText, fontSize: 13, marginTop: 28, opacity: 0.65 }}>검색 결과가 없습니다.</div>}
+              <div className="character-list">
+                {chars.length === 0 && !showAdd && <div className="character-empty character-empty--initial">캐릭터가 없어요</div>}
+                {chars.length > 0 && filteredChars.length === 0 && <div className="character-empty character-empty--search">검색 결과가 없습니다.</div>}
                 {visibleChars.map(c => (
               <SortableCard key={c.id} id={c.id} disabled={alphabeticalView}>
-                {({ listeners }) => <div className="character-list-item" style={{ background: t.panel, borderRadius: 12, padding: '13px 15px', border: `0.5px solid ${t.border}` }}>
+                {({ listeners }) => <Card className="character-list-item">
                 {editingChar === c.id ? (
-                  <div style={{ transformOrigin: 'top', animation: 'character-card-expand 240ms cubic-bezier(0.2, 0.8, 0.2, 1)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
-                      <label style={{ cursor: 'pointer' }}>
-                        <div className="squircle-media" style={{ width: 86, height: 86, background: editImagePreview ? 'transparent' : t.bg, border: `0.5px dashed ${t.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>{editImagePreview ? <img src={editImagePreview} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 24, color: t.border }}>+</span>}</div>
-                        <div style={{ fontSize: 10, color: t.subText, textAlign: 'center', marginTop: 4 }}>프로필 이미지</div>
-                        <input type="file" accept="image/*" onChange={handleEditImageChange} style={{ display: 'none' }} />
+                  <div className="character-expand">
+                    <div className="character-photo-field">
+                      <label className="character-photo-label">
+                        <div className="squircle-media character-photo-placeholder">{editImagePreview ? <img src={editImagePreview} className="character-media" /> : <span className="character-photo-plus">+</span>}</div>
+                        <div className="character-photo-caption">프로필 이미지</div>
+                        <input type="file" accept="image/*" onChange={handleEditImageChange} />
                       </label>
                     </div>
-                    <input value={editName} onChange={e => setEditName(e.target.value)} placeholder="캐릭터 이름 *" style={{ width: '100%', background: t.bg, border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '9px 12px', color: t.inputText, fontSize: 13, outline: 'none', boxSizing: 'border-box', marginBottom: 8 }} />
-                    <textarea value={editDescription} onChange={e => setEditDescription(e.target.value)} placeholder="캐릭터 설명 (선택)" style={{ width: '100%', background: t.bg, border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '9px 12px', color: t.inputText, fontSize: 13, outline: 'none', boxSizing: 'border-box', resize: 'none', height: 70, marginBottom: 10 }} />
-                    <div style={{ marginBottom: 12, padding: 11, borderRadius: 10, background: t.bg, border: `0.5px solid ${t.border}` }}>
-                      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 9 }}>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ color: t.theirText, fontSize: 12 }}>입력 중 말하기 애니메이션</div>
-                          <div style={{ marginTop: 2, color: t.subText, fontSize: 10 }}>입 모양이 다른 이미지를 2~4장 등록해 주세요.</div>
+                    <TextInput value={editName} onChange={e => setEditName(e.target.value)} placeholder="캐릭터 이름 *" className="character-form-input" />
+                    <TextArea value={editDescription} onChange={e => setEditDescription(e.target.value)} placeholder="캐릭터 설명 (선택)" className="character-form-description" />
+                    <Card className="character-frames-panel">
+                      <div className="character-frames-heading">
+                        <div className="character-grow">
+                          <div className="character-frames-title">입력 중 말하기 애니메이션</div>
+                          <div className="character-frames-copy">입 모양이 다른 이미지를 2~4장 등록해 주세요.</div>
                         </div>
-                        <button type="button" onClick={() => { setTalkingPreviewPlaying(current => !current); setTalkingPreviewIndex(0) }} disabled={talkingFrames.length === 0} aria-label={talkingPreviewPlaying ? '미리보기 정지' : '미리보기 재생'} style={{ width: 32, height: 32, display: 'grid', placeItems: 'center', border: `0.5px solid ${t.border}`, borderRadius: 9, background: 'none', color: t.subText, opacity: talkingFrames.length === 0 ? 0.35 : 1 }}>
+                        <IconButton type="button" onClick={() => { setTalkingPreviewPlaying(current => !current); setTalkingPreviewIndex(0) }} disabled={talkingFrames.length === 0} label={talkingPreviewPlaying ? '미리보기 정지' : '미리보기 재생'} className="character-frames-play">
                           {talkingPreviewPlaying ? <Pause size={14} /> : <Play size={14} />}
-                        </button>
+                        </IconButton>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 9 }}>
-                        <div className="squircle-media" style={{ width: 62, height: 62, flexShrink: 0, overflow: 'hidden', background: t.panel, border: `0.5px solid ${t.border}` }}>
-                          <img src={talkingPreviewIndex === 0 ? editImagePreview || DEFAULT_AVATAR : talkingFrames[talkingPreviewIndex - 1]?.image_url || editImagePreview || DEFAULT_AVATAR} alt="말하기 애니메이션 미리보기" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      <div className="character-frames-preview">
+                        <div className="squircle-media character-frames-avatar">
+                          <img src={talkingPreviewIndex === 0 ? editImagePreview || DEFAULT_AVATAR : talkingFrames[talkingPreviewIndex - 1]?.image_url || editImagePreview || DEFAULT_AVATAR} alt="말하기 애니메이션 미리보기" className="character-media" />
                         </div>
-                        <div style={{ flex: 1, color: t.subText, fontSize: 10, lineHeight: 1.5 }}>기본 프로필과 등록된 프레임을 번갈아 재생합니다. 얼굴 위치와 이미지 크기를 동일하게 맞추면 자연스러워요.</div>
+                        <div className="character-frames-copy">기본 프로필과 등록된 프레임을 번갈아 재생합니다. 얼굴 위치와 이미지 크기를 동일하게 맞추면 자연스러워요.</div>
                       </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 6 }}>
+                      <div className="character-frames-grid">
                         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={reorderTalkingFrames}>
                           <SortableContext items={talkingFrames.map(frame => frame.id)} strategy={rectSortingStrategy}>
                             {talkingFrames.map((frame, index) => (
                               <SortableFrame key={frame.id} frame={frame}>
-                                <div style={{ width: '100%', height: '100%', overflow: 'hidden', borderRadius: 8, background: t.panel, cursor: 'grab' }}>
-                                  <img src={frame.image_url} alt={`말하기 프레임 ${index + 1}`} draggable={false} style={{ width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' }} />
-                                  <button type="button" onPointerDown={event => event.stopPropagation()} onClick={() => deleteTalkingFrame(frame)} aria-label={`말하기 프레임 ${index + 1} 삭제`} style={{ position: 'absolute', top: 3, right: 3, width: 22, height: 22, display: 'grid', placeItems: 'center', padding: 0, border: 0, borderRadius: '50%', background: 'rgba(0,0,0,0.62)', color: '#fff' }}><Trash2 size={11} /></button>
+                                <div className="character-frame-media character-frame-media--drag">
+                                  <img src={frame.image_url} alt={`말하기 프레임 ${index + 1}`} draggable={false} className="character-media character-media--drag" />
+                                  <IconButton type="button" onPointerDown={event => event.stopPropagation()} onClick={() => deleteTalkingFrame(frame)} label={`말하기 프레임 ${index + 1} 삭제`} className="character-frame-delete"><Trash2 size={11} /></IconButton>
                                 </div>
                               </SortableFrame>
                             ))}
                           </SortableContext>
                         </DndContext>
                         {talkingFrames.length < 4 && (
-                          <label style={{ aspectRatio: '1 / 1', display: 'grid', placeItems: 'center', borderRadius: 8, border: `0.5px dashed ${t.border}`, color: t.subText, cursor: talkingFramesLoading ? 'wait' : 'pointer', opacity: talkingFramesLoading ? 0.5 : 1 }}>
-                            <span style={{ fontSize: 20 }}>+</span>
-                            <input type="file" accept="image/*" multiple disabled={talkingFramesLoading} onChange={event => { uploadTalkingFrames(c, event.target.files); event.target.value = '' }} style={{ display: 'none' }} />
+                          <label className="character-frame-add">
+                            <span className="character-frame-plus">+</span>
+                            <input type="file" accept="image/*" multiple disabled={talkingFramesLoading} onChange={event => { uploadTalkingFrames(c, event.target.files); event.target.value = '' }} />
                           </label>
                         )}
                       </div>
-                    </div>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <button onClick={() => saveEdit(c)} disabled={loading} style={{ flex: 1, background: t.point, border: 'none', borderRadius: 8, padding: 9, color: '#fff', fontSize: 12, cursor: 'pointer' }}>
+                    </Card>
+                    <div className="character-actions">
+                      <Button onClick={() => saveEdit(c)} disabled={loading} className="character-action-fill">
                         {loading ? '...' : '저장'}
-                      </button>
-                      <button onClick={() => setEditingChar(null)} style={{ flex: 1, background: 'none', border: `0.5px solid ${t.border}`, borderRadius: 8, padding: 9, color: t.subText, fontSize: 12, cursor: 'pointer' }}>
+                      </Button>
+                      <Button variant="secondary" onClick={() => setEditingChar(null)} className="character-action-fill">
                         취소
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 ) : (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <button {...listeners} disabled={alphabeticalView} aria-label={`${c.name} 순서 이동`} style={{ display: 'flex', background: 'none', border: 0, padding: 1, cursor: alphabeticalView ? 'default' : 'grab', touchAction: 'none', opacity: alphabeticalView ? 0.25 : 0.65 }}>
-                      <GripVertical size={17} color={t.subText} />
-                    </button>
-                    <div className="squircle-media" role="button" tabIndex={0} aria-label={`${c.name} 프로필 사진 크게 보기`} onClick={() => setProfilePreview({ url: c.image_url || DEFAULT_AVATAR, name: c.name })} onKeyDown={event => (event.key === 'Enter' || event.key === ' ') && setProfilePreview({ url: c.image_url || DEFAULT_AVATAR, name: c.name })} style={{ width: 53, height: 53, background: c.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 500, color: c.text_color, flexShrink: 0, overflow: 'hidden', cursor: 'zoom-in' }}><img src={c.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>
-                    <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => navigate(`/characters/${c.id}/edit`)}>
-                      <div style={{ fontSize: 14, fontWeight: 500, color: t.theirText }}>{c.name}</div>
-                      {c.description && <div style={{ fontSize: 11, color: t.subText, marginTop: 2 }}>{c.description}</div>}
+                  <div className="character-row">
+                    <IconButton {...listeners} disabled={alphabeticalView} label={`${c.name} 순서 이동`} className="character-drag">
+                      <GripVertical size={17} />
+                    </IconButton>
+                    <div role="button" tabIndex={0} aria-label={`${c.name} 프로필 사진 크게 보기`} onClick={() => setProfilePreview({ url: c.image_url || DEFAULT_AVATAR, name: c.name })} onKeyDown={event => (event.key === 'Enter' || event.key === ' ') && setProfilePreview({ url: c.image_url || DEFAULT_AVATAR, name: c.name })} className="squircle-media character-avatar character-avatar--active" style={{ background: c.color, color: c.text_color }}><img src={c.image_url || DEFAULT_AVATAR} alt="" className="character-media" /></div>
+                    <div className="character-edit-link" onClick={() => navigate(`/characters/${c.id}/edit`)}>
+                      <div className="character-name">{c.name}</div>
+                      {c.description && <div className="character-description">{c.description}</div>}
                     </div>
-                    <button onClick={() => navigate(`/characters/${c.id}/text-effects`)} aria-label={`${c.name} 대사 연출 설정`} style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, padding: '6px 8px', border: `1px solid ${t.border}`, borderRadius: 8, background: `${t.point}18`, color: t.theirText, fontSize: 10, cursor: 'pointer' }}>
-                      <Sparkles size={13} color={t.point} /> 연출
-                    </button>
-                    <button onClick={() => deleteChar(c.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, opacity: 0.4, display: 'flex', alignItems: 'center' }}>
-                      <X size={16} color={t.subText} />
-                    </button>
+                    <Button variant="secondary" size="sm" onClick={() => navigate(`/characters/${c.id}/text-effects`)} aria-label={`${c.name} 대사 연출 설정`} className="character-effects">
+                      <Sparkles size={13} className="character-accent-icon" /> 연출
+                    </Button>
+                    <IconButton label={`${c.name} 삭제`} onClick={() => deleteChar(c.id)} className="character-delete">
+                      <X size={16} />
+                    </IconButton>
                   </div>
                 )}
-                </div>}
+                </Card>}
               </SortableCard>
                 ))}
               </div>
@@ -773,21 +753,21 @@ export default function Characters() {
           </DndContext>
 
           {showArchive && (
-            <div style={{ marginTop: 16 }}>
-              <div style={{ fontSize: 12, color: t.subText, marginBottom: 8 }}>보관된 캐릭터</div>
-              {archivedChars.length === 0 && <div style={{ textAlign: 'center', color: t.subText, fontSize: 12, opacity: 0.5 }}>보관된 캐릭터가 없어요</div>}
+            <div className="character-archive">
+              <div className="character-section-label">보관된 캐릭터</div>
+              {archivedChars.length === 0 && <div className="character-empty character-empty--archive">보관된 캐릭터가 없어요</div>}
               {archivedChars.map(c => (
-                <div key={c.id} style={{ background: t.bg, borderRadius: 12, padding: '12px 15px', display: 'flex', alignItems: 'center', gap: 12, border: `0.5px solid ${t.border}`, marginBottom: 8, opacity: 0.6 }}>
-                  <div className="squircle-media" role="button" tabIndex={0} aria-label={`${c.name} 프로필 사진 크게 보기`} onClick={() => setProfilePreview({ url: c.image_url || DEFAULT_AVATAR, name: c.name })} onKeyDown={event => (event.key === 'Enter' || event.key === ' ') && setProfilePreview({ url: c.image_url || DEFAULT_AVATAR, name: c.name })} style={{ width: 48, height: 48, background: c.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 500, color: c.text_color, flexShrink: 0, overflow: 'hidden', cursor: 'zoom-in' }}><img src={c.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, fontWeight: 500, color: t.theirText }}>{c.name}</div>
-                    {c.description && <div style={{ fontSize: 11, color: t.subText, marginTop: 2 }}>{c.description}</div>}
+                <Card key={c.id} className="character-list-item character-row character-archived">
+                  <div role="button" tabIndex={0} aria-label={`${c.name} 프로필 사진 크게 보기`} onClick={() => setProfilePreview({ url: c.image_url || DEFAULT_AVATAR, name: c.name })} onKeyDown={event => (event.key === 'Enter' || event.key === ' ') && setProfilePreview({ url: c.image_url || DEFAULT_AVATAR, name: c.name })} className="squircle-media character-avatar character-avatar--archived" style={{ background: c.color, color: c.text_color }}><img src={c.image_url || DEFAULT_AVATAR} alt="" className="character-media" /></div>
+                  <div className="character-grow">
+                    <div className="character-name character-name--archived">{c.name}</div>
+                    {c.description && <div className="character-description">{c.description}</div>}
                   </div>
-                  <button onClick={() => restoreChar(c.id)} style={{ background: 'none', border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '5px 8px', color: t.subText, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <RotateCcw size={12} color={t.subText} />
-                    <span style={{ fontSize: 11 }}>복원</span>
-                  </button>
-                </div>
+                  <Button variant="secondary" size="sm" onClick={() => restoreChar(c.id)} className="character-restore">
+                    <RotateCcw size={12} />
+                    복원
+                  </Button>
+                </Card>
               ))}
             </div>
           )}

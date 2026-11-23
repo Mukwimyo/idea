@@ -3,8 +3,10 @@ import { ChevronLeft, ImagePlus, Sparkles, Trash2 } from 'lucide-react'
 import Cropper from 'react-easy-crop'
 import { useNavigate, useParams } from 'react-router-dom'
 import LoadingScreen from '../components/LoadingScreen'
+import { Button, IconButton, TextArea, TextInput } from '../components/ui'
 import { supabase, uploadFile, validateImageFile } from '../lib/supabase'
 import { DEFAULT_THEME_ID, getTheme } from '../lib/themes'
+import { useThemeVars } from '../lib/themeVars'
 import { cropProfileImage } from '../lib/profileImageCrop'
 
 const DEFAULT_AVATAR = `${import.meta.env.BASE_URL}default-avatar.png`
@@ -63,8 +65,9 @@ export default function CharacterEdit() {
     return () => { active = false }
   }, [characterId])
 
+  useThemeVars(theme)
+
   if (!theme || (!character && !notice)) return <LoadingScreen />
-  const t = theme
 
   const chooseImage = event => {
     const file = event.target.files?.[0]
@@ -165,52 +168,74 @@ export default function CharacterEdit() {
   }
 
   return (
-    <div className="modern-surface-page character-edit-page" style={{ minHeight: '100dvh', background: t.bg, color: t.theirText }}>
-      <header className="modern-page-header" style={{ position: 'sticky', top: 0, zIndex: 5, display: 'flex', alignItems: 'center', gap: 10, padding: '14px 16px', background: `${t.bg}ee`, borderBottom: `1px solid ${t.border}`, backdropFilter: 'blur(12px)' }}>
-        <button onClick={() => navigate(-1)} aria-label="뒤로" style={{ width: 36, height: 36, display: 'grid', placeItems: 'center', border: 0, background: 'none', color: t.theirText }}><ChevronLeft size={22} /></button>
-        <div style={{ flex: 1, fontSize: 16, fontWeight: 650 }}>프로필 수정</div>
-        <button onClick={save} disabled={saving || !character} style={{ border: 0, background: 'none', color: t.point, fontSize: 13, fontWeight: 700, cursor: 'pointer', opacity: saving ? 0.5 : 1 }}>{saving ? '저장 중…' : '저장'}</button>
+    <div className="character-edit-page">
+      <header className="character-edit-header">
+        <IconButton onClick={() => navigate(-1)} label="뒤로" className="character-edit-back"><ChevronLeft size={22} /></IconButton>
+        <div className="character-title character-grow">프로필 수정</div>
+        <Button variant="ghost" onClick={save} disabled={saving || !character} className="character-edit-save">{saving ? '저장 중…' : '저장'}</Button>
       </header>
 
-      <main className="modern-page-shell" style={{ maxWidth: 480, margin: '0 auto', padding: '24px 18px 40px' }}>
+      <main className="character-edit-shell">
         {character && <>
-          <label style={{ display: 'grid', justifyItems: 'center', gap: 8, marginBottom: 24, cursor: 'pointer' }}>
-            <img className="squircle-media" src={imagePreview || DEFAULT_AVATAR} alt="" style={{ width: 104, height: 104, objectFit: 'cover' }} />
-            <span style={{ display: 'flex', alignItems: 'center', gap: 5, color: t.point, fontSize: 11 }}><ImagePlus size={14} /> 사진 변경</span>
-            <input type="file" accept="image/*" onChange={chooseImage} style={{ display: 'none' }} />
+          <label className="character-edit-photo">
+            <img src={imagePreview || DEFAULT_AVATAR} alt="" className="squircle-media character-edit-photo-image" />
+            <span className="character-edit-photo-caption"><ImagePlus size={14} /> 사진 변경</span>
+            <input type="file" accept="image/*" onChange={chooseImage} />
           </label>
 
-          <label style={{ display: 'grid', gap: 7, marginBottom: 14 }}><span style={{ color: t.subText, fontSize: 11 }}>이름</span><input value={name} onChange={event => setName(event.target.value)} style={{ minHeight: 48, padding: '10px 12px', border: `1px solid ${t.border}`, borderRadius: 12, background: t.panel, color: t.inputText, fontSize: 14 }} /></label>
-          <label style={{ display: 'grid', gap: 7, marginBottom: 24 }}><span style={{ color: t.subText, fontSize: 11 }}>설명</span><textarea value={description} onChange={event => setDescription(event.target.value)} rows={4} style={{ padding: 12, border: `1px solid ${t.border}`, borderRadius: 12, background: t.panel, color: t.inputText, fontSize: 13, resize: 'vertical' }} /></label>
+          <label className="character-edit-field">
+            <span className="character-field-label">이름</span>
+            <TextInput value={name} onChange={event => setName(event.target.value)} />
+          </label>
+          <label className="character-edit-field character-edit-field--description">
+            <span className="character-field-label">설명</span>
+            <TextArea value={description} onChange={event => setDescription(event.target.value)} rows={4} className="character-edit-description" />
+          </label>
 
-          <button onClick={() => navigate(`/characters/${characterId}/text-effects`)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '15px 0', border: 0, borderTop: `1px solid ${t.border}`, borderBottom: `1px solid ${t.border}`, background: 'none', color: t.theirText, textAlign: 'left', cursor: 'pointer' }}><Sparkles size={17} color={t.point} /><span style={{ flex: 1 }}>채팅 등장 효과</span><span style={{ color: t.subText, fontSize: 11 }}>설정</span></button>
+          <Button variant="ghost" onClick={() => navigate(`/characters/${characterId}/text-effects`)} className="character-edit-effects">
+            <Sparkles size={17} className="character-accent-icon" />
+            <span className="character-grow">채팅 등장 효과</span>
+            <span className="character-field-label">설정</span>
+          </Button>
 
-          <section style={{ paddingTop: 24 }}>
-            <div style={{ fontSize: 13, fontWeight: 650 }}>입력 중 말하기 애니메이션</div>
-            <div style={{ marginTop: 4, color: t.subText, fontSize: 10 }}>입 모양이 다른 이미지를 최대 4장 등록할 수 있어요.</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 8, marginTop: 14 }}>
-              {frames.map((frame, index) => <div key={frame.id} style={{ position: 'relative', aspectRatio: '1 / 1' }}><img src={frame.image_url} alt={`말하기 프레임 ${index + 1}`} style={{ width: '100%', height: '100%', borderRadius: 10, objectFit: 'cover' }} /><button onClick={() => removeFrame(frame)} aria-label={`말하기 프레임 ${index + 1} 삭제`} style={{ position: 'absolute', top: 3, right: 3, width: 23, height: 23, display: 'grid', placeItems: 'center', padding: 0, border: 0, borderRadius: '50%', background: 'rgba(0,0,0,.65)', color: '#fff' }}><Trash2 size={11} /></button></div>)}
-              {frames.length < 4 && <label style={{ aspectRatio: '1 / 1', display: 'grid', placeItems: 'center', border: `1px dashed ${t.border}`, borderRadius: 10, color: t.subText, cursor: frameLoading ? 'wait' : 'pointer', opacity: frameLoading ? 0.5 : 1 }}><span style={{ fontSize: 22 }}>+</span><input type="file" accept="image/*" multiple disabled={frameLoading} onChange={addFrames} style={{ display: 'none' }} /></label>}
+          <section className="character-edit-frames">
+            <div className="character-frames-title">입력 중 말하기 애니메이션</div>
+            <div className="character-frames-copy">입 모양이 다른 이미지를 최대 4장 등록할 수 있어요.</div>
+            <div className="character-frames-grid character-frames-grid--edit">
+              {frames.map((frame, index) => (
+                <div key={frame.id} className="character-frame">
+                  <img src={frame.image_url} alt={`말하기 프레임 ${index + 1}`} className="character-media character-frame-media" />
+                  <IconButton onClick={() => removeFrame(frame)} label={`말하기 프레임 ${index + 1} 삭제`} className="character-frame-delete">
+                    <Trash2 size={11} />
+                  </IconButton>
+                </div>
+              ))}
+              {frames.length < 4 && (
+                <label className="character-frame-add">
+                  <span className="character-frame-plus">+</span>
+                  <input type="file" accept="image/*" multiple disabled={frameLoading} onChange={addFrames} />
+                </label>
+              )}
             </div>
           </section>
         </>}
-        {notice && <div role="status" style={{ marginTop: 18, color: notice.includes('못') ? '#f87171' : t.subText, fontSize: 11 }}>{notice}</div>}
+        {notice && <div role="status" className={`character-notice${notice.includes('못') ? ' is-error' : ''}`}>{notice}</div>}
       </main>
-      {showCropper && <div role="presentation" onMouseDown={event => { if (event.target === event.currentTarget && !cropProcessing) { setShowCropper(false); setCropFile(null) } }} style={{ position: 'fixed', inset: 0, zIndex: 30, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, padding: 20, background: 'rgba(0,0,0,.82)' }}>
-        <section role="dialog" aria-modal="true" aria-labelledby="profile-crop-title" style={{ display: 'grid', justifyItems: 'center', gap: 16, width: 'min(100%, 360px)', color: '#fff' }}>
-          <h2 id="profile-crop-title" style={{ margin: 0, fontSize: 15, fontWeight: 650 }}>프로필 사진 영역 선택</h2>
-          <div style={{ position: 'relative', width: 'min(78vw, 320px)', height: 'min(78vw, 320px)', overflow: 'hidden', borderRadius: 12, background: '#111' }}>
+      {showCropper && <div role="presentation" onMouseDown={event => { if (event.target === event.currentTarget && !cropProcessing) { setShowCropper(false); setCropFile(null) } }} className="character-crop-backdrop">
+        <section role="dialog" aria-modal="true" aria-labelledby="profile-crop-title" className="character-crop-panel">
+          <h2 id="profile-crop-title" className="character-crop-title">프로필 사진 영역 선택</h2>
+          <div className="character-crop-media">
             <Cropper image={cropSrc} crop={crop} zoom={zoom} aspect={1} cropShape="rect" onCropChange={setCrop} onZoomChange={setZoom} onCropComplete={(_, pixels) => setCroppedAreaPixels(pixels)} />
           </div>
-          <label style={{ display: 'grid', justifyItems: 'center', gap: 8, width: 'min(78vw, 320px)', color: '#ddd', fontSize: 11 }}>
+          <label className="character-crop-zoom">
             확대 조절
-            <input aria-label="사진 확대" type="range" min={1} max={3} step={0.1} value={zoom} onChange={event => setZoom(Number(event.target.value))} style={{ width: '100%', accentColor: t.point }} />
+            <input aria-label="사진 확대" type="range" min={1} max={3} step={0.1} value={zoom} onChange={event => setZoom(Number(event.target.value))} className="character-crop-range" />
           </label>
-          {cropFile?.type === 'image/gif' && <div style={{ maxWidth: 320, color: '#bbb', fontSize: 10, lineHeight: 1.5, textAlign: 'center' }}>선택 영역을 원본 해상도로 자르고 GIF 움직임을 유지해요. 잘라낸 파일도 5MB 이하여야 해요.</div>}
-          {cropError && <div role="alert" style={{ maxWidth: 320, color: '#fca5a5', fontSize: 11, textAlign: 'center' }}>{cropError}</div>}
-          <div style={{ display: 'flex', gap: 10 }}>
-            <button onClick={() => { if (!cropProcessing) { setShowCropper(false); setCropFile(null); setCropError('') } }} disabled={cropProcessing} style={{ border: '1px solid #ffffff66', borderRadius: 8, padding: '9px 18px', background: 'transparent', color: '#fff', opacity: cropProcessing ? 0.5 : 1 }}>취소</button>
-            <button onClick={confirmCrop} disabled={cropProcessing} style={{ border: 0, borderRadius: 8, padding: '9px 20px', background: t.point, color: '#fff', fontWeight: 650, opacity: cropProcessing ? 0.6 : 1 }}>{cropProcessing ? `${cropFile?.type === 'image/gif' ? 'GIF' : '사진'} 처리 중 ${cropProgress}%` : '적용'}</button>
+          {cropFile?.type === 'image/gif' && <div className="character-crop-copy">선택 영역을 원본 해상도로 자르고 GIF 움직임을 유지해요. 잘라낸 파일도 5MB 이하여야 해요.</div>}
+          {cropError && <div role="alert" className="character-crop-error">{cropError}</div>}
+          <div className="character-actions">
+            <Button variant="secondary" onClick={() => { if (!cropProcessing) { setShowCropper(false); setCropFile(null); setCropError('') } }} disabled={cropProcessing}>취소</Button>
+            <Button onClick={confirmCrop} disabled={cropProcessing} className="character-crop-confirm">{cropProcessing ? `${cropFile?.type === 'image/gif' ? 'GIF' : '사진'} 처리 중 ${cropProgress}%` : '적용'}</Button>
           </div>
         </section>
       </div>}

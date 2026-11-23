@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ChevronDown, ChevronUp, ListMusic, Music, Pause, Play, Plus, Repeat, Shuffle, SkipBack, SkipForward, Trash2, Volume2, X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { Button, Card, IconButton, TextInput } from './ui'
 
 function formatTime(seconds) {
   const safe = Number.isFinite(seconds) ? Math.max(0, Math.floor(seconds)) : 0
@@ -18,7 +19,7 @@ function playbackPosition(state, duration) {
   return duration > 0 ? Math.min(raw, duration) : raw
 }
 
-export default function SharedBackgroundAudio({ roomId, userId, theme, open, onClose }) {
+export default function SharedBackgroundAudio({ roomId, userId, open, onClose }) {
   const [shared, setShared] = useState(null)
   const [duration, setDuration] = useState(0)
   const [position, setPosition] = useState(0)
@@ -32,7 +33,6 @@ export default function SharedBackgroundAudio({ roomId, userId, theme, open, onC
   const [selectedTrackByPlaylist, setSelectedTrackByPlaylist] = useState({})
   const audioRef = useRef(null)
   const sharedRef = useRef(null)
-  const t = theme
 
   const loadLibrary = useCallback(async () => {
     const [{ data: trackRows, error: trackError }, { data: playlistRows, error: playlistError }] = await Promise.all([
@@ -164,35 +164,95 @@ export default function SharedBackgroundAudio({ roomId, userId, theme, open, onC
     await loadLibrary()
   }
 
-  return <>
-    <audio ref={audioRef} src={shared?.audio_url || undefined} loop={!shared?.playlist_id} preload="auto" onEnded={() => shared?.playlist_item_id && advance(1)} onLoadedMetadata={event => { setDuration(event.currentTarget.duration || 0); event.currentTarget.volume = volume }} onTimeUpdate={event => setPosition(event.currentTarget.currentTime)} />
-    {needsGesture && shared?.is_playing && !open && <button onClick={allowPlayback} style={{ position: 'fixed', left: '50%', bottom: 'calc(82px + env(safe-area-inset-bottom))', transform: 'translateX(-50%)', zIndex: 115, padding: '9px 13px', borderRadius: 18, border: `1px solid ${t.border}`, background: `${t.panel}ee`, color: t.theirText }}><Play size={14} fill="currentColor" /> 재생 허용</button>}
-    {open && <div onPointerDown={event => event.target === event.currentTarget && onClose()} style={{ position: 'fixed', inset: 0, zIndex: 125, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', background: 'rgba(0,0,0,0.28)' }}>
-      <section className="ui-slide-up" style={{ width: '100%', maxWidth: 480, maxHeight: '82vh', overflowY: 'auto', padding: '14px 16px calc(18px + env(safe-area-inset-bottom))', borderRadius: '22px 22px 0 0', border: `1px solid ${t.border}`, background: t.panel, boxShadow: '0 -18px 50px rgba(0,0,0,0.3)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}><Music size={18} color={t.point} /><strong style={{ flex: 1, color: t.theirText, fontSize: 14 }}>공유 배경음</strong><button onClick={onClose} style={{ width: 34, height: 34, border: 0, background: 'none', color: t.subText }}><X size={18} /></button></div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 5, marginTop: 8 }}>
-          {[['player', '재생', Music], ['playlists', '플레이리스트', ListMusic]].map(([id, label, Icon]) => <button key={id} onClick={() => setTab(id)} style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6, padding: 8, borderRadius: 9, border: `1px solid ${tab === id ? t.point : t.border}`, background: tab === id ? `${t.point}22` : t.bg, color: tab === id ? t.point : t.subText }}><Icon size={14} />{label}</button>)}
+  return (
+    <>
+      <audio ref={audioRef} src={shared?.audio_url || undefined} loop={!shared?.playlist_id} preload="auto" onEnded={() => shared?.playlist_item_id && advance(1)} onLoadedMetadata={event => { setDuration(event.currentTarget.duration || 0); event.currentTarget.volume = volume }} onTimeUpdate={event => setPosition(event.currentTarget.currentTime)} />
+      {needsGesture && shared?.is_playing && !open && (
+        <Button variant="secondary" className="shared-audio-allow" onClick={allowPlayback}><Play size={14} fill="currentColor" /> 재생 허용</Button>
+      )}
+      {open && (
+        <div onPointerDown={event => event.target === event.currentTarget && onClose()} className="room-sheet-backdrop shared-audio-backdrop">
+          <Card as="section" className="room-sheet shared-audio">
+            <div className="room-panel-header">
+              <Music size={18} />
+              <strong className="room-panel-title">공유 배경음</strong>
+              <IconButton type="button" label="닫기" className="room-panel-icon" onClick={onClose}><X size={18} /></IconButton>
+            </div>
+            <div className="room-panel-tabs shared-audio__tabs">
+              {[['player', '재생', Music], ['playlists', '플레이리스트', ListMusic]].map(([id, label, Icon]) => (
+                <Button key={id} variant="secondary" className="room-panel-tab" data-selected={tab === id} onClick={() => setTab(id)}>
+                  <Icon size={14} />{label}
+                </Button>
+              ))}
+            </div>
+            {tab === 'player' ? (
+              shared?.audio_url ? (
+                <div className="room-panel-stack shared-audio__player">
+                  <div className="shared-audio__track-title">{shared.title || '배경음'}</div>
+                  <div className="room-panel-row shared-audio__transport">
+                    <IconButton type="button" label="이전 곡" className="room-panel-icon" disabled={!shared.playlist_item_id} onClick={() => advance(-1)}><SkipBack size={16} fill="currentColor" /></IconButton>
+                    <IconButton type="button" label={shared.is_playing && !needsGesture ? '일시 정지' : '재생'} className="room-panel-icon shared-audio__play" onClick={needsGesture ? allowPlayback : togglePlayback}>
+                      {shared.is_playing && !needsGesture ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" />}
+                    </IconButton>
+                    <IconButton type="button" label="다음 곡" className="room-panel-icon" disabled={!shared.playlist_item_id} onClick={() => advance(1)}><SkipForward size={16} fill="currentColor" /></IconButton>
+                    <span className="room-panel-caption shared-audio__time">{formatTime(position)}</span>
+                    <input className="room-panel-range" type="range" min="0" max={duration || 1} step=".5" value={Math.min(position, duration || 1)} onChange={event => setPosition(Number(event.target.value))} onPointerUp={event => seek(event.currentTarget.value)} />
+                    <span className="room-panel-caption shared-audio__time">{formatTime(duration)}</span>
+                  </div>
+                  <div className="room-panel-row shared-audio__volume">
+                    <Volume2 size={15} />
+                    <input className="room-panel-range" type="range" min="0" max="1" step=".05" value={volume} onChange={event => setVolume(Number(event.target.value))} />
+                    <span className="room-panel-caption">{Math.round(volume * 100)}%</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="room-panel-empty shared-audio__empty">재생 중인 배경음이 없어요.</div>
+              )
+            ) : (
+              <div className="room-panel-stack shared-audio__library">
+                <div className="room-panel-row shared-audio__field">
+                  <TextInput value={newPlaylistName} onChange={event => setNewPlaylistName(event.target.value)} placeholder="새 플레이리스트 이름" />
+                  <IconButton type="button" label="플레이리스트 추가" className="room-panel-icon shared-audio__add" onClick={createPlaylist}><Plus size={16} /></IconButton>
+                </div>
+                {playlists.map(playlist => (
+                  <Card as="section" key={playlist.id} className="room-panel-stack shared-audio__playlist">
+                    <div className="room-panel-row shared-audio__playlist-header">
+                      <strong>{playlist.name}</strong>
+                      <IconButton type="button" label="셔플" className="room-panel-icon" active={playlist.shuffle_enabled} onClick={() => updatePlaylist(playlist.id, { shuffle_enabled: !playlist.shuffle_enabled })}><Shuffle size={14} /></IconButton>
+                      <IconButton type="button" label="반복" className="room-panel-icon" active={playlist.repeat_mode !== 'none'} onClick={() => updatePlaylist(playlist.id, { repeat_mode: playlist.repeat_mode === 'all' ? 'one' : playlist.repeat_mode === 'one' ? 'none' : 'all' })}>
+                        <Repeat size={14} /><span>{playlist.repeat_mode === 'one' ? '1' : ''}</span>
+                      </IconButton>
+                      <IconButton type="button" label="플레이리스트 삭제" className="room-panel-icon" onClick={() => deletePlaylist(playlist)}><Trash2 size={14} /></IconButton>
+                    </div>
+                    <div className="room-panel-stack shared-audio__items">
+                      {playlist.room_audio_playlist_items.map((item, index) => (
+                        <div key={item.id} className="room-panel-row shared-audio__item">
+                          <Button variant="ghost" className="shared-audio__item-title" data-current={shared?.playlist_item_id === item.id} onClick={() => playItem(item.id)}>
+                            <span>{item.background_audio_tracks?.title || '음원'}</span>
+                          </Button>
+                          <IconButton type="button" label="위로 이동" className="room-panel-icon" onClick={() => moveItem(playlist, index, -1)} disabled={index === 0}><ChevronUp size={13} /></IconButton>
+                          <IconButton type="button" label="아래로 이동" className="room-panel-icon" onClick={() => moveItem(playlist, index, 1)} disabled={index === playlist.room_audio_playlist_items.length - 1}><ChevronDown size={13} /></IconButton>
+                          <IconButton type="button" label="음원 삭제" className="room-panel-icon shared-audio__remove" onClick={() => removeItem(item.id)}><X size={13} /></IconButton>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="room-panel-row shared-audio__field">
+                      <select className="ui-input" value={selectedTrackByPlaylist[playlist.id] || ''} onChange={event => setSelectedTrackByPlaylist(current => ({ ...current, [playlist.id]: event.target.value }))}>
+                        <option value="">음원 선택</option>
+                        {tracks.map(track => <option key={track.id} value={track.id}>{track.title}</option>)}
+                      </select>
+                      <IconButton type="button" label="음원 추가" className="room-panel-icon shared-audio__add" onClick={() => addTrack(playlist)}><Plus size={14} /></IconButton>
+                    </div>
+                  </Card>
+                ))}
+                {playlists.length === 0 && <div className="room-panel-empty">플레이리스트를 만들어 음원을 추가해보세요.</div>}
+              </div>
+            )}
+            <div className="room-panel-caption shared-audio__notice">재생 상태는 방 전체에 공유되고, 음량은 내 기기에만 적용돼요.</div>
+            {error && <div className="room-panel-error shared-audio__notice">{error}</div>}
+          </Card>
         </div>
-        {tab === 'player' ? (shared?.audio_url ? <div style={{ display: 'grid', gap: 12, marginTop: 14 }}>
-          <div style={{ color: t.theirText, fontSize: 13 }}>{shared.title || '배경음'}</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <button disabled={!shared.playlist_item_id} onClick={() => advance(-1)} style={{ width: 34, height: 34, border: 0, borderRadius: '50%', background: 'transparent', color: t.subText }}><SkipBack size={16} fill="currentColor" /></button>
-            <button onClick={needsGesture ? allowPlayback : togglePlayback} style={{ width: 42, height: 42, border: 0, borderRadius: '50%', background: t.point, color: '#fff' }}>{shared.is_playing && !needsGesture ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" />}</button>
-            <button disabled={!shared.playlist_item_id} onClick={() => advance(1)} style={{ width: 34, height: 34, border: 0, borderRadius: '50%', background: 'transparent', color: t.subText }}><SkipForward size={16} fill="currentColor" /></button>
-            <span style={{ width: 36, color: t.subText, fontSize: 10 }}>{formatTime(position)}</span><input type="range" min="0" max={duration || 1} step=".5" value={Math.min(position, duration || 1)} onChange={event => setPosition(Number(event.target.value))} onPointerUp={event => seek(event.currentTarget.value)} style={{ flex: 1, accentColor: t.point }} /><span style={{ width: 36, color: t.subText, fontSize: 10 }}>{formatTime(duration)}</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}><Volume2 size={15} color={t.subText} /><input type="range" min="0" max="1" step=".05" value={volume} onChange={event => setVolume(Number(event.target.value))} style={{ flex: 1, accentColor: t.point }} /><span style={{ color: t.subText, fontSize: 10 }}>{Math.round(volume * 100)}%</span></div>
-        </div> : <div style={{ marginTop: 14, padding: 18, border: `1px dashed ${t.border}`, borderRadius: 13, color: t.subText, textAlign: 'center', fontSize: 11 }}>재생 중인 배경음이 없어요.</div>) : <div style={{ display: 'grid', gap: 10, marginTop: 12 }}>
-          <div style={{ display: 'flex', gap: 6 }}><input value={newPlaylistName} onChange={event => setNewPlaylistName(event.target.value)} placeholder="새 플레이리스트 이름" style={{ flex: 1, minWidth: 0, padding: 9, borderRadius: 9, border: `1px solid ${t.border}`, background: t.bg, color: t.inputText }} /><button onClick={createPlaylist} style={{ width: 38, border: 0, borderRadius: 9, background: t.point, color: '#fff' }}><Plus size={16} /></button></div>
-          {playlists.map(playlist => <section key={playlist.id} style={{ padding: 10, borderRadius: 12, border: `1px solid ${t.border}`, background: t.bg }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><strong style={{ flex: 1, color: t.theirText, fontSize: 12 }}>{playlist.name}</strong><button onClick={() => updatePlaylist(playlist.id, { shuffle_enabled: !playlist.shuffle_enabled })} style={{ width: 30, height: 30, border: 0, borderRadius: 8, background: playlist.shuffle_enabled ? `${t.point}25` : 'transparent', color: playlist.shuffle_enabled ? t.point : t.subText }}><Shuffle size={14} /></button><button onClick={() => updatePlaylist(playlist.id, { repeat_mode: playlist.repeat_mode === 'all' ? 'one' : playlist.repeat_mode === 'one' ? 'none' : 'all' })} style={{ width: 30, height: 30, border: 0, borderRadius: 8, background: playlist.repeat_mode !== 'none' ? `${t.point}25` : 'transparent', color: playlist.repeat_mode !== 'none' ? t.point : t.subText }}><Repeat size={14} /><span style={{ fontSize: 7 }}>{playlist.repeat_mode === 'one' ? '1' : ''}</span></button><button onClick={() => deletePlaylist(playlist)} style={{ width: 30, height: 30, border: 0, background: 'transparent', color: t.subText }}><Trash2 size={14} /></button></div>
-            <div style={{ display: 'grid', gap: 5, marginTop: 7 }}>{playlist.room_audio_playlist_items.map((item, index) => <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: 6, borderRadius: 8, background: t.panel }}><button onClick={() => playItem(item.id)} style={{ flex: 1, minWidth: 0, border: 0, background: 'transparent', color: shared?.playlist_item_id === item.id ? t.point : t.theirText, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 11 }}>{item.background_audio_tracks?.title || '음원'}</button><button onClick={() => moveItem(playlist, index, -1)} disabled={index === 0} style={{ border: 0, background: 'none', color: t.subText }}><ChevronUp size={13} /></button><button onClick={() => moveItem(playlist, index, 1)} disabled={index === playlist.room_audio_playlist_items.length - 1} style={{ border: 0, background: 'none', color: t.subText }}><ChevronDown size={13} /></button><button onClick={() => removeItem(item.id)} style={{ border: 0, background: 'none', color: '#f87171' }}><X size={13} /></button></div>)}</div>
-            <div style={{ display: 'flex', gap: 5, marginTop: 7 }}><select value={selectedTrackByPlaylist[playlist.id] || ''} onChange={event => setSelectedTrackByPlaylist(current => ({ ...current, [playlist.id]: event.target.value }))} style={{ flex: 1, minWidth: 0, padding: 7, borderRadius: 8, border: `1px solid ${t.border}`, background: t.panel, color: t.inputText }}><option value="">음원 선택</option>{tracks.map(track => <option key={track.id} value={track.id}>{track.title}</option>)}</select><button onClick={() => addTrack(playlist)} style={{ width: 34, border: 0, borderRadius: 8, background: t.point, color: '#fff' }}><Plus size={14} /></button></div>
-          </section>)}
-          {playlists.length === 0 && <div style={{ padding: 22, color: t.subText, textAlign: 'center', fontSize: 11 }}>플레이리스트를 만들어 음원을 추가해보세요.</div>}
-        </div>}
-        <div style={{ marginTop: 9, color: t.subText, fontSize: 10 }}>재생 상태는 방 전체에 공유되고, 음량은 내 기기에만 적용돼요.</div>{error && <div style={{ marginTop: 8, color: '#ef7777', fontSize: 10 }}>{error}</div>}
-      </section>
-    </div>}
-  </>
+      )}
+    </>
+  )
 }
