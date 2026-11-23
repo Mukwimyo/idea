@@ -4,6 +4,7 @@ import { DEFAULT_THEME_ID, THEMES, getTheme } from '../lib/themes'
 import { useThemeVars } from '../lib/themeVars'
 import { ChevronLeft, ChevronRight, LogOut, Users, Bell, BellOff, CircleHelp } from 'lucide-react'
 import { supabase, subscribePush, unsubscribePush } from '../lib/supabase'
+import { Button, Card, IconButton, Toggle } from '../components/ui'
 import Toast from '../components/Toast'
 import useToast from '../hooks/useToast'
 import { clearPendingMessages } from '../features/messages/pendingMessageStore'
@@ -23,114 +24,52 @@ const FONTS = [
 
 function ThemePreview({ t }) {
   return (
-    <div
-      style={{
-        width: 140,
-        borderRadius: 10,
-        overflow: 'hidden',
-        border: `1.5px solid ${t.border}`,
-        flexShrink: 0,
-      }}>
-      <div
-        style={{
-          background: t.panel,
-          padding: '5px 7px',
-          borderBottom: `0.5px solid ${t.border}`,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 4,
-        }}>
-        <div
-          style={{
-            width: 12,
-            height: 12,
-            borderRadius: '50%',
-            background: t.point,
-            flexShrink: 0,
-          }}
-        />
-        <div
-          style={{
-            fontSize: 8,
-            fontWeight: 500,
-            color: t.theirText,
-            overflow: 'hidden',
-            whiteSpace: 'nowrap',
-          }}>
-          이데아
-        </div>
-      </div>
-      <div
-        style={{
-          background: t.bg,
-          padding: '5px 6px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 4,
-        }}>
-        <div style={{ display: 'flex', gap: 3, alignItems: 'flex-end' }}>
-          <div
-            style={{
-              width: 10,
-              height: 10,
-              borderRadius: '50%',
-              background: t.theirBubble,
-              border: `0.5px solid ${t.theirBorder}`,
-              flexShrink: 0,
-            }}
+    <span className="settings-preview" style={{ borderColor: t.border }}>
+      <span
+        className="settings-preview__header"
+        style={{ background: t.panel, borderColor: t.border, color: t.theirText }}>
+        <span className="settings-preview__icon" style={{ background: t.point }} />
+        이데아
+      </span>
+      <span className="settings-preview__chat" style={{ background: t.bg }}>
+        <span className="settings-preview__row">
+          <span
+            className="settings-preview__avatar settings-preview__avatar--their"
+            style={{ background: t.theirBubble, borderColor: t.theirBorder }}
           />
-          <div
-            style={{
-              background: t.theirBubble,
-              border: `0.5px solid ${t.theirBorder}`,
-              borderRadius: '2px 7px 7px 7px',
-              padding: '3px 6px',
-              fontSize: 8,
-              color: t.theirText,
-              lineHeight: 1.4,
-            }}>
-            기다렸어. <span style={{ fontSize: 7, color: t.subText }}>(눈 맞추며)</span>
-          </div>
-        </div>
-        <div
-          style={{
-            textAlign: 'center',
-            fontSize: 7,
-            color: t.narrColor,
-            fontStyle: 'italic',
-          }}>
+          <span
+            className="settings-preview__bubble settings-preview__bubble--their"
+            style={{ background: t.theirBubble, borderColor: t.theirBorder, color: t.theirText }}>
+            기다렸어. <span style={{ color: t.subText }}>(눈 맞추며)</span>
+          </span>
+        </span>
+        <span className="settings-preview__narration" style={{ color: t.narrColor }}>
           · · · 안개 · · ·
-        </div>
-        <div
-          style={{
-            display: 'flex',
-            gap: 3,
-            alignItems: 'flex-end',
-            flexDirection: 'row-reverse',
-          }}>
-          <div
-            style={{
-              width: 10,
-              height: 10,
-              borderRadius: '50%',
-              background: t.myBubble,
-              flexShrink: 0,
-            }}
-          />
-          <div
-            style={{
-              background: t.myBubble,
-              borderRadius: '7px 2px 7px 7px',
-              padding: '3px 6px',
-              fontSize: 8,
-              color: t.myText,
-              lineHeight: 1.4,
-            }}>
-            뭐야 이게. <span style={{ fontSize: 7, color: t.myAct }}>(물러서며)</span>
-          </div>
-        </div>
-      </div>
-    </div>
+        </span>
+        <span className="settings-preview__row settings-preview__row--mine">
+          <span className="settings-preview__avatar" style={{ background: t.myBubble }} />
+          <span
+            className="settings-preview__bubble settings-preview__bubble--mine"
+            style={{ background: t.myBubble, color: t.myText }}>
+            뭐야 이게. <span style={{ color: t.myAct }}>(물러서며)</span>
+          </span>
+        </span>
+      </span>
+    </span>
+  )
+}
+
+function ThemeOption({ theme, selected, onClick }) {
+  return (
+    <Button variant="ghost" className="settings-theme-option" aria-pressed={selected} onClick={onClick}>
+      <span
+        className="settings-theme-option__frame"
+        style={{ borderColor: selected ? theme.point : theme.border }}
+        aria-hidden="true">
+        <ThemePreview t={theme} />
+      </span>
+      <span className="settings-theme-option__name">{theme.name}</span>
+    </Button>
   )
 }
 
@@ -265,207 +204,58 @@ export default function Settings() {
   const lightThemes = THEMES.filter(th => !th.dark)
 
   return (
-    <div
-      className={`settings-page-drawer modern-surface-page app-settings-page${closing ? ' is-closing' : ''}`}
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 100,
-        minHeight: '100dvh',
-        overflowY: 'auto',
-        background: t.bg,
-        transition: 'background 0.3s',
-      }}>
+    <div className={`settings-page-drawer settings-page app-settings-page${closing ? ' is-closing' : ''}`}>
       <Toast toast={toast} />
-      <div className="modern-page-shell" style={{ maxWidth: 480, margin: '0 auto', padding: 16 }}>
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-            marginBottom: 24,
-            paddingTop: 8,
-          }}>
-          <button
-            onClick={closeSettings}
-            style={{
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              padding: 0,
-              display: 'flex',
-              alignItems: 'center',
-            }}>
-            <ChevronLeft size={22} color={t.subText} />
-          </button>
-          <div style={{ fontSize: 16, fontWeight: 500, color: t.theirText }}>설정</div>
-          {saving && <div style={{ marginLeft: 'auto', fontSize: 11, color: t.subText }}>저장 중...</div>}
+      <div className="settings-shell">
+        <div className="settings-header">
+          <IconButton type="button" label="뒤로 가기" className="settings-back" onClick={closeSettings}>
+            <ChevronLeft size={22} />
+          </IconButton>
+          <div className="settings-title">설정</div>
+          {saving && <div className="settings-saving">저장 중...</div>}
         </div>
 
-
-        <div className="settings-section" style={{ marginBottom: 28 }}>
-          <div
-            style={{
-              fontSize: 11,
-              color: t.subText,
-              textTransform: 'uppercase',
-              letterSpacing: '0.06em',
-              marginBottom: 12,
-            }}>
-            내 테마 (전역)
-          </div>
-          <div
-            style={{
-              fontSize: 11,
-              color: t.subText,
-              marginBottom: 12,
-              opacity: 0.7,
-            }}>
+        <div className="settings-section">
+          <div className="settings-section-title">내 테마 (전역)</div>
+          <div className="settings-section-description">
             모든 채팅방에 기본 적용돼요. 채팅방별로 따로 설정할 수도 있어요.
           </div>
-
-          <div
-            style={{
-              fontSize: 11,
-              color: t.subText,
-              marginBottom: 8,
-              opacity: 0.6,
-            }}>
-            다크
-          </div>
-          <div className="settings-theme-grid"
-            style={{
-              display: 'flex',
-              gap: 10,
-              flexWrap: 'wrap',
-              marginBottom: 16,
-            }}>
+          <div className="settings-theme-label">다크</div>
+          <div className="settings-theme-grid settings-theme-grid--dark">
             {darkThemes.map(th => (
-              <div
-                key={th.id}
-                onClick={() => saveTheme(th.id)}
-                style={{
-                  cursor: 'pointer',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: 5,
-                }}>
-                <div
-                  style={{
-                    borderRadius: 10,
-                    overflow: 'hidden',
-                    border: myThemeId === th.id ? `2.5px solid ${th.point}` : `1.5px solid ${th.border}`,
-                    transition: 'border 0.15s',
-                  }}>
-                  <ThemePreview t={th} />
-                </div>
-                <div
-                  style={{
-                    fontSize: 10,
-                    color: myThemeId === th.id ? t.point : t.subText,
-                    fontWeight: myThemeId === th.id ? 500 : 400,
-                  }}>
-                  {th.name}
-                </div>
-              </div>
+              <ThemeOption key={th.id} theme={th} selected={myThemeId === th.id} onClick={() => saveTheme(th.id)} />
             ))}
           </div>
-
-          <div
-            style={{
-              fontSize: 11,
-              color: t.subText,
-              marginBottom: 8,
-              opacity: 0.6,
-            }}>
-            라이트
-          </div>
-          <div className="settings-theme-grid" style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <div className="settings-theme-label">라이트</div>
+          <div className="settings-theme-grid">
             {lightThemes.map(th => (
-              <div
-                key={th.id}
-                onClick={() => saveTheme(th.id)}
-                style={{
-                  cursor: 'pointer',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: 5,
-                }}>
-                <div
-                  style={{
-                    borderRadius: 10,
-                    overflow: 'hidden',
-                    border: myThemeId === th.id ? `2.5px solid ${th.point}` : `1.5px solid ${th.border}`,
-                    transition: 'border 0.15s',
-                  }}>
-                  <ThemePreview t={th} />
-                </div>
-                <div
-                  style={{
-                    fontSize: 10,
-                    color: myThemeId === th.id ? th.point : t.subText,
-                    fontWeight: myThemeId === th.id ? 500 : 400,
-                  }}>
-                  {th.name}
-                </div>
-              </div>
+              <ThemeOption key={th.id} theme={th} selected={myThemeId === th.id} onClick={() => saveTheme(th.id)} />
             ))}
           </div>
         </div>
 
-        <div style={{ height: 0.5, background: t.border, marginBottom: 28 }} />
+        <div className="settings-divider" />
 
-        <div className="settings-section" style={{ marginBottom: 28 }}>
-          <div
-            style={{
-              fontSize: 11,
-              color: t.subText,
-              textTransform: 'uppercase',
-              letterSpacing: '0.06em',
-              marginBottom: 12,
-            }}>
-            폰트
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div className="settings-section">
+          <div className="settings-section-title">폰트</div>
+          <div className="settings-font-list">
             {FONTS.map(f => (
-              <div className="settings-row"
+              <Button
                 key={f.id}
-                onClick={() => saveFont(f.id)}
-                style={{
-                  background: t.panel,
-                  border: myFontId === f.id ? `1.5px solid ${t.point}` : `0.5px solid ${t.border}`,
-                  borderRadius: 10,
-                  padding: '10px 14px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                }}>
-                <span
-                  style={{
-                    fontSize: 14,
-                    fontFamily: f.family,
-                    color: t.theirText,
-                  }}>
-                  {f.name}
-                </span>
-                <span
-                  style={{
-                    fontSize: 12,
-                    fontFamily: f.family,
-                    color: t.subText,
-                  }}>
-                  가나다 ABC 123
-                </span>
-              </div>
+                variant="ghost"
+                className="settings-row settings-font-option"
+                aria-pressed={myFontId === f.id}
+                style={{ fontFamily: f.family }}
+                onClick={() => saveFont(f.id)}>
+                <span>{f.name}</span>
+                <span className="settings-font-option__sample">가나다 ABC 123</span>
+              </Button>
             ))}
           </div>
-          <div className="settings-row" style={{ marginTop: 12, padding: '12px 14px', borderRadius: 12, border: `0.5px solid ${t.border}`, background: t.panel }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 10 }}>
-              <div style={{ fontSize: 13, color: t.theirText }}>채팅 글자 크기</div>
-              <div style={{ fontSize: 12, color: t.subText }}>{Math.round(fontScale * 100)}%</div>
+          <div className="settings-row settings-font-scale-row">
+            <div className="settings-font-scale-label">
+              <div>채팅 글자 크기</div>
+              <div className="settings-font-scale-value">{Math.round(fontScale * 100)}%</div>
             </div>
             <input
               type="range"
@@ -482,83 +272,35 @@ export default function Settings() {
               onPointerUp={event => saveFontScale(event.currentTarget.value)}
               onKeyUp={event => saveFontScale(event.currentTarget.value)}
               aria-label="채팅 글자 크기"
-              style={{ width: '100%', accentColor: t.point }}
+              className="settings-font-scale"
             />
           </div>
         </div>
 
-        <div className="settings-section" style={{ marginBottom: 28 }}>
-          <div
-            style={{
-              fontSize: 11,
-              color: t.subText,
-              textTransform: 'uppercase',
-              letterSpacing: '0.06em',
-              marginBottom: 12,
-            }}>
-            알림
-          </div>
-          <div className="settings-row"
-            style={{
-              background: t.panel,
-              border: `0.5px solid ${t.border}`,
-              borderRadius: 12,
-              padding: '12px 14px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-            }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              {pushEnabled ? <Bell size={15} color={t.subText} /> : <BellOff size={15} color={t.subText} />}
-              <div style={{ fontSize: 13, color: t.theirText }}>새 메시지 푸시 알림</div>
+        <div className="settings-section">
+          <div className="settings-section-title">알림</div>
+          <div className="settings-row">
+            <div className="settings-row-label">
+              {pushEnabled ? <Bell size={15} /> : <BellOff size={15} />}
+              <div>새 메시지 푸시 알림</div>
             </div>
-            <button
-              type="button"
-              role="switch"
-              aria-label="새 메시지 푸시 알림"
-              aria-checked={pushEnabled}
+            <Toggle
+              label="새 메시지 푸시 알림"
+              checked={pushEnabled}
+              className={pushLoading ? 'settings-switch--loading' : undefined}
               onClick={togglePush}
-              style={{
-                width: 40,
-                height: 22,
-                appearance: 'none',
-                padding: 0,
-                border: 0,
-                borderRadius: 11,
-                cursor: pushLoading ? 'wait' : 'pointer',
-                transition: 'background 0.2s',
-                background: pushEnabled ? t.point : t.border,
-                position: 'relative',
-                flexShrink: 0,
-                opacity: pushLoading ? 0.5 : 1,
-              }}>
-              <span
-                style={{
-                  position: 'absolute',
-                  top: 3,
-                  left: 3,
-                  transform: pushEnabled ? 'translateX(17px)' : 'translateX(0)',
-                  width: 16,
-                  height: 16,
-                  borderRadius: '50%',
-                  background: '#fff',
-                  transition: 'transform 0.2s',
-                }}
-              />
-            </button>
+            />
           </div>
         </div>
-        <div className="settings-section" style={{ marginBottom: 28 }}>
-          <div style={{ fontSize: 11, color: t.subText, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>채팅방</div>
-          <div className="settings-row" style={{ background: t.panel, border: `0.5px solid ${t.border}`, borderRadius: 12, padding: '12px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ fontSize: 13, color: t.theirText }}>입장 룰렛 애니메이션</div>
-            <button
-              type="button"
-              role="switch"
-              aria-label="입장 룰렛 애니메이션"
-              aria-checked={showEntering}
-              onClick={async () => {
-                const next = !showEntering
+
+        <div className="settings-section">
+          <div className="settings-section-title">채팅방</div>
+          <div className="settings-row">
+            <div>입장 룰렛 애니메이션</div>
+            <Toggle
+              label="입장 룰렛 애니메이션"
+              checked={showEntering}
+              onChange={async next => {
                 setShowEntering(next)
                 const {
                   data: { user },
@@ -566,44 +308,34 @@ export default function Settings() {
                 const { error } = await supabase.from('profiles').update({ show_entering: next }).eq('id', user.id)
                 showToast(error ? '입장 애니메이션 설정을 저장하지 못했어요.' : '입장 애니메이션 설정이 저장됐어요.', error ? 'error' : 'success')
               }}
-              style={{ width: 40, height: 22, appearance: 'none', padding: 0, border: 0, borderRadius: 11, cursor: 'pointer', transition: 'background 0.2s', background: showEntering ? t.point : t.border, position: 'relative', flexShrink: 0 }}>
-              <span style={{ position: 'absolute', top: 3, left: 3, transform: showEntering ? 'translateX(17px)' : 'translateX(0)', width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'transform 0.2s' }} />
-            </button>
+            />
           </div>
-          <div className="settings-row" style={{ background: t.panel, border: `0.5px solid ${t.border}`, borderRadius: 12, padding: '12px 14px', marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <div className="settings-row">
             <div>
-              <div style={{ fontSize: 13, color: t.theirText }}>캐릭터 선택 위치</div>
-              <div style={{ fontSize: 10, color: t.subText, marginTop: 2 }}>켜면 채팅방 상단 사람 아이콘에서 바꿔요. 끄면 기존 하단 버튼을 사용해요.</div>
+              <div>캐릭터 선택 위치</div>
+              <div className="settings-row-description">켜면 채팅방 상단 사람 아이콘에서 바꿔요. 끄면 기존 하단 버튼을 사용해요.</div>
             </div>
-            <button
-              type="button"
-              role="switch"
-              aria-label="상단바 캐릭터 선택 사용"
-              aria-checked={topCharacterPicker}
-              onClick={async () => {
-                const next = !topCharacterPicker
+            <Toggle
+              label="상단바 캐릭터 선택 사용"
+              checked={topCharacterPicker}
+              onChange={async next => {
                 setTopCharacterPicker(next)
                 const { data: { user } } = await supabase.auth.getUser()
                 const { error } = await supabase.from('profiles').update({ top_character_picker: next }).eq('id', user.id)
                 showToast(error ? '캐릭터 선택 위치를 저장하지 못했어요.' : '캐릭터 선택 위치가 저장됐어요.', error ? 'error' : 'success')
                 if (error) setTopCharacterPicker(!next)
               }}
-              style={{ width: 40, height: 22, appearance: 'none', padding: 0, border: 0, borderRadius: 11, cursor: 'pointer', transition: 'background 0.2s', background: topCharacterPicker ? t.point : t.border, position: 'relative', flexShrink: 0 }}>
-              <span style={{ position: 'absolute', top: 3, left: 3, transform: topCharacterPicker ? 'translateX(17px)' : 'translateX(0)', width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'transform 0.2s' }} />
-            </button>
+            />
           </div>
-          <div className="settings-row" style={{ background: t.panel, border: `0.5px solid ${t.border}`, borderRadius: 12, padding: '12px 14px', marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div className="settings-row">
             <div>
-              <div style={{ fontSize: 13, color: t.theirText }}>메시지 시간 표시</div>
-              <div style={{ fontSize: 10, color: t.subText, marginTop: 2 }}>같은 분의 마지막 메시지에만 표시돼요.</div>
+              <div>메시지 시간 표시</div>
+              <div className="settings-row-description">같은 분의 마지막 메시지에만 표시돼요.</div>
             </div>
-            <button
-              type="button"
-              role="switch"
-              aria-label="메시지 시간 표시"
-              aria-checked={showMessageTime}
-              onClick={async () => {
-                const next = !showMessageTime
+            <Toggle
+              label="메시지 시간 표시"
+              checked={showMessageTime}
+              onChange={async next => {
                 setShowMessageTime(next)
                 const {
                   data: { user },
@@ -611,22 +343,17 @@ export default function Settings() {
                 const { error } = await supabase.from('profiles').update({ show_message_time: next }).eq('id', user.id)
                 showToast(error ? '시간 표시 설정을 저장하지 못했어요.' : '시간 표시 설정이 저장됐어요.', error ? 'error' : 'success')
               }}
-              style={{ width: 40, height: 22, appearance: 'none', padding: 0, border: 0, borderRadius: 11, cursor: 'pointer', transition: 'background 0.2s', background: showMessageTime ? t.point : t.border, position: 'relative', flexShrink: 0 }}>
-              <span style={{ position: 'absolute', top: 3, left: 3, transform: showMessageTime ? 'translateX(17px)' : 'translateX(0)', width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'transform 0.2s' }} />
-            </button>
+            />
           </div>
-          <div className="settings-row" style={{ background: t.panel, border: `0.5px solid ${t.border}`, borderRadius: 12, padding: '12px 14px', marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div className="settings-row">
             <div>
-              <div style={{ fontSize: 13, color: t.theirText }}>수정됨 표시</div>
-              <div style={{ fontSize: 10, color: t.subText, marginTop: 2 }}>편집한 메시지 옆의 수정 이력을 표시해요.</div>
+              <div>수정됨 표시</div>
+              <div className="settings-row-description">편집한 메시지 옆의 수정 이력을 표시해요.</div>
             </div>
-            <button
-              type="button"
-              role="switch"
-              aria-label="수정됨 표시"
-              aria-checked={showEditedLabel}
-              onClick={async () => {
-                const next = !showEditedLabel
+            <Toggle
+              label="수정됨 표시"
+              checked={showEditedLabel}
+              onChange={async next => {
                 setShowEditedLabel(next)
                 const {
                   data: { user },
@@ -634,99 +361,56 @@ export default function Settings() {
                 const { error } = await supabase.from('profiles').update({ show_edited_label: next }).eq('id', user.id)
                 showToast(error ? '수정됨 표시 설정을 저장하지 못했어요.' : '수정됨 표시 설정이 저장됐어요.', error ? 'error' : 'success')
               }}
-              style={{ width: 40, height: 22, appearance: 'none', padding: 0, border: 0, borderRadius: 11, cursor: 'pointer', transition: 'background 0.2s', background: showEditedLabel ? t.point : t.border, position: 'relative', flexShrink: 0 }}>
-              <span style={{ position: 'absolute', top: 3, left: 3, transform: showEditedLabel ? 'translateX(17px)' : 'translateX(0)', width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'transform 0.2s' }} />
-            </button>
+            />
           </div>
-          <div className="settings-row" style={{ background: t.panel, border: `0.5px solid ${t.border}`, borderRadius: 12, padding: '12px 14px', marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <div className="settings-row">
             <div>
-              <div style={{ fontSize: 13, color: t.theirText }}>말풍선 배경 숨기기</div>
-              <div style={{ fontSize: 10, color: t.subText, marginTop: 2 }}>켜면 모든 대화방에서 말풍선 배경색을 투명하게 표시해요.</div>
+              <div>말풍선 배경 숨기기</div>
+              <div className="settings-row-description">켜면 모든 대화방에서 말풍선 배경색을 투명하게 표시해요.</div>
             </div>
-            <button
-              type="button"
-              role="switch"
-              aria-label="말풍선 배경 숨기기"
-              aria-checked={hideMessageBubbles}
-              onClick={async () => {
-                const next = !hideMessageBubbles
+            <Toggle
+              label="말풍선 배경 숨기기"
+              checked={hideMessageBubbles}
+              onChange={async next => {
                 setHideMessageBubbles(next)
                 const { data: { user } } = await supabase.auth.getUser()
                 const { error } = await supabase.from('profiles').update({ hide_message_bubbles: next }).eq('id', user.id)
                 showToast(error ? '말풍선 설정을 저장하지 못했어요.' : '말풍선 설정이 저장됐어요.', error ? 'error' : 'success')
                 if (error) setHideMessageBubbles(!next)
               }}
-              style={{ width: 40, height: 22, appearance: 'none', padding: 0, border: 0, borderRadius: 11, cursor: 'pointer', transition: 'background 0.2s', background: hideMessageBubbles ? t.point : t.border, position: 'relative', flexShrink: 0 }}>
-              <span style={{ position: 'absolute', top: 3, left: 3, transform: hideMessageBubbles ? 'translateX(17px)' : 'translateX(0)', width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'transform 0.2s' }} />
-            </button>
+            />
           </div>
         </div>
-        <div style={{ marginBottom: 28 }}>
-          <div
-            style={{
-              fontSize: 11,
-              color: t.subText,
-              textTransform: 'uppercase',
-              letterSpacing: '0.06em',
-              marginBottom: 12,
-            }}>
-            계정
-          </div>
-          <div
-            style={{
-              background: t.panel,
-              border: `0.5px solid ${t.border}`,
-              borderRadius: 12,
-              overflow: 'hidden',
-            }}>
-            <div
-              style={{
-                padding: '12px 14px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                borderBottom: `0.5px solid ${t.border}`,
-                cursor: 'pointer',
-              }}
-              onClick={() => navigate('/characters')}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <Users size={15} color={t.subText} />
-                <div style={{ fontSize: 13, color: t.theirText }}>캐릭터 관리</div>
-              </div>
-              <ChevronRight size={16} color={t.subText} />
-            </div>
-            <div
-              style={{
-                padding: '12px 14px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                cursor: 'pointer',
-              }}
+
+        <div className="settings-account">
+          <div className="settings-section-title">계정</div>
+          <Card className="settings-account-card">
+            <Button variant="ghost" block className="settings-account-action" onClick={() => navigate('/characters')}>
+              <span className="settings-row-label">
+                <Users size={15} />
+                캐릭터 관리
+              </span>
+              <ChevronRight size={16} />
+            </Button>
+            <Button
+              variant="ghost"
+              block
+              className="settings-account-action settings-account-action--danger"
               onClick={handleLogout}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <LogOut size={15} color="#f87171" />
-                <div style={{ fontSize: 13, color: '#f87171' }}>로그아웃</div>
-              </div>
-              <ChevronRight size={16} color={t.subText} />
-            </div>
-            <div
-              style={{
-                padding: '12px 14px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                borderTop: `0.5px solid ${t.border}`,
-                cursor: 'pointer',
-              }}
-              onClick={() => navigate('/help')}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <CircleHelp size={15} color={t.subText} />
-                <div style={{ fontSize: 13, color: t.theirText }}>앱 사용법</div>
-              </div>
-              <ChevronRight size={16} color={t.subText} />
-            </div>
-          </div>
+              <span className="settings-row-label">
+                <LogOut size={15} />
+                로그아웃
+              </span>
+              <ChevronRight size={16} />
+            </Button>
+            <Button variant="ghost" block className="settings-account-action" onClick={() => navigate('/help')}>
+              <span className="settings-row-label">
+                <CircleHelp size={15} />
+                앱 사용법
+              </span>
+              <ChevronRight size={16} />
+            </Button>
+          </Card>
         </div>
       </div>
     </div>
