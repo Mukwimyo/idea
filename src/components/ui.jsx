@@ -57,6 +57,15 @@ export function Card({ as: Component = 'div', interactive = false, className, ..
 
 export { Card as Surface }
 
+export function Skeleton({ className }) {
+  return (
+    <div
+      className={['ui-skeleton', className].filter(Boolean).join(' ')}
+      aria-hidden="true"
+    />
+  )
+}
+
 export function Toggle({ checked, onChange, label, disabled, className, onClick, ...props }) {
   return (
     <button

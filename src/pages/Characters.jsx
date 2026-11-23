@@ -9,7 +9,7 @@ import { DndContext, PointerSensor, TouchSensor, closestCenter, useSensor, useSe
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy, rectSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import ProfileImageModal from '../components/ProfileImageModal'
-import LoadingScreen from '../components/LoadingScreen'
+import { CharacterListSkeleton } from '../components/Skeletons'
 import { Button, Card, IconButton, TextArea, TextInput } from '../components/ui'
 import { cropProfileImage } from '../lib/profileImageCrop'
 import {
@@ -455,7 +455,7 @@ export default function Characters() {
   useThemeVars(theme)
 
   if (!theme)
-    return <LoadingScreen />
+    return <CharacterListSkeleton room={Boolean(roomId)} />
 
   const normalizedSearch = searchQuery.trim().toLocaleLowerCase('ko-KR')
   const filteredChars = chars.filter(character => character.name.toLocaleLowerCase('ko-KR').includes(normalizedSearch))

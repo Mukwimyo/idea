@@ -52,8 +52,9 @@
 | `RoomGroupPicker.jsx`, `RoomGroupCreatePanel.jsx` | 방 그룹 선택·생성 |
 | `ConfirmDialog.jsx` + `hooks/useConfirmDialog.js` | 확인 대화상자 |
 | `Toast.jsx` + `hooks/useToast.js` | 토스트 알림 |
-| `LoadingScreen.jsx` | 전체 화면 로딩 |
-| `ui.jsx` | 기본 UI: `IconButton`, `Surface` |
+| `LoadingScreen.jsx` | 전체 화면 로딩 (앱 첫 진입, 캐릭터 편집·텍스트 효과) |
+| `Skeletons.jsx` | 스켈레톤 로딩: 방 목록·채팅방·캐릭터 목록 (D3) |
+| `ui.jsx` | 기본 UI: `Button`, `IconButton`, `TextInput`, `TextArea`, `Card`(`Surface`), `Toggle`, `Dialog`, `Skeleton` |
 | `TextEffectConfigurator.jsx` | 텍스트 효과 설정 UI |
 | `hooks/useMessageStageEffects.js` | 충격 연출 화면 흔들림 |
 

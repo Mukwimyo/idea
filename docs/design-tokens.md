@@ -208,3 +208,13 @@ C 단계 각 화면 작업에서 함께 처리. 대응표는 B4 파생 변수 �
 
 - `ConfirmDialog`는 `Dialog` + `Button` 으로 재구성(외부 API·동작 동일). danger 확인 버튼은 `Button --danger`(현재 `#d84f57` → `--c-danger`).
 - 화면별 기존 마크업을 공통 컴포넌트로 바꾸는 작업은 C1~C4에서 한다.
+
+---
+
+## D3. 스켈레톤 명세
+
+- 공통 컴포넌트 `Skeleton`(`ui.jsx`, `.ui-skeleton`): 블록 배경 `color-mix(in srgb, var(--c-border) 45%, transparent)`, 모서리는 대상 요소의 토큰(카드 `--radius-lg`, 말풍선 `--radius-md`, 아바타 `--radius-full`, 텍스트 줄 `--radius-sm`). `aria-hidden`.
+- 반짝임: 왼→오 하이라이트(`color-mix(in srgb, var(--c-surface) 60%, transparent)`) 1.4s linear 반복. 연출 예외(반복 애니메이션). reduced-motion은 B6 전역 규칙으로 정지.
+- 화면 컨테이너에 `role="status"` + `aria-label="불러오는 중"`(시각 문구 없음), `aria-busy="true"`.
+- 레이아웃: 실제 화면과 같은 헤더·여백·카드 크기(로딩 → 화면 전환 시 레이아웃 점프 없음). 방 목록 카드 4개, 채팅방 말풍선 좌우 교차 6개(폭 40~70% 다양), 캐릭터 목록 행 4개.
+- 앱 첫 진입(App.jsx 인증 확인)과 CharacterEdit·CharacterTextEffects는 기존 `LoadingScreen` 유지.

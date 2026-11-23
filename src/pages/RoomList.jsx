@@ -8,7 +8,7 @@ import { DndContext, PointerSensor, TouchSensor, closestCenter, useSensor, useSe
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { Button, Card, IconButton, TextInput } from '../components/ui'
-import LoadingScreen from '../components/LoadingScreen'
+import { RoomListSkeleton } from '../components/Skeletons'
 import EntryCharacterPicker from '../components/EntryCharacterPicker'
 import RoomGroupCreatePanel from '../components/RoomGroupCreatePanel'
 import RoomGroupPicker from '../components/RoomGroupPicker'
@@ -381,7 +381,7 @@ export default function RoomList() {
   useThemeVars(t)
 
   if (!theme)
-    return <LoadingScreen />
+    return <RoomListSkeleton />
 
   const logoVariant = t.dark ? 'dark' : 'light'
   const headerLogo = `${import.meta.env.BASE_URL}branding/idea-logo-header-${logoVariant}.png`

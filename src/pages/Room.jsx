@@ -10,7 +10,7 @@ import CommunicationSessions from '../components/CommunicationSessions'
 import CommunicationRecord from '../components/CommunicationRecord'
 import Toast from '../components/Toast'
 import useToast from '../hooks/useToast'
-import LoadingScreen from '../components/LoadingScreen'
+import { RoomSkeleton } from '../components/Skeletons'
 import EntryCharacterPicker from '../components/EntryCharacterPicker'
 import SharedBackgroundAudio from '../components/SharedBackgroundAudio'
 import RoomWorldPanel from '../components/RoomWorldPanel'
@@ -1846,7 +1846,7 @@ export default function Room() {
     : 0
 
   if (!theme)
-    return <LoadingScreen />
+    return <RoomSkeleton style={{ top: viewportOffsetTop, height: viewportHeight }} />
 
   const newMessageCountLabel = formatNewMessageCount(newMessageCount)
 
