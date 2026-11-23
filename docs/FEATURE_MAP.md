@@ -56,7 +56,7 @@
 | `Skeletons.jsx` | 스켈레톤 로딩: 방 목록·채팅방·캐릭터 목록 (D3) |
 | `ui.jsx` | 기본 UI: `Button`, `IconButton`, `TextInput`, `TextArea`, `Card`(`Surface`), `Toggle`, `Dialog`, `Skeleton` |
 | `TextEffectConfigurator.jsx` | 텍스트 효과 설정 UI |
-| `hooks/useMessageStageEffects.js` | 충격 연출 화면 흔들림 |
+| `hooks/useMessageStageEffects.js` | 충격 연출 화면 흔들림 + 진동(`lib/haptics.js`, D5: Android 전용, 설정 "충격 연출 진동", 기기별 localStorage, 기본 꺼짐) |
 
 ## 방 목록 `src/pages/RoomList.jsx`
 

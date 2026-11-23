@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react'
+import { vibrateImpact } from '../lib/haptics'
 import { prefersReducedMotion } from '../lib/motion'
 
 const IMPACT_KEYFRAMES = [
@@ -17,6 +18,7 @@ export default function useMessageStageEffects(stageRef) {
 
   return useCallback(effectKey => {
     if (effectKey !== 'impact') return
+    vibrateImpact()
     if (prefersReducedMotion()) return
 
     const stage = stageRef.current

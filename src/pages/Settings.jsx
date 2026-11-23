@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { DEFAULT_THEME_ID, THEMES, getTheme } from '../lib/themes'
+import { getImpactHapticsEnabled, isImpactHapticsSupported, setImpactHapticsEnabled, vibrateImpact } from '../lib/haptics'
 import { useThemeVars } from '../lib/themeVars'
 import { ChevronLeft, ChevronRight, LogOut, Users, Bell, BellOff, CircleHelp } from 'lucide-react'
 import { supabase, subscribePush, unsubscribePush } from '../lib/supabase'
@@ -82,6 +83,7 @@ export default function Settings() {
   const [fontScale, setFontScale] = useState(() => Number(localStorage.getItem('idea-font-scale') || 1))
   const [pushEnabled, setPushEnabled] = useState(false)
   const [showEntering, setShowEntering] = useState(true)
+  const [impactHapticsEnabled, setImpactHapticsChecked] = useState(getImpactHapticsEnabled)
   const [showMessageTime, setShowMessageTime] = useState(true)
   const [showEditedLabel, setShowEditedLabel] = useState(true)
   const [topCharacterPicker, setTopCharacterPicker] = useState(false)
@@ -310,6 +312,23 @@ export default function Settings() {
               }}
             />
           </div>
+          {isImpactHapticsSupported() && (
+            <div className="settings-row">
+              <div>
+                <div>충격 연출 진동</div>
+                <div className="settings-row-description">충격 연출이 재생될 때 휴대폰을 진동해요 (Android)</div>
+              </div>
+              <Toggle
+                label="충격 연출 진동"
+                checked={impactHapticsEnabled}
+                onChange={next => {
+                  setImpactHapticsChecked(next)
+                  setImpactHapticsEnabled(next)
+                  if (next) vibrateImpact()
+                }}
+              />
+            </div>
+          )}
           <div className="settings-row">
             <div>
               <div>캐릭터 선택 위치</div>

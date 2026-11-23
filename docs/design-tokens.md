@@ -218,3 +218,12 @@ C 단계 각 화면 작업에서 함께 처리. 대응표는 B4 파생 변수 �
 - 화면 컨테이너에 `role="status"` + `aria-label="불러오는 중"`(시각 문구 없음), `aria-busy="true"`.
 - 레이아웃: 실제 화면과 같은 헤더·여백·카드 크기(로딩 → 화면 전환 시 레이아웃 점프 없음). 방 목록 카드 4개, 채팅방 말풍선 좌우 교차 6개(폭 40~70% 다양), 캐릭터 목록 행 4개.
 - 앱 첫 진입(App.jsx 인증 확인)과 CharacterEdit·CharacterTextEffects는 기존 `LoadingScreen` 유지.
+
+---
+
+## D5. 충격 연출 진동 명세
+
+- 새 파일 `src/lib/haptics.js`: `isImpactHapticsSupported()`(= `navigator.vibrate` 존재 && UA에 `Android`), `getImpactHapticsEnabled()` / `setImpactHapticsEnabled(bool)`(`localStorage` 키 `idea-impact-haptics`, 값 `'1'`/`'0'`, **기본 꺼짐**), `vibrateImpact()`(지원·켜짐일 때만 `navigator.vibrate([24, 36, 48])`, 예외 무시).
+- 저장 위치: 기기별 `localStorage`. 진동은 기기 성격 설정이고 DB 컬럼 추가는 마이그레이션 수정 금지 규칙에 걸리므로 프로필에 저장하지 않는다.
+- 호출: `useMessageStageEffects`에서 `impact` 재생 시. reduced-motion 여부와 무관(진동은 모션이 아님)하게 설정만 따른다.
+- 설정 화면: 기존 토글 목록에 `Toggle` 한 행 — 제목 "충격 연출 진동", 설명 "충격 연출이 재생될 때 휴대폰을 진동해요 (Android)". **지원 기기에서만 표시**.
