@@ -5,7 +5,8 @@ export const UI_MODES = Object.freeze({
   MODERN: 'modern',
 })
 
-export const normalizeUiMode = value => value === UI_MODES.CLASSIC ? UI_MODES.CLASSIC : UI_MODES.MODERN
+// Classic mode is retired: every stored or requested value resolves to modern.
+export const normalizeUiMode = () => UI_MODES.MODERN
 
 export const getStoredUiMode = (storage = globalThis.localStorage) => {
   try {
