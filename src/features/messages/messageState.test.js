@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import { highestReadableMessage, mergeMessages, messageRenderKey } from './messageState'
+import { formatNewMessageCount, highestReadableMessage, mergeMessages, messageRenderKey } from './messageState'
+
+describe('formatNewMessageCount', () => {
+  it.each([
+    [0, ''],
+    [1, '1'],
+    [99, '99'],
+    [100, '99+'],
+  ])('formats a count of %i as "%s"', (count, expected) => {
+    expect(formatNewMessageCount(count)).toBe(expected)
+  })
+})
 
 describe('mergeMessages', () => {
   it('replaces an optimistic message by client id without duplicating it', () => {

@@ -32,7 +32,7 @@ import {
   joinRoomWithInvite,
   sendRoomMessage as sendRoomMessageRpc,
 } from '../features/messages/messageApi'
-import { highestReadableMessage, mergeMessages, messageRenderKey } from '../features/messages/messageState'
+import { formatNewMessageCount, highestReadableMessage, mergeMessages, messageRenderKey } from '../features/messages/messageState'
 import { readQuickToolPreferences, toggleFavoriteTool, writeQuickToolPreferences } from '../features/rooms/quickToolPreferences'
 import {
   queuePendingMessage,
@@ -220,6 +220,7 @@ export default function Room() {
   const [showSlot, setShowSlot] = useState(true)
   const [hideScroll, setHideScroll] = useState(false)
   const [newMsgAlert, setNewMsgAlert] = useState(false)
+  const [newMessageCount, setNewMessageCount] = useState(0)
   const [roomNameText, setRoomNameText] = useState('')
   const [showCharList, setShowCharList] = useState(false)
   const [closingCharList, setClosingCharList] = useState(false)
@@ -277,6 +278,7 @@ export default function Room() {
   const fileInputRef = useRef(null)
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
+  const composerRef = useRef(null)
   const isAtBottomRef = useRef(true)
   const messageListRef = useRef(null)
   const initialScrollDone = useRef(false)
@@ -552,7 +554,10 @@ export default function Room() {
             }
             const fullMsg = { ...hydrated, entrance_side: newMsg.user_id === userIdRef.current ? null : 'left' }
             setMessages(prev => mergeMessages(prev, fullMsg))
-            if (!isAtBottomRef.current) setNewMsgAlert(true)
+            if (!isAtBottomRef.current) {
+              setNewMsgAlert(true)
+              if (newMsg.user_id !== userIdRef.current) setNewMessageCount(count => count + 1)
+            }
           } else if (payload.eventType === 'UPDATE') {
             setMessages(prev => mergeMessages(prev, payload.new))
           } else if (payload.eventType === 'DELETE') {
@@ -717,6 +722,7 @@ export default function Room() {
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'instant' })
     setNewMsgAlert(false)
+    setNewMessageCount(0)
     isAtBottomRef.current = true
     markAsRead(messagesRef.current)
   }
@@ -728,7 +734,10 @@ export default function Room() {
     setHideScroll(false)
     clearTimeout(scrollTimerRef.current)
     scrollTimerRef.current = setTimeout(() => setHideScroll(true), 1500)
-    if (isAtBottomRef.current) setNewMsgAlert(false)
+    if (isAtBottomRef.current) {
+      setNewMsgAlert(false)
+      setNewMessageCount(0)
+    }
   }
 
   const refreshReadCursors = async () => {
@@ -949,6 +958,22 @@ export default function Room() {
     window.addEventListener('resize', resizeComposer)
     return () => window.removeEventListener('resize', resizeComposer)
   }, [input, theme])
+
+  useLayoutEffect(() => {
+    const composer = composerRef.current
+    const stage = roomStageRef.current
+    if (!theme || !composer || !stage || typeof ResizeObserver === 'undefined') return
+
+    const updateHeight = () => stage.style.setProperty('--composer-h', `${composer.offsetHeight}px`)
+    updateHeight()
+
+    const observer = new ResizeObserver(updateHeight)
+    observer.observe(composer, { box: 'border-box' })
+    return () => {
+      observer.disconnect()
+      stage.style.removeProperty('--composer-h')
+    }
+  }, [theme])
 
   const sendMessage = async () => {
     if (!input.trim()) return
@@ -1823,6 +1848,8 @@ export default function Room() {
   if (!theme)
     return <LoadingScreen />
 
+  const newMessageCountLabel = formatNewMessageCount(newMessageCount)
+
   return (
     <div
       ref={roomStageRef}
@@ -2273,9 +2300,14 @@ export default function Room() {
 
       {/* 새 메시지 알림 버튼 */}
       {newMsgAlert && (
-        <div onClick={scrollToBottom} style={{ position: 'fixed', bottom: 110, left: '50%', transform: 'translateX(-50%)', zIndex: 20, background: t.panel, border: `1px solid ${t.border}`, color: t.theirText, padding: '6px 16px', borderRadius: 20, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>
-          <ArrowDown size={13} color="#fff" />새 대화
-        </div>
+        <Button
+          variant="secondary"
+          className="room-new-message"
+          aria-label={newMessageCount > 0 ? `새 대화 ${newMessageCount}개로 이동` : '새 대화로 이동'}
+          onClick={scrollToBottom}>
+          <ArrowDown aria-hidden="true" />
+          {newMessageCountLabel ? `새 대화 ${newMessageCountLabel}` : '새 대화'}
+        </Button>
       )}
 
       {/* 메시지 목록 */}
@@ -2740,7 +2772,7 @@ export default function Room() {
       </div>
 
       {/* 입력 영역 */}
-      <div className="room-composer">
+      <div ref={composerRef} className="room-composer">
         <div className="room-composer__scrim" aria-hidden="true" />
         {((myChars.length > 0 && !topCharacterPickerEnabled) || selectedMessageEffect) && (
           <div className="composer-context-row">

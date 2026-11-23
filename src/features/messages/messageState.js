@@ -7,6 +7,11 @@ const hasSequence = message => Number.isFinite(Number(message?.sequence_no))
 
 export const messageRenderKey = message => message?.client_message_id || message?.id
 
+export const formatNewMessageCount = count => {
+  if (count === 0) return ''
+  return count > 99 ? '99+' : String(count)
+}
+
 export const compareMessages = (left, right) => {
   if (hasSequence(left) && hasSequence(right)) {
     const sequenceDifference = Number(left.sequence_no) - Number(right.sequence_no)

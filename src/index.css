@@ -1934,6 +1934,32 @@ textarea.ui-input {
     padding: var(--sp-1) var(--sp-2) var(--sp-2);
 }
 
+.room-new-message.ui-btn {
+    position: absolute;
+    z-index: 20;
+    bottom: calc(var(--composer-h, 110px) + var(--sp-3));
+    left: 50%;
+    translate: -50% 0;
+    gap: var(--sp-2);
+    height: var(--control-h);
+    min-height: var(--touch-min);
+    border-radius: var(--radius-full);
+    font-size: var(--fs-label);
+    box-shadow: var(--shadow-sm);
+    animation: room-new-message-enter var(--dur-base) var(--ease-out);
+}
+
+.room-new-message svg {
+    width: 1em;
+    height: 1em;
+    color: var(--c-accent);
+}
+
+@keyframes room-new-message-enter {
+    from { opacity: 0; transform: translateY(var(--sp-2)); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
 .room-composer {
     position: absolute;
     inset: auto 0 0;
