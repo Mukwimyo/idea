@@ -433,7 +433,7 @@ export default function CommunicationSessions({ roomId, userId, myChars, theme, 
               const node = event.currentTarget
               isNearMessageBottomRef.current = node.scrollHeight - node.scrollTop - node.clientHeight < 80
             }} style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 14 }}>
-              {(messages[activeSession.id] || []).map(message => <div key={message.id} style={{ width: 'fit-content', maxWidth: '75%', margin: message.user_id === userId ? '0 0 9px auto' : '0 auto 9px 0', padding: '8px 11px', borderRadius: 12, background: message.user_id === userId ? t.myBubble : t.theirBubble, color: message.user_id === userId ? t.myText : t.theirText }}>{message.content}</div>)}
+              {(messages[activeSession.id] || []).map(message => <div key={message.id} className="message-bubble" style={{ width: 'fit-content', maxWidth: '75%', margin: message.user_id === userId ? '0 0 9px auto' : '0 auto 9px 0', padding: '8px 11px', borderRadius: 12, background: message.user_id === userId ? t.myBubble : t.theirBubble, color: message.user_id === userId ? t.myText : t.theirText }}>{message.content}</div>)}
               {remoteTyping?.sessionId === activeSession.id && remoteTyping.expiresAt > now && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '4px 0 8px', color: t.subText, fontSize: 10 }}>
                   <span style={{ letterSpacing: 2 }}>•••</span>

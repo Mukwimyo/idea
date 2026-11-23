@@ -857,12 +857,23 @@ button {
 
 button,
 [role="button"] {
-    transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease, opacity 160ms ease, transform 160ms ease;
+    transition:
+        background-color var(--ui-motion-fast) ease,
+        border-color var(--ui-motion-fast) ease,
+        color var(--ui-motion-fast) ease,
+        opacity var(--ui-motion-fast) ease,
+        scale var(--ui-motion-fast) ease;
 }
 
-button:not(:disabled):active,
-[role="button"]:active {
-    transform: scale(0.97);
+:where([data-message-bubble], .message-bubble, .character-list-item, .help-guide-card, .ui-mode-card) {
+    transition: scale var(--ui-motion-fast) ease;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    :is(button, [role="button"]):not(:disabled, [aria-disabled="true"]):active,
+    :is([data-message-bubble], .message-bubble, .room-list-card, .character-list-item, .help-guide-card, .ui-mode-card):active:not(:has(:is(button, [role="button"], a, input, select, textarea):active)) {
+        scale: 0.98;
+    }
 }
 
 button:focus-visible,
@@ -1063,7 +1074,7 @@ button:disabled {
 }
 
 .room-card-transition {
-    transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+    transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease, scale var(--ui-motion-fast) ease;
 }
 
 .room-card-first-enter {
@@ -1318,13 +1329,16 @@ button:disabled {
         animation: none;
     }
 
-    .room-card-transition {
-        transition: none;
+    button,
+    [role="button"],
+    .room-card-transition,
+    :where([data-message-bubble], .message-bubble, .character-list-item, .help-guide-card, .ui-mode-card) {
+        transition: filter var(--ui-motion-fast) ease;
     }
 
-    button,
-    [role="button"] {
-        transition: none;
+    :is(button, [role="button"]):not(:disabled, [aria-disabled="true"]):active,
+    :is([data-message-bubble], .message-bubble, .room-list-card, .character-list-item, .help-guide-card, .ui-mode-card):active:not(:has(:is(button, [role="button"], a, input, select, textarea):active)) {
+        filter: opacity(85%);
     }
 }
 @keyframes toast-enter {

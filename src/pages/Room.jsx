@@ -2551,7 +2551,7 @@ export default function Room() {
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMine ? 'flex-end' : 'flex-start', maxWidth: '76%' }}>
                   {showMessageIdentity && char?.name && <div style={{ marginBottom: 4, color: t.subText, fontSize: 11 }}>{char.name}</div>}
-                  <div style={{ width: 190, display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 3, overflow: 'hidden', borderRadius: 11 }}>
+                  <div className="message-bubble" style={{ width: 190, display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 3, overflow: 'hidden', borderRadius: 11 }}>
                     {imageUrls.map((url, imageIndex) => (
                       <img
                         key={`${url}-${imageIndex}`}
@@ -2601,7 +2601,7 @@ export default function Room() {
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMine ? 'flex-end' : 'flex-start', maxWidth: '72%' }}>
                   {showMessageIdentity && char?.name && <div style={{ maxWidth: '100%', marginBottom: 4, color: t.subText, fontSize: 11, lineHeight: 1.35, overflowWrap: 'anywhere', textAlign: isMine ? 'right' : 'left' }}>{char.name}</div>}
-                  <img src={msg.content} style={{ maxWidth: 180, borderRadius: 10, cursor: 'pointer' }} onClick={() => openImageMessage(msg.content)} />
+                  <img className="message-bubble" src={msg.content} style={{ maxWidth: 180, borderRadius: 10, cursor: 'pointer' }} onClick={() => openImageMessage(msg.content)} />
                   {showMessageTimestamp && <div style={{ fontSize: 10, color: t.subText, marginTop: 2, opacity: 0.72 }}>{new Date(msg.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}</div>}
                   {renderMessageActions(msg, false)}
                   {renderDeliveryStatus(msg)}
