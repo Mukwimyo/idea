@@ -7,7 +7,7 @@ import { Settings, Users, Trash2, CirclePlus, LogIn, Search, ListRestart, GripVe
 import { DndContext, PointerSensor, TouchSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core'
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { IconButton } from '../components/ui'
+import { Button, Card, IconButton, TextInput } from '../components/ui'
 import LoadingScreen from '../components/LoadingScreen'
 import EntryCharacterPicker from '../components/EntryCharacterPicker'
 import RoomGroupCreatePanel from '../components/RoomGroupCreatePanel'
@@ -31,7 +31,11 @@ import { createClientMessageId, findRoomByInviteCode, joinRoomWithInvite } from 
 function SortableRoomCard({ roomId, disabled, elevated = false, children }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: roomId, disabled })
   return (
-    <div ref={setNodeRef} {...attributes} style={{ width: '100%', minWidth: 0, maxWidth: '100%', transform: CSS.Transform.toString(transform), transition, position: 'relative', zIndex: isDragging ? 40 : elevated ? 30 : 'auto', opacity: isDragging ? 0.72 : 1 }}>
+    <div
+      ref={setNodeRef}
+      {...attributes}
+      className="room-list-sortable"
+      style={{ transform: CSS.Transform.toString(transform), transition, zIndex: isDragging ? 40 : elevated ? 30 : 'auto', opacity: isDragging ? 0.72 : 1 }}>
       {children({ listeners })}
     </div>
   )
@@ -404,33 +408,33 @@ export default function RoomList() {
   const renderRoomCard = (room, roomIndex) => (
     <SortableRoomCard key={room.id} roomId={room.id} disabled={!reordering} elevated={roomMenuId === room.id}>
       {({ listeners }) => (
-        <div
+        <Card
+          interactive
           className={`room-list-card room-card-transition${playInitialRoomAnimation ? ' room-card-first-enter' : ''}`}
           onClick={() => !reordering && navigate(`/room/${room.id}`)}
           style={{
-            width: '100%',
-            minWidth: 0,
-            maxWidth: '100%',
-            background: t.panel,
-            borderRadius: 12,
-            padding: '13px 15px',
             cursor: reordering ? 'default' : 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 12,
-            border: `1px solid ${t.border}`,
-            boxShadow: '0 1px 4px rgba(0,0,0,0.15)',
             animationDelay: playInitialRoomAnimation ? `${Math.min(roomIndex, 10) * 70}ms` : undefined,
           }}>
-          {reordering && <button {...listeners} onClick={event => event.stopPropagation()} aria-label={`${room.name} 순서 이동`} style={{ border: 0, background: 'none', padding: 2, display: 'flex', cursor: 'grab', touchAction: 'none' }}><GripVertical size={18} color={t.subText} /></button>}
-          <div className="room-list-card__cover squircle-media" style={{ width: 48, height: 48, background: t.point, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, color: t.bg, flexShrink: 0, overflow: 'hidden' }}>{room.cover_image ? <img src={room.cover_image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '✦'}</div>
-          <div className="room-list-card__content" style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              {room.is_favorite && <Star size={14} color={t.point} fill={t.point} aria-label="즐겨찾기" style={{ flexShrink: 0 }} />}
-              <div className="room-list-card__name" style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 15, fontWeight: 600, color: t.theirText }}>{room.name}</div>
-              {room.lastMsg?.created_at && <time className="room-list-card__time" style={{ color: t.subText, fontSize: 11, flexShrink: 0 }}>{formatRoomTime(room.lastMsg.created_at)}</time>}
+          {reordering && (
+            <IconButton
+              {...listeners}
+              className="room-list-icon-button room-list-card__drag"
+              onClick={event => event.stopPropagation()}
+              label={`${room.name} 순서 이동`}>
+              <GripVertical size={18} />
+            </IconButton>
+          )}
+          <div className="room-list-card__cover squircle-media">
+            {room.cover_image ? <img src={room.cover_image} alt="" /> : '✦'}
+          </div>
+          <div className="room-list-card__content">
+            <div className="room-list-card__heading">
+              {room.is_favorite && <Star size={14} className="room-list-card__favorite" fill="currentColor" aria-label="즐겨찾기" />}
+              <div className="room-list-card__name">{room.name}</div>
+              {room.lastMsg?.created_at && <time className="room-list-card__time">{formatRoomTime(room.lastMsg.created_at)}</time>}
             </div>
-            <div className="room-list-card__preview" style={{ fontSize: 11, color: t.subText, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <div className="room-list-card__preview">
               {room.lastMsg
                 ? room.lastMsg.type === 'chat'
                   ? `${room.lastMsg.characters?.name || ''}: ${room.lastMsg.content}`
@@ -446,60 +450,44 @@ export default function RoomList() {
                 : ''}
             </div>
           </div>
-          {room.unreadCount > 0 && <div className="room-list-card__unread" style={{ background: t.point, color: t.bg, borderRadius: 10, padding: '2px 7px', fontSize: 11, fontWeight: 600, flexShrink: 0 }}>{room.unreadCount}</div>}
-          {!reordering && <div className="room-list-card__actions" style={{ position: 'relative' }}>
+          {room.unreadCount > 0 && <div className="room-list-card__unread">{room.unreadCount}</div>}
+          {!reordering && <div className="room-list-card__actions">
             <IconButton
+              className="room-list-icon-button"
               onMouseDown={event => event.stopPropagation()}
               onClick={event => { event.stopPropagation(); setRoomMenuId(current => current === room.id ? null : room.id) }}
-              label={`${room.name} 메뉴`}
-              borderColor="transparent"
-              pointColor={t.point}
-              color={t.subText}
-              style={{ width: 44, height: 44 }}>
+              label={`${room.name} 메뉴`}>
               <MoreHorizontal size={19} />
             </IconButton>
-            {roomMenuId === room.id && <div className="message-action-menu room-list-card-menu" onClick={event => event.stopPropagation()} style={{ position: 'absolute', zIndex: 20, top: 42, right: 0, width: 190, padding: 5, border: `1px solid ${t.border}`, borderRadius: 11, background: t.panel, boxShadow: '0 10px 28px rgba(0,0,0,.28)' }}>
-              <button onClick={event => { toggleFavorite(event, room); setRoomMenuId(null) }} style={{ width: '100%', minHeight: 40, display: 'flex', alignItems: 'center', gap: 9, padding: '0 10px', border: 0, borderRadius: 8, background: 'transparent', color: t.theirText, fontSize: 12 }}><Star size={15} fill={room.is_favorite ? 'currentColor' : 'none'} />{room.is_favorite ? '즐겨찾기 해제' : '즐겨찾기'}</button>
-              <div style={{ padding: '5px 9px 8px' }}>
-                <label htmlFor={`room-group-${room.id}`} style={{ display: 'block', marginBottom: 5, color: t.subText, fontSize: 9 }}>그룹 이동</label>
-                <select id={`room-group-${room.id}`} value={room.room_group_id || ''} onChange={event => moveRoom(room, event.target.value)} style={{ width: '100%', padding: '7px 8px', border: `1px solid ${t.border}`, borderRadius: 7, background: t.bg, color: t.inputText, fontSize: 11 }}>
+            {roomMenuId === room.id && <Card className="message-action-menu room-list-card-menu" onClick={event => event.stopPropagation()}>
+              <Button variant="ghost" block className="room-list-card-menu__action" onClick={event => { toggleFavorite(event, room); setRoomMenuId(null) }}>
+                <Star size={15} fill={room.is_favorite ? 'currentColor' : 'none'} />
+                {room.is_favorite ? '즐겨찾기 해제' : '즐겨찾기'}
+              </Button>
+              <div className="room-list-card-menu__group">
+                <label htmlFor={`room-group-${room.id}`} className="room-list-field-label">그룹 이동</label>
+                <select className="ui-input room-list-input" id={`room-group-${room.id}`} value={room.room_group_id || ''} onChange={event => moveRoom(room, event.target.value)}>
                   <option value="">미분류</option>
                   {roomGroups.map(group => <option key={group.id} value={group.id}>{group.name}</option>)}
                 </select>
               </div>
-              {room.created_by === userId && <button onClick={event => { setRoomMenuId(null); deleteRoom(event, room.id, room.created_by) }} style={{ width: '100%', minHeight: 40, display: 'flex', alignItems: 'center', gap: 9, padding: '0 10px', border: 0, borderRadius: 8, background: 'transparent', color: '#f87171', fontSize: 12 }}><Trash2 size={15} />채팅방 삭제</button>}
-            </div>}
+              {room.created_by === userId && (
+                <Button variant="ghost" block className="room-list-card-menu__action room-list-card-menu__action--danger" onClick={event => { setRoomMenuId(null); deleteRoom(event, room.id, room.created_by) }}>
+                  <Trash2 size={15} />채팅방 삭제
+                </Button>
+              )}
+            </Card>}
           </div>}
-        </div>
+        </Card>
       )}
     </SortableRoomCard>
   )
 
   return (
-    <div
-      className="room-list-page"
-      style={{
-        width: '100%',
-        minHeight: '100vh',
-        overflowX: 'hidden',
-        backgroundColor: t.bg,
-        backgroundImage: `url("${backgroundLogo}")`,
-        backgroundRepeat: 'repeat',
-        backgroundPosition: 'center top',
-        backgroundSize: '450px 450px',
-        padding: 16,
-        transition: 'background-color 0.3s',
-        '--room-list-bg': t.bg,
-        '--room-list-panel': t.panel,
-        '--room-list-border': t.border,
-        '--room-list-point': t.point,
-        '--room-list-text': t.theirText,
-        '--room-list-subtext': t.subText,
-      }}>
+    <div className="room-list-page" style={{ backgroundImage: `url("${backgroundLogo}")` }}>
       <Toast toast={toast} />
       <ConfirmDialog
         open={Boolean(confirmation)}
-        theme={t}
         {...confirmation}
         onConfirm={() => closeConfirmation(true)}
         onCancel={() => closeConfirmation(false)}
@@ -513,22 +501,14 @@ export default function RoomList() {
         onSelect={completeJoinRoom}
         onClose={() => !entryJoining && setPendingJoinRoom(null)}
       />
-      <div className="room-list-shell" style={{ width: '100%', minWidth: 0, maxWidth: 400, margin: '0 auto', position: 'relative' }}>
+      <div className="room-list-shell">
         {/* 헤더 */}
-        <div
-          className="room-list-header"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-            marginBottom: 14,
-            paddingTop: 8,
-          }}>
-          <div className="room-list-header__brand" style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center' }}>
-            <img className="room-list-header__logo" src={headerLogo} alt="IDEA" style={{ display: 'block', width: 84, height: 'auto', maxHeight: 42, objectFit: 'contain', objectPosition: 'left center' }} />
+        <div className="room-list-header">
+          <div className="room-list-header__brand">
+            <img className="room-list-header__logo" src={headerLogo} alt="IDEA" />
           </div>
-          <button
-            className="ui-touch-target room-list-primary-action"
+          <Button
+            className="room-list-primary-action"
             onClick={() => {
               setShowGroupCreate(false)
               if (showCreate || showJoin) {
@@ -538,275 +518,178 @@ export default function RoomList() {
                 setShowCreate(true)
               }
             }}
-            aria-expanded={showCreate || showJoin}
-            style={{ height: 44, display: 'flex', alignItems: 'center', gap: 6, padding: '0 12px', background: showCreate || showJoin ? `${t.point}22` : t.point, border: `1px solid ${t.point}`, borderRadius: 11, color: showCreate || showJoin ? t.point : '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600, flexShrink: 0 }}>
+            aria-label="새 대화"
+            aria-expanded={showCreate || showJoin}>
             <CirclePlus size={17} /><span>새 대화</span>
-          </button>
+          </Button>
           {sortMode === 'manual' && (
-            <button
+            <IconButton
               className="room-list-icon-action"
               onClick={() => setReordering(current => !current)}
-              aria-label={reordering ? '순서 변경 완료' : '채팅방 순서 변경'}
-              title={reordering ? '순서 변경 완료' : '채팅방 순서 변경'}
-              style={{ width: 40, height: 40, background: reordering ? `${t.point}22` : 'none', border: `1px solid ${reordering ? t.point : t.border}`, borderRadius: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <ListRestart size={17} color={reordering ? t.point : t.subText} />
-            </button>
+              label={reordering ? '순서 변경 완료' : '채팅방 순서 변경'}
+              active={reordering}>
+              <ListRestart size={17} />
+            </IconButton>
           )}
-          <button
-            onClick={() => navigate('/characters')}
-            aria-label="캐릭터"
-            title="캐릭터"
-            className="ui-touch-target room-list-icon-action"
-            style={{ width: 44, height: 44, background: 'none', border: `1px solid ${t.border}`, borderRadius: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <Users size={17} color={t.subText} />
-          </button>
-          <button
-            onClick={() => navigate('/settings')}
-            aria-label="설정"
-            title="설정"
-            className="ui-touch-target room-list-icon-action"
-            style={{ width: 44, height: 44, background: 'none', border: `1px solid ${t.border}`, borderRadius: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <Settings size={17} color={t.subText} />
-          </button>
+          <IconButton className="room-list-icon-action" onClick={() => navigate('/characters')} label="캐릭터">
+            <Users size={17} />
+          </IconButton>
+          <IconButton className="room-list-icon-action" onClick={() => navigate('/settings')} label="설정">
+            <Settings size={17} />
+          </IconButton>
         </div>
 
-        <div className="room-list-search" style={{ position: 'relative', marginBottom: 14 }}>
-          <Search size={15} color={t.subText} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)' }} />
-          <input className="room-list-search__input" value={searchQuery} onChange={event => setSearchQuery(event.target.value)} placeholder="역극방 이름 검색" aria-label="역극방 이름 검색" style={{ width: '100%', minHeight: 44, background: t.panel, border: `1px solid ${t.border}`, borderRadius: 11, padding: '10px 38px', color: t.inputText, fontSize: 14, outline: 'none' }} />
-          {searchQuery && <button onClick={() => setSearchQuery('')} aria-label="검색어 지우기" style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', border: 0, background: 'none', padding: 4, cursor: 'pointer', display: 'flex' }}><X size={14} color={t.subText} /></button>}
+        <div className="room-list-search">
+          <Search size={15} className="room-list-search__icon" />
+          <TextInput
+            className="room-list-input room-list-search__input"
+            value={searchQuery}
+            onChange={event => setSearchQuery(event.target.value)}
+            placeholder="역극방 이름 검색"
+            aria-label="역극방 이름 검색"
+          />
+          {searchQuery && (
+            <IconButton className="room-list-icon-button room-list-search__clear" onClick={() => setSearchQuery('')} label="검색어 지우기">
+              <X size={14} />
+            </IconButton>
+          )}
         </div>
 
-        <div className="room-list-sort" style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 12, padding: 4, borderRadius: 11, border: `1px solid ${t.border}`, background: `color-mix(in srgb, ${t.panel} 86%, transparent)` }}>
-          <button
+        <div className="room-list-sort">
+          <Button
+            variant="ghost"
             className={`room-list-sort__button${sortMode === 'recent' ? ' is-active' : ''}`}
-            onClick={() => changeSortMode('recent')}
-            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '7px 9px', border: 0, borderRadius: 8, background: sortMode === 'recent' ? `${t.point}28` : 'transparent', color: sortMode === 'recent' ? t.point : t.subText, fontSize: 11, cursor: 'pointer' }}>
+            onClick={() => changeSortMode('recent')}>
             <Clock3 size={13} />최근 대화순
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="ghost"
             className={`room-list-sort__button${sortMode === 'manual' ? ' is-active' : ''}`}
-            onClick={() => changeSortMode('manual')}
-            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '7px 9px', border: 0, borderRadius: 8, background: sortMode === 'manual' ? `${t.point}28` : 'transparent', color: sortMode === 'manual' ? t.point : t.subText, fontSize: 11, cursor: 'pointer' }}>
+            onClick={() => changeSortMode('manual')}>
             <GripVertical size={13} />직접 정렬
-          </button>
+          </Button>
         </div>
 
-        <div className="room-list-group-actions" style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
-          <button
-            type="button"
+        <div className="room-list-group-actions">
+          <Button
+            variant="secondary"
             className="room-list-group-create"
             onClick={() => {
               setShowCreate(false)
               setShowJoin(false)
               setShowGroupCreate(current => !current)
             }}
-            aria-expanded={showGroupCreate}
-            style={{ minHeight: 36, display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0 11px', border: `1px solid ${showGroupCreate ? t.point : t.border}`, borderRadius: 9, background: showGroupCreate ? `${t.point}22` : t.panel, color: showGroupCreate ? t.point : t.subText, fontSize: 11, cursor: 'pointer' }}>
+            aria-expanded={showGroupCreate}>
             <FolderPlus size={14} />새 그룹
-          </button>
+          </Button>
         </div>
 
-        {showGroupCreate && <RoomGroupCreatePanel onCreate={addRoomGroup} onClose={() => setShowGroupCreate(false)} theme={t} />}
+        {showGroupCreate && <RoomGroupCreatePanel onCreate={addRoomGroup} onClose={() => setShowGroupCreate(false)} />}
 
         {/* 방 만들기 폼 */}
         {showCreate && (
-          <div
-            className="inline-panel-reveal room-list-inline-panel"
-            style={{
-              background: t.panel,
-              borderRadius: 12,
-              padding: 14,
-              marginBottom: 12,
-              border: `1px solid ${t.border}`,
-              boxShadow: `0 1px 4px rgba(0,0,0,0.15)`,
-            }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 14, padding: 4, borderRadius: 10, background: t.bg }}>
-              <button style={{ minHeight: 38, border: 0, borderRadius: 8, background: `${t.point}28`, color: t.point, fontSize: 12, fontWeight: 600 }}>방 만들기</button>
-              <button onClick={() => { setShowCreate(false); setShowJoin(true) }} style={{ minHeight: 38, border: 0, borderRadius: 8, background: 'transparent', color: t.subText, fontSize: 12 }}>초대 코드</button>
+          <Card className="inline-panel-reveal room-list-inline-panel">
+            <div className="room-list-panel-tabs">
+              <Button variant="ghost" className="room-list-panel-tab is-active">방 만들기</Button>
+              <Button variant="ghost" className="room-list-panel-tab" onClick={() => { setShowCreate(false); setShowJoin(true) }}>초대 코드</Button>
             </div>
-            <div style={{ fontSize: 13, color: t.subText, marginBottom: 8 }}>채팅방 이름</div>
-            <input
+            <div className="room-list-field-label">채팅방 이름</div>
+            <TextInput
+              aria-label="채팅방 이름"
+              className="room-list-input"
               value={roomName}
               onChange={e => setRoomName(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && createRoom()}
               placeholder="예) 세라핀 × 리온"
-              style={{
-                width: '100%',
-                background: t.bg,
-                border: `1px solid ${t.border}`,
-                boxShadow: `0 1px 4px rgba(0,0,0,0.15)`,
-                borderRadius: 8,
-                padding: '9px 12px',
-                color: t.inputText,
-                fontSize: 13,
-                outline: 'none',
-                boxSizing: 'border-box',
-              }}
             />
             <RoomGroupPicker
               groups={roomGroups}
               value={createRoomGroupId}
               onChange={setCreateRoomGroupId}
-              theme={t}
               disabled={loading}
             />
-            <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-              <button
-                onClick={createRoom}
-                disabled={loading}
-                style={{
-                  flex: 1,
-                  background: t.point,
-                  border: 'none',
-                  borderRadius: 8,
-                  padding: '9px',
-                  color: '#fff',
-                  fontSize: 12,
-                  cursor: 'pointer',
-                }}>
-                만들기
-              </button>
-              <button
-                onClick={() => setShowCreate(false)}
-                style={{
-                  flex: 1,
-                  background: 'none',
-                  border: `1px solid ${t.border}`,
-                  boxShadow: `0 1px 4px rgba(0,0,0,0.15)`,
-                  borderRadius: 8,
-                  padding: '9px',
-                  color: t.subText,
-                  fontSize: 12,
-                  cursor: 'pointer',
-                }}>
-                취소
-              </button>
+            <div className="room-list-panel-actions">
+              <Button onClick={createRoom} disabled={loading}>만들기</Button>
+              <Button variant="secondary" onClick={() => setShowCreate(false)}>취소</Button>
             </div>
-          </div>
+          </Card>
         )}
 
         {/* 초대코드 입장 폼 */}
         {showJoin && (
-          <div
-            className="inline-panel-reveal room-list-inline-panel"
-            style={{
-              background: t.panel,
-              borderRadius: 12,
-              padding: 14,
-              marginBottom: 12,
-              border: `1px solid ${t.border}`,
-              boxShadow: `0 1px 4px rgba(0,0,0,0.15)`,
-            }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 14, padding: 4, borderRadius: 10, background: t.bg }}>
-              <button onClick={() => { setShowJoin(false); setShowCreate(true) }} style={{ minHeight: 38, border: 0, borderRadius: 8, background: 'transparent', color: t.subText, fontSize: 12 }}>방 만들기</button>
-              <button style={{ minHeight: 38, border: 0, borderRadius: 8, background: `${t.point}28`, color: t.point, fontSize: 12, fontWeight: 600 }}>초대 코드</button>
+          <Card className="inline-panel-reveal room-list-inline-panel">
+            <div className="room-list-panel-tabs">
+              <Button variant="ghost" className="room-list-panel-tab" onClick={() => { setShowJoin(false); setShowCreate(true) }}>방 만들기</Button>
+              <Button variant="ghost" className="room-list-panel-tab is-active">초대 코드</Button>
             </div>
-            <div style={{ fontSize: 13, color: t.subText, marginBottom: 8 }}>초대 코드</div>
-            <input
+            <div className="room-list-field-label">초대 코드</div>
+            <TextInput
+              aria-label="초대 코드"
+              className="room-list-input"
               value={inviteCode}
               onChange={e => setInviteCode(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && joinRoom()}
               placeholder="8자리 코드 입력"
-              style={{
-                width: '100%',
-                background: t.bg,
-                border: `1px solid ${t.border}`,
-                boxShadow: `0 1px 4px rgba(0,0,0,0.15)`,
-                borderRadius: 8,
-                padding: '9px 12px',
-                color: t.inputText,
-                fontSize: 13,
-                outline: 'none',
-                boxSizing: 'border-box',
-              }}
             />
             <RoomGroupPicker
               groups={roomGroups}
               value={joinRoomGroupId}
               onChange={setJoinRoomGroupId}
-              theme={t}
               disabled={loading}
             />
-            <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-              <button
-                onClick={joinRoom}
-                disabled={loading}
-                style={{
-                  flex: 1,
-                  background: t.point,
-                  border: 'none',
-                  borderRadius: 8,
-                  padding: '9px',
-                  color: '#fff',
-                  fontSize: 12,
-                  cursor: 'pointer',
-                }}>
-                입장
-              </button>
-              <button
-                onClick={() => setShowJoin(false)}
-                style={{
-                  flex: 1,
-                  background: 'none',
-                  border: `1px solid ${t.border}`,
-                  boxShadow: `0 1px 4px rgba(0,0,0,0.15)`,
-                  borderRadius: 8,
-                  padding: '9px',
-                  color: t.subText,
-                  fontSize: 12,
-                  cursor: 'pointer',
-                }}>
-                취소
-              </button>
+            <div className="room-list-panel-actions">
+              <Button onClick={joinRoom} disabled={loading}>입장</Button>
+              <Button variant="secondary" onClick={() => setShowJoin(false)}>취소</Button>
             </div>
-          </div>
+          </Card>
         )}
 
         {/* 방 목록 */}
-        {reordering && <div className="reorder-mode-reveal" style={{ color: t.subText, fontSize: 11, marginBottom: 8 }}>손잡이를 끌어 채팅방 순서를 변경하세요.</div>}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {reordering && <div className="reorder-mode-reveal room-list-reorder-hint">손잡이를 끌어 채팅방 순서를 변경하세요.</div>}
+        <div>
           {rooms.length === 0 && (
-            <div className="ui-empty-state" style={{ color: t.subText }}>
-              <div className="ui-empty-state__icon" style={{ color: t.point, background: `${t.point}18`, border: `1px solid ${t.point}38` }}><MessageCircle size={27} /></div>
-              <strong style={{ color: t.theirText, fontSize: 16 }}>첫 이야기를 시작해보세요</strong>
-              <span style={{ maxWidth: 270, fontSize: 13, lineHeight: 1.6 }}>새 역극방을 만들거나 받은 초대 코드로 친구의 방에 들어갈 수 있어요.</span>
-              <div className="ui-empty-state__actions">
-                <button onClick={() => { setShowJoin(false); setShowCreate(true) }} style={{ border: 0, background: t.point, color: '#fff' }}><CirclePlus size={15} /> 방 만들기</button>
-                <button onClick={() => { setShowCreate(false); setShowJoin(true) }} style={{ border: `1px solid ${t.border}`, background: t.panel, color: t.theirText }}><LogIn size={15} /> 코드 입장</button>
+            <div className="room-list-empty">
+              <div className="room-list-empty__icon"><MessageCircle size={27} /></div>
+              <strong className="room-list-empty__title">첫 이야기를 시작해보세요</strong>
+              <span className="room-list-empty__description">새 역극방을 만들거나 받은 초대 코드로 친구의 방에 들어갈 수 있어요.</span>
+              <div className="room-list-empty__actions">
+                <Button onClick={() => { setShowJoin(false); setShowCreate(true) }}><CirclePlus size={15} /> 방 만들기</Button>
+                <Button variant="secondary" onClick={() => { setShowCreate(false); setShowJoin(true) }}><LogIn size={15} /> 코드 입장</Button>
               </div>
             </div>
           )}
-          {rooms.length > 0 && filteredRooms.length === 0 && <div style={{ textAlign: 'center', color: t.subText, fontSize: 13, marginTop: 32, opacity: 0.6 }}>검색 결과가 없어요.</div>}
+          {rooms.length > 0 && filteredRooms.length === 0 && <div className="room-list-no-results">검색 결과가 없어요.</div>}
         </div>
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleRoomDragEnd}>
-          <div className="room-list-groups" style={{ width: '100%', minWidth: 0, maxWidth: '100%', display: 'grid', gap: 15, marginTop: rooms.length === 0 ? 10 : 0 }}>
+          <div className={`room-list-groups${rooms.length === 0 ? ' room-list-groups--empty' : ''}`}>
             {roomGroupSections.map(section => {
               const collapsed = collapsedGroupIds.has(section.id)
               const unreadCount = section.rooms.reduce((sum, room) => sum + room.unreadCount, 0)
               return (
-                <section className="room-list-group" key={section.id} style={{ width: '100%', minWidth: 0, maxWidth: '100%' }}>
-                  <div className="room-list-group__header" style={{ display: 'flex', alignItems: 'center', gap: 5, minHeight: 34, marginBottom: collapsed ? 0 : 7 }}>
-                    <button
-                      type="button"
+                <section className="room-list-group" key={section.id}>
+                  <div className="room-list-group__header">
+                    <Button
+                      variant="ghost"
                       className="room-list-group__toggle"
                       onClick={() => toggleRoomGroup(section.id)}
-                      aria-expanded={!collapsed}
-                      style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 7, padding: '5px 2px', border: 0, background: 'transparent', color: t.theirText, textAlign: 'left' }}>
-                      {collapsed ? <ChevronRight size={14} color={t.subText} /> : <ChevronDown size={14} color={t.subText} />}
-                      <Folder size={14} color={section.id === UNASSIGNED_ROOM_GROUP_ID ? t.subText : t.point} />
-                      <strong style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 12 }}>{section.name}</strong>
-                      <span style={{ color: t.subText, fontSize: 10 }}>{section.rooms.length}</span>
-                      {unreadCount > 0 && <span style={{ marginLeft: 2, padding: '1px 6px', borderRadius: 9, background: `${t.point}24`, color: t.point, fontSize: 9 }}>{unreadCount}</span>}
-                    </button>
+                      aria-expanded={!collapsed}>
+                      {collapsed ? <ChevronRight size={14} className="room-list-group__chevron" /> : <ChevronDown size={14} className="room-list-group__chevron" />}
+                      <Folder size={14} className={section.id === UNASSIGNED_ROOM_GROUP_ID ? 'room-list-group__chevron' : 'room-list-group__folder'} />
+                      <strong className="room-list-group__name">{section.name}</strong>
+                      <span className="room-list-group__count">{section.rooms.length}</span>
+                      {unreadCount > 0 && <span className="room-list-group__unread">{unreadCount}</span>}
+                    </Button>
                     {section.id !== UNASSIGNED_ROOM_GROUP_ID && (
-                      <button className="room-list-group__delete" type="button" aria-label={`${section.name} 그룹 삭제`} onClick={() => removeRoomGroup(section)} style={{ width: 32, height: 32, display: 'grid', placeItems: 'center', border: 0, borderRadius: 8, background: 'transparent', color: t.subText, opacity: 0.58 }}><Trash2 size={13} /></button>
+                      <IconButton className="room-list-icon-button room-list-group__delete" label={`${section.name} 그룹 삭제`} onClick={() => removeRoomGroup(section)}>
+                        <Trash2 size={13} />
+                      </IconButton>
                     )}
                   </div>
                   {!collapsed && (
                     <SortableContext items={section.rooms.map(room => room.id)} strategy={verticalListSortingStrategy}>
-                      <div className="room-list-group__rooms" style={{ width: '100%', minWidth: 0, maxWidth: '100%', display: 'grid', gap: 8 }}>
+                      <div className="room-list-group__rooms">
                         {section.rooms.map(renderRoomCard)}
-                        {section.rooms.length === 0 && <div style={{ padding: '10px 12px', borderRadius: 10, background: `${t.panel}88`, color: t.subText, fontSize: 11 }}>아직 이 그룹에 방이 없어요.</div>}
+                        {section.rooms.length === 0 && <div className="room-list-group__empty">아직 이 그룹에 방이 없어요.</div>}
                       </div>
                     </SortableContext>
                   )}
