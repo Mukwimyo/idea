@@ -113,10 +113,10 @@ easing (3종)
 ## B4. 테마 → CSS 변수
 
 주입 방식
-- 새 파일 `src/lib/themeVars.js`: `themeToCssVars(theme)` (순수 함수, 테스트 대상) + `applyThemeVars(theme)` (`document.documentElement`에 설정, `data-theme-tone="dark|light"`와 `color-scheme`도 설정).
-- 각 페이지가 테마를 결정하는 지점(`setTheme` 직후 또는 `useEffect([theme])`)에서 `applyThemeVars` 호출. Room의 "공유 테마 따라가기"도 동일하게 현재 적용 테마 기준.
-- A6의 `--app-bg`(현재 App.jsx 시작 시에만 갱신)는 `--c-bg`로 통합. 설정 화면 테마 변경·채팅방 공유 테마 적용 시에도 즉시 반영되어야 한다(A6 미완 부분).
-- 페이지별 변수(`--room-list-*`, `--quick-tool-*`, `--ui-mode-*`)는 B4에서 새 변수의 별칭으로만 바꾸고(`--room-list-bg: var(--c-bg)` 등), 제거는 C 단계.
+- 새 파일 `src/lib/themeVars.js`: `themeToCssVars(theme)` (순수 함수, 테스트 대상) + `applyThemeVars(theme)` (`document.documentElement`에 설정, `data-theme-tone="dark|light"` 설정. `color-scheme`은 브라우저 기본 컨트롤 색까지 바뀌어 B4에서 보류, C 단계 컨트롤 정리 때 적용).
+- 훅 `useThemeVars(theme)` (같은 파일, `useEffect([theme])`에서 `applyThemeVars` 호출, theme가 없으면 무시)를 각 페이지가 화면에 쓰는 테마(`t`)로 호출: Room, RoomList, Characters, CharacterEdit, CharacterTextEffects, Help, Settings. Room의 "공유 테마 따라가기"도 현재 적용 테마 기준. 설정의 테마 미리보기 카드처럼 현재 테마가 아닌 색은 적용하지 않는다.
+- A6의 `--app-bg`(현재 App.jsx 시작 시에만 갱신)는 `--c-bg`로 통합. App.jsx 시작 시 캐시 테마로 `applyThemeVars` 1회 호출, 이후 페이지 훅이 갱신(A6 미완 부분 해결).
+- 페이지별 변수(`--room-list-*`, `--quick-tool-*`, `--ui-mode-*`)는 B4에서 건드리지 않는다. C 단계 각 화면에서 `--c-*`로 교체 후 제거(인라인 주입을 없애는 순간 첫 렌더 색이 달라질 수 있어 화면 단위로 확인).
 - 인라인 `t.xxx` 사용처 교체는 C 단계. B4는 변수만 존재하게 한다.
 
 역할별 변수 (테마 객체에서)

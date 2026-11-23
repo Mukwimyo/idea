@@ -5,6 +5,7 @@ import TextEffectConfigurator from '../components/TextEffectConfigurator'
 import LoadingScreen from '../components/LoadingScreen'
 import { supabase } from '../lib/supabase'
 import { DEFAULT_THEME_ID, getTheme } from '../lib/themes'
+import { useThemeVars } from '../lib/themeVars'
 import { normalizeTextEffectSettings } from '../features/messages/textEffectSettings'
 
 export default function CharacterTextEffects() {
@@ -36,6 +37,8 @@ export default function CharacterTextEffects() {
     })()
     return () => { active = false }
   }, [characterId])
+
+  useThemeVars(theme)
 
   if (!theme || (!character && !notice)) return <LoadingScreen />
 

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase, uploadFile, validateImageFile } from '../lib/supabase'
 import { DEFAULT_THEME_ID, getTheme } from '../lib/themes'
+import { useThemeVars } from '../lib/themeVars'
 import { ChevronLeft, X, RotateCcw, Search, Check, ArrowDownAZ, GripVertical, Play, Pause, Trash2, Sparkles } from 'lucide-react'
 import Cropper from 'react-easy-crop'
 import { DndContext, PointerSensor, TouchSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core'
@@ -444,10 +445,12 @@ export default function Characters() {
     fetchChars()
   }
 
+  const t = theme
+  useThemeVars(t)
+
   if (!theme)
     return <LoadingScreen />
 
-  const t = theme
   const normalizedSearch = searchQuery.trim().toLocaleLowerCase('ko-KR')
   const filteredChars = chars.filter(character => character.name.toLocaleLowerCase('ko-KR').includes(normalizedSearch))
   const visibleChars = alphabeticalView ? [...filteredChars].sort((a, b) => a.name.localeCompare(b.name, 'ko-KR')) : filteredChars

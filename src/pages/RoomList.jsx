@@ -2,6 +2,7 @@ import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { DEFAULT_THEME_ID, getTheme } from '../lib/themes'
+import { useThemeVars } from '../lib/themeVars'
 import { Settings, Users, Trash2, CirclePlus, LogIn, Search, ListRestart, GripVertical, X, Star, Clock3, MoreHorizontal, MessageCircle, Folder, FolderPlus, ChevronDown, ChevronRight } from 'lucide-react'
 import { DndContext, PointerSensor, TouchSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core'
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
@@ -372,10 +373,12 @@ export default function RoomList() {
     }
   }
 
+  const t = theme
+  useThemeVars(t)
+
   if (!theme)
     return <LoadingScreen />
 
-  const t = theme
   const logoVariant = t.dark ? 'dark' : 'light'
   const headerLogo = `${import.meta.env.BASE_URL}branding/idea-logo-header-${logoVariant}.png`
   const backgroundLogo = `${import.meta.env.BASE_URL}branding/idea-logo-background-tile-${logoVariant}.png`

@@ -5,6 +5,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import LoadingScreen from '../components/LoadingScreen'
 import { supabase, uploadFile, validateImageFile } from '../lib/supabase'
 import { DEFAULT_THEME_ID, getTheme } from '../lib/themes'
+import { useThemeVars } from '../lib/themeVars'
 import { cropProfileImage } from '../lib/profileImageCrop'
 
 const DEFAULT_AVATAR = `${import.meta.env.BASE_URL}default-avatar.png`
@@ -63,8 +64,10 @@ export default function CharacterEdit() {
     return () => { active = false }
   }, [characterId])
 
-  if (!theme || (!character && !notice)) return <LoadingScreen />
   const t = theme
+  useThemeVars(t)
+
+  if (!theme || (!character && !notice)) return <LoadingScreen />
 
   const chooseImage = event => {
     const file = event.target.files?.[0]

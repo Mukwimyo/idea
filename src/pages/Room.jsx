@@ -2,6 +2,7 @@ import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase, uploadFile, validateImageFile } from '../lib/supabase'
 import { DEFAULT_THEME_ID, THEMES, getTheme } from '../lib/themes'
+import { useThemeVars } from '../lib/themeVars'
 import { prefersReducedMotion } from '../lib/motion'
 import { ChevronLeft, ChevronRight, Settings, Search, Images, ArrowUp, Eye, ArrowDown, ChevronDown, ChevronUp, Quote, RotateCcw, AlertCircle, Minus, Phone, Copy, DoorOpen, Send, Music, Grid2X2, ImagePlus, Star, Bookmark, MapPin, StickyNote, Dices, Crown, Percent, Scissors, Shuffle, Sparkles, UserRound, UsersRound, X } from 'lucide-react'
 import ProfileImageModal from '../components/ProfileImageModal'
@@ -1630,6 +1631,7 @@ export default function Room() {
   }
 
   const t = theme || getTheme(DEFAULT_THEME_ID)
+  useThemeVars(theme)
 
   const roomTools = [
     { id: 'image', label: '이미지', icon: ImagePlus },

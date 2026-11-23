@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { DEFAULT_THEME_ID, THEMES, getTheme } from '../lib/themes'
+import { useThemeVars } from '../lib/themeVars'
 import { ChevronLeft, ChevronRight, LogOut, Users, Bell, BellOff, CircleHelp } from 'lucide-react'
 import { supabase, subscribePush, unsubscribePush } from '../lib/supabase'
 import Toast from '../components/Toast'
@@ -259,6 +260,7 @@ export default function Settings() {
   }
 
   const t = getTheme(myThemeId)
+  useThemeVars(t)
   const darkThemes = THEMES.filter(th => th.dark)
   const lightThemes = THEMES.filter(th => !th.dark)
 

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { supabase } from './lib/supabase'
 import { getTheme } from './lib/themes'
+import { applyThemeVars } from './lib/themeVars'
 import Auth from './pages/Auth'
 import RoomList from './pages/RoomList'
 import Room from './pages/Room'
@@ -35,11 +36,7 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    const updateAppBackground = themeId => {
-      document.documentElement.style.setProperty('--app-bg', getTheme(themeId).bg)
-    }
-
-    updateAppBackground(localStorage.getItem('idea-theme-id'))
+    applyThemeVars(getTheme(localStorage.getItem('idea-theme-id')))
     supabase.auth.getSession().then(({ data: { session } }) => setSession(session))
     const {
       data: { subscription },
@@ -58,7 +55,6 @@ export default function App() {
           }
           if (data?.theme_id) {
             localStorage.setItem('idea-theme-id', data.theme_id)
-            updateAppBackground(data.theme_id)
           }
           const fontScale = Number(data?.font_scale || localStorage.getItem('idea-font-scale') || 1)
           document.documentElement.style.setProperty('--idea-font-scale', String(fontScale))

@@ -30,6 +30,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { DEFAULT_THEME_ID, getTheme } from '../lib/themes'
+import { useThemeVars } from '../lib/themeVars'
 
 const Section = ({ title, children, theme }) => (
   <section className="help-section" style={{ marginBottom: 28 }}>
@@ -74,6 +75,7 @@ export default function Help() {
   }, [])
 
   const t = theme
+  useThemeVars(t)
 
   return (
     <div className="settings-page-drawer modern-surface-page help-page" style={{ position: 'fixed', inset: 0, zIndex: 100, overflowY: 'auto', background: t.bg, color: t.theirText }}>
