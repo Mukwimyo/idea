@@ -911,6 +911,22 @@ export default function Room() {
     persistMessageRef.current = persistMessage
   })
 
+  useLayoutEffect(() => {
+    const textarea = inputRef.current
+    if (!textarea) return
+
+    const resizeComposer = () => {
+      const scrollTop = textarea.scrollTop
+      textarea.style.height = '34px'
+      textarea.style.height = `${textarea.scrollHeight}px`
+      textarea.scrollTop = scrollTop
+    }
+
+    resizeComposer()
+    window.addEventListener('resize', resizeComposer)
+    return () => window.removeEventListener('resize', resizeComposer)
+  }, [input, theme])
+
   const sendMessage = async () => {
     if (!input.trim()) return
     const content = input.trim().replace(/\(([^)]*$)/g, '($1)')
@@ -2873,7 +2889,7 @@ export default function Room() {
         {showQuickToolPicker && (
           <QuickToolPicker tools={favoriteRoomTools} activeId={quickTool} theme={t} onSelect={selectQuickTool} />
         )}
-        <div style={{ position: 'relative', display: 'flex', gap: 2, alignItems: 'center', width: '100%', height: 42, minHeight: 42, padding: '0 2px', borderRadius: showRoleplayMenu ? '0 0 22px 22px' : 22, background: `color-mix(in srgb, ${t.panel} 88%, transparent)`, backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)', border: `1px solid color-mix(in srgb, ${t.border} 65%, transparent)`, borderTop: showRoleplayMenu ? 0 : `1px solid color-mix(in srgb, ${t.border} 65%, transparent)`, boxShadow: showRoleplayMenu ? '0 8px 20px rgba(0,0,0,0.12)' : '0 8px 24px rgba(0,0,0,0.22)', pointerEvents: 'auto' }}>
+        <div style={{ position: 'relative', display: 'flex', gap: 2, alignItems: 'center', width: '100%', minHeight: 42, padding: '0 2px', borderRadius: showRoleplayMenu ? '0 0 22px 22px' : 22, background: `color-mix(in srgb, ${t.panel} 88%, transparent)`, backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)', border: `1px solid color-mix(in srgb, ${t.border} 65%, transparent)`, borderTop: showRoleplayMenu ? 0 : `1px solid color-mix(in srgb, ${t.border} 65%, transparent)`, boxShadow: showRoleplayMenu ? '0 8px 20px rgba(0,0,0,0.12)' : '0 8px 24px rgba(0,0,0,0.22)', pointerEvents: 'auto' }}>
           <button className="ui-touch-target" onMouseDown={e => e.preventDefault()} onClick={() => { setShowQuickToolPicker(false); if (showRoleplayMenu) closeRoleplayMenu(); else openRoleplayMenu() }} aria-label="대화 도구 메뉴" aria-expanded={showRoleplayMenu} style={{ width: 44, height: 44, padding: 0, border: 0, background: 'transparent', cursor: 'pointer', flexShrink: 0, display: 'grid', placeItems: 'center' }}>
             <span style={{ width: 34, height: 34, display: 'grid', placeItems: 'center', borderRadius: '50%', border: `1px solid ${showRoleplayMenu ? t.point : 'transparent'}`, background: showRoleplayMenu ? `${t.point}2f` : `${t.border}66` }}><Grid2X2 size={16} color={showRoleplayMenu ? t.point : t.subText} /></span>
           </button>
@@ -2906,7 +2922,7 @@ export default function Room() {
               placeholder={isNarrActive ? '나레이션 입력...' : activeChar ? `${activeChar.name}${instrumentalParticle(activeChar.name)} 입력...` : '캐릭터를 먼저 추가해주세요'}
               enterKeyHint="enter"
               rows={1}
-              style={{ flex: 1, minWidth: 0, height: 34, minHeight: 34, maxHeight: 34, overflowY: 'auto', background: 'transparent', border: 'none', borderRadius: 0, padding: '6px 5px', color: isNarrActive ? t.narrColor : t.inputText, fontSize: 'calc(14px * var(--idea-font-scale, 1))', outline: 'none', resize: 'none', lineHeight: 1.55, fontStyle: isNarrActive ? 'italic' : 'normal' }}
+              style={{ flex: 1, minWidth: 0, minHeight: 34, maxHeight: 120, overflowY: 'auto', background: 'transparent', border: 'none', borderRadius: 0, padding: '6px 5px', color: isNarrActive ? t.narrColor : t.inputText, fontSize: 'max(16px, calc(14px * var(--idea-font-scale, 1)))', outline: 'none', resize: 'none', lineHeight: 1.35, fontStyle: isNarrActive ? 'italic' : 'normal' }}
             />
             {myChars.length > 0 && selectedQuickTool && (() => {
               const QuickToolIcon = selectedQuickTool.icon
