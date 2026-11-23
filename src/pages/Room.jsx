@@ -16,6 +16,7 @@ import SharedBackgroundAudio from '../components/SharedBackgroundAudio'
 import RoomWorldPanel from '../components/RoomWorldPanel'
 import RandomTools from '../components/RandomTools'
 import ConfirmDialog from '../components/ConfirmDialog'
+import { Button, Card, IconButton, TextArea, TextInput, Toggle } from '../components/ui'
 import QuickToolPicker from '../components/QuickToolPicker'
 import { MessageEffectBubble, MessageEffectChip, MessageEffectPicker } from '../components/MessageEffects'
 import AnimatedMessageText from '../components/AnimatedMessageText'
@@ -63,7 +64,7 @@ function instrumentalParticle(name) {
   return finalConsonant === 0 || finalConsonant === 8 ? '로' : '으로'
 }
 
-function SlotEntrance({ roomName, bgColor, pointColor, onDone }) {
+function SlotEntrance({ roomName, onDone }) {
   const reelRef = useRef(null)
   const [dots, setDots] = useState('')
 
@@ -91,7 +92,7 @@ function SlotEntrance({ roomName, bgColor, pointColor, onDone }) {
     items.forEach(text => {
       const div = document.createElement('div')
       div.textContent = text
-      div.style.cssText = `height:${ITEM_H}px;line-height:${ITEM_H}px;font-size:20px;color:${pointColor}33;white-space:nowrap;text-align:center;width:100%;font-family:sans-serif;transition:font-size 0.5s ease,color 0.5s ease,height 0.5s ease,line-height 0.5s ease;`
+      div.className = 'room-slot__item'
       reel.appendChild(div)
     })
 
@@ -107,14 +108,9 @@ function SlotEntrance({ roomName, bgColor, pointColor, onDone }) {
           spans.forEach((s, i) => {
             const dist = Math.abs(i - targetIdx)
             if (dist === 0) {
-              s.style.fontSize = '36px'
-              s.style.fontWeight = '600'
-              s.style.color = pointColor
-              s.style.height = '80px'
-              s.style.lineHeight = '80px'
+              s.classList.add('room-slot__item--selected')
             } else if (dist === 1) {
-              s.style.fontSize = '22px'
-              s.style.color = pointColor + '88'
+              s.classList.add('room-slot__item--adjacent')
             }
           })
           setTimeout(() => {
@@ -130,15 +126,13 @@ function SlotEntrance({ roomName, bgColor, pointColor, onDone }) {
   }, [roomName])
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: bgColor, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 20 }}>
-      <div style={{ fontSize: 20, color: pointColor + '88', letterSpacing: 3, textAlign: 'center', width: 160 }}>ENTERING{dots}</div>
-      <div style={{ width: '60%', maxWidth: 260, height: 0.5, background: pointColor + '44' }} />
-      <div style={{ height: `${WINDOW_H}px`, overflow: 'hidden', position: 'relative', width: '100%', maxWidth: 360 }}>
-        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 80, zIndex: 2, background: `linear-gradient(to bottom, ${bgColor} 20%, transparent)` }} />
-        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 80, zIndex: 2, background: `linear-gradient(to top, ${bgColor} 20%, transparent)` }} />
-        <div ref={reelRef} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', willChange: 'transform' }} />
+    <div className="room-slot" style={{ '--room-slot-item-height': `${ITEM_H}px`, '--room-slot-window-height': `${WINDOW_H}px` }}>
+      <div className="room-slot__status">ENTERING{dots}</div>
+      <div className="room-slot__divider" />
+      <div className="room-slot__window">
+        <div ref={reelRef} className="room-slot__reel" />
       </div>
-      <div style={{ width: '60%', maxWidth: 260, height: 0.5, background: pointColor + '44' }} />
+      <div className="room-slot__divider" />
     </div>
   )
 }
@@ -155,7 +149,7 @@ function parseContent(text, actionSize) {
   while ((m = re.exec(text)) !== null) {
     if (m.index > last) parts.push(<span key={last}>{text.slice(last, m.index)}</span>)
     parts.push(
-      <span key={m.index} style={{ fontSize: actionSize === 'large' ? '1em' : '0.85em', color: 'inherit', opacity: 1 }}>
+      <span key={m.index} className={actionSize === 'large' ? 'message-action-text message-action-text--large' : 'message-action-text'}>
         {m[0]}
       </span>
     )
@@ -1660,36 +1654,26 @@ export default function Room() {
     const isBookmarked = bookmarkedMessageIds.has(msg.id)
     return (
       <div
-        className="message-action-menu"
+        className="message-action-menu message-controls"
         data-message-menu="true"
-        onPointerDown={event => event.stopPropagation()}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          marginTop: 5,
-          border: `1px solid ${t.border}`,
-          borderRadius: 9,
-          overflow: 'hidden',
-          background: t.panel,
-          boxShadow: '0 3px 10px rgba(0,0,0,0.2)',
-        }}>
-        <button onClick={() => toggleMessageBookmark(msg)} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, border: 0, background: 'none', color: isBookmarked ? t.point : t.theirText, padding: '7px 11px', fontSize: 11, cursor: 'pointer' }}>
+        onPointerDown={event => event.stopPropagation()}>
+        <Button variant="ghost" className={isBookmarked ? 'message-control--bookmarked' : undefined} onClick={() => toggleMessageBookmark(msg)}>
           <Bookmark size={12} fill={isBookmarked ? 'currentColor' : 'none'} />
           {isBookmarked ? '해제' : '북마크'}
-        </button>
-        {isMine && <div style={{ width: 1, alignSelf: 'stretch', background: t.border }} />}
+        </Button>
+        {isMine && <div className="message-control-divider" />}
         {isMine && canEdit && (
           <>
-            <button onClick={() => startEditingMessage(msg)} style={{ border: 0, background: 'none', color: t.theirText, padding: '7px 13px', fontSize: 11, cursor: 'pointer' }}>
+            <Button variant="ghost" onClick={() => startEditingMessage(msg)}>
               수정
-            </button>
-            <div style={{ width: 1, alignSelf: 'stretch', background: t.border }} />
+            </Button>
+            <div className="message-control-divider" />
           </>
         )}
         {isMine && (
-          <button disabled={deletingMessageId === msg.id} onClick={() => deleteMessage(msg)} style={{ border: 0, background: 'none', color: '#f87171', padding: '7px 13px', fontSize: 11, cursor: 'pointer' }}>
+          <Button variant="ghost" className="message-control--danger" disabled={deletingMessageId === msg.id} onClick={() => deleteMessage(msg)}>
             삭제
-          </button>
+          </Button>
         )}
       </div>
     )
@@ -1698,31 +1682,32 @@ export default function Room() {
     if (msg.delivery_state === 'uploading') {
       const progress = Math.max(0, Math.min(100, msg.upload_progress || 0))
       return (
-        <div style={{ width: 150, marginTop: 5 }}>
-          <div style={{ marginBottom: 3, color: t.subText, fontSize: 10 }}>업로드 중 {progress}%</div>
-          <div style={{ height: 3, overflow: 'hidden', borderRadius: 2, background: t.border }}>
-            <div style={{ width: `${progress}%`, height: '100%', borderRadius: 2, background: t.point, transition: 'width 120ms linear' }} />
+        <div className="message-upload">
+          <div className="message-upload__label">업로드 중 {progress}%</div>
+          <div className="message-upload__track">
+            <div className="message-upload__progress" style={{ width: `${progress}%` }} />
           </div>
         </div>
       )
     }
-    if (msg.delivery_state === 'upload_failed') return <span style={{ marginTop: 4, color: '#f87171', fontSize: 10 }}>파일 업로드 실패</span>
+    if (msg.delivery_state === 'upload_failed') return <span className="message-upload-failed">파일 업로드 실패</span>
     if (msg.delivery_state === 'sending')
       return (
-        <span style={{ position: 'absolute', right: 43, bottom: -7, color: t.subText, fontSize: 9, lineHeight: 1, opacity: 0.62, pointerEvents: 'none' }}>
+        <span className="message-sending">
           전송 중…
         </span>
       )
     if (msg.delivery_state !== 'failed') return null
     return (
-      <button
+      <Button
+        variant="ghost"
         onClick={() => retryMessage(msg)}
-        style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 4, padding: '5px 8px', border: '1px solid #f8717188', borderRadius: 9, color: '#fca5a5', background: '#f8717114', fontSize: 10, cursor: 'pointer' }}>
+        className="message-retry">
         <AlertCircle size={12} />
         전송 실패
         <RotateCcw size={12} />
         다시 시도
-      </button>
+      </Button>
     )
   }
   const isNarrActive = mode === 'narration'
@@ -1819,34 +1804,14 @@ export default function Room() {
       ).length
     : 0
 
-  const iconBtn = (onClick, icon, active) => ({
-    onClick,
-    className: 'ui-touch-target',
-    style: { width: 44, height: 44, background: active ? t.point + '1f' : 'none', border: 'none', borderRadius: 11, padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  })
-
   if (!theme)
     return <LoadingScreen />
 
   return (
     <div
       ref={roomStageRef}
-      style={{
-        position: 'fixed',
-        top: viewportOffsetTop,
-        left: 0,
-        right: 0,
-        width: '100%',
-        height: viewportHeight,
-        overflow: 'hidden',
-        background: t.bg,
-        '--scrollbar-color': t.border,
-        display: 'flex',
-        flexDirection: 'column',
-        maxWidth: 480,
-        margin: '0 auto',
-        animation: !showEntering ? 'slide-in-right 0.3s ease' : 'none',
-      }}>
+      className={!showEntering ? 'room-stage room-stage--slide-in' : 'room-stage'}
+      style={{ top: viewportOffsetTop, height: viewportHeight }}>
       <Toast toast={toast} />
       <ConfirmDialog
         open={Boolean(confirmation)}
@@ -1872,8 +1837,6 @@ export default function Room() {
       {showSlot && room && showEntering && (
         <SlotEntrance
           roomName={room.name}
-          bgColor={t.bg}
-          pointColor={t.point}
           onDone={() => {
             setShowSlot(false)
           }}
@@ -1881,61 +1844,51 @@ export default function Room() {
       )}
 
       {/* 헤더 */}
-      <div
-        style={{
-          background: 'transparent',
-          padding: '8px 12px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          width: '100%',
-          zIndex: 10,
-          isolation: 'isolate',
-        }}>
-        <div
-          aria-hidden="true"
-          style={{
-            position: 'absolute',
-            zIndex: -1,
-            inset: '0 0 -17px',
-            pointerEvents: 'none',
-            background: `linear-gradient(to bottom, color-mix(in srgb, ${t.panel} 68%, transparent) 0%, color-mix(in srgb, ${t.panel} 48%, transparent) 42%, color-mix(in srgb, ${t.panel} 18%, transparent) 72%, transparent 100%)`,
-            backdropFilter: 'blur(9px)',
-            WebkitBackdropFilter: 'blur(9px)',
-            maskImage: 'linear-gradient(to bottom, #000 0%, #000 46%, rgba(0,0,0,0.72) 68%, transparent 100%)',
-            WebkitMaskImage: 'linear-gradient(to bottom, #000 0%, #000 46%, rgba(0,0,0,0.72) 68%, transparent 100%)',
-          }}
-        />
-        <button className="ui-touch-target" aria-label="채팅방 목록으로 돌아가기" onClick={() => navigate('/')} style={{ width: 44, height: 44, flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <ChevronLeft size={22} color={t.subText} />
-        </button>
-        {!(topCharacterPickerEnabled && showTopCharacterPicker) && <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 15, fontWeight: 600, color: t.theirText, lineHeight: 1.3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{room?.name}</div>
-        </div>}
+      <div className="room-header">
+        <div aria-hidden="true" className="room-header__backdrop" />
+        <IconButton className="room-header__button" label="채팅방 목록으로 돌아가기" onClick={() => navigate('/')}>
+          <ChevronLeft size={22} />
+        </IconButton>
+        {!(topCharacterPickerEnabled && showTopCharacterPicker) && (
+          <div className="room-header__title">{room?.name}</div>
+        )}
         {topCharacterPickerEnabled && showTopCharacterPicker ? (
-          <div role="group" aria-label="캐릭터 선택" className="character-strip" style={{ display: 'flex', alignItems: 'center', gap: 7, flex: 1, minWidth: 0, flexWrap: 'nowrap', overflowX: 'auto', overflowY: 'hidden', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', touchAction: 'pan-x', padding: '3px 1px' }}>
+          <div role="group" aria-label="캐릭터 선택" className="character-strip room-header__characters">
             {myChars.length ? myChars.map(character => {
               const selected = activeChar?.id === character.id && mode === 'chat'
-              return <button key={character.id} onMouseDown={event => event.preventDefault()} onPointerDown={preserveComposerFocus} onClick={() => chooseCharacter(character)} aria-label={`${character.name} 선택`} aria-pressed={selected} title={character.name} style={{ width: 36, height: 36, padding: 0, borderRadius: '50%', flex: '0 0 36px', overflow: 'hidden', cursor: 'pointer', background: character.color || t.point, border: `${selected ? 2 : 1}px solid ${selected ? t.point : t.border}`, boxShadow: selected ? `0 0 0 2px color-mix(in srgb, ${t.point} 24%, transparent)` : 'none' }}>
-                <img src={character.image_url || DEFAULT_AVATAR} alt="" style={{ display: 'block', width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
-              </button>
-            }) : <span style={{ color: t.subText, fontSize: 11, whiteSpace: 'nowrap' }}>캐릭터 없음</span>}
+              return (
+                <IconButton
+                  key={character.id}
+                  className="room-header__button room-header__character"
+                  onMouseDown={event => event.preventDefault()}
+                  onPointerDown={preserveComposerFocus}
+                  onClick={() => chooseCharacter(character)}
+                  label={`${character.name} 선택`}
+                  aria-pressed={selected}
+                  title={character.name}>
+                  <span className="room-header__avatar" style={{ backgroundColor: character.color || undefined }}>
+                    <img src={character.image_url || DEFAULT_AVATAR} alt="" />
+                  </span>
+                </IconButton>
+              )
+            }) : <span className="room-header__caption">캐릭터 없음</span>}
           </div>
         ) : <>
-          <button {...iconBtn(() => openPanel(showSearch ? null : 'search'), null, showSearch)} aria-label="대화 검색">
-            <Search size={15} color={showSearch ? t.point : t.subText} />
-          </button>
-          <button
-            {...iconBtn(() => (showGallery ? closeGalleryPanel() : openPanel('gallery')), null, showGallery)}
-            aria-label="대화방 갤러리">
-            <Images size={15} color={showGallery ? t.point : t.subText} />
-          </button>
-          {!topCharacterPickerEnabled && <button
-            {...iconBtn(() => {
+          <IconButton className="room-header__button" label="대화 검색" active={showSearch} onClick={() => openPanel(showSearch ? null : 'search')}>
+            <Search size={15} />
+          </IconButton>
+          <IconButton
+            className="room-header__button"
+            label="대화방 갤러리"
+            active={showGallery}
+            onClick={() => (showGallery ? closeGalleryPanel() : openPanel('gallery'))}>
+            <Images size={15} />
+          </IconButton>
+          {!topCharacterPickerEnabled && <IconButton
+            className="room-header__button"
+            label="중요 대사 북마크"
+            active={showBookmarks}
+            onClick={() => {
               if (showBookmarks) closeBookmarksPanel()
               else {
                 setShowSearch(false)
@@ -1944,186 +1897,205 @@ export default function Room() {
                 setClosingBookmarks(false)
                 setShowBookmarks(true)
               }
-            }, null, showBookmarks)}
-            aria-label="중요 대사 북마크">
-            <Bookmark size={15} color={showBookmarks ? t.point : t.subText} fill={showBookmarks ? 'currentColor' : 'none'} />
-          </button>}
-          {topCharacterPickerEnabled && !showTopCharacterPicker && <button {...iconBtn(toggleTopCharacterPicker, null, false)} onPointerDown={preserveComposerFocus} aria-label="캐릭터 선택" aria-expanded={false}>
-            <UserRound size={17} color={t.subText} />
-          </button>}
-          <button {...iconBtn(() => (showTheme ? closeThemePanel() : openPanel('theme')), null, showTheme)} aria-label="채팅방 설정">
-            <Settings size={15} color={showTheme ? t.point : t.subText} />
-          </button>
+            }}>
+            <Bookmark size={15} fill={showBookmarks ? 'currentColor' : 'none'} />
+          </IconButton>}
+          {topCharacterPickerEnabled && !showTopCharacterPicker && <IconButton
+            className="room-header__button"
+            label="캐릭터 선택"
+            onClick={toggleTopCharacterPicker}
+            onPointerDown={preserveComposerFocus}
+            aria-expanded={false}>
+            <UserRound size={17} />
+          </IconButton>}
+          <IconButton
+            className="room-header__button"
+            label="채팅방 설정"
+            active={showTheme}
+            onClick={() => (showTheme ? closeThemePanel() : openPanel('theme'))}>
+            <Settings size={15} />
+          </IconButton>
         </>}
-        {topCharacterPickerEnabled && showTopCharacterPicker && <button {...iconBtn(toggleTopCharacterPicker, null, true)} onPointerDown={preserveComposerFocus} aria-label="캐릭터 목록 닫기" aria-expanded={true}>
-          <UserRound size={17} color={t.point} />
-        </button>}
+        {topCharacterPickerEnabled && showTopCharacterPicker && <IconButton
+          className="room-header__button"
+          label="캐릭터 목록 닫기"
+          active
+          onClick={toggleTopCharacterPicker}
+          onPointerDown={preserveComposerFocus}
+          aria-expanded={true}>
+          <UserRound size={17} />
+        </IconButton>}
       </div>
 
       {/* 초대 코드 패널 */}
       {showInvite && (
-        <div className="top-panel-backdrop" style={{ position: 'fixed', top: 49, left: 0, right: 0, bottom: 0, zIndex: 50, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }} onClick={() => setShowInvite(false)}>
-          <div className="top-panel-sheet" style={{ background: t.panel, padding: '14px 16px', borderBottom: `0.5px solid ${t.border}`, textAlign: 'center', maxWidth: 480, margin: '0 auto', width: '100%' }} onClick={e => e.stopPropagation()}>
-            <div style={{ fontSize: 11, color: t.subText, marginBottom: 4 }}>초대 코드</div>
-            <button onClick={copyInviteCode} style={{ margin: '0 auto', display: 'flex', alignItems: 'center', gap: 7, border: 0, background: 'none', color: t.point, cursor: 'pointer' }}>
-              <span style={{ fontSize: 22, fontWeight: 600, letterSpacing: 3 }}>{room?.invite_code}</span>
+        <div className="top-panel-backdrop" onClick={() => setShowInvite(false)}>
+          <div className="top-panel-sheet room-invite-panel" onClick={e => e.stopPropagation()}>
+            <div className="top-panel-caption">초대 코드</div>
+            <Button variant="ghost" className="room-invite-code room-invite-code--large" onClick={copyInviteCode}>
+              <span>{room?.invite_code}</span>
               <Copy size={15} />
-            </button>
-            <div style={{ fontSize: 10, color: t.subText, marginTop: 4, opacity: 0.6 }}>상대방에게 이 코드를 알려주세요</div>
+            </Button>
+            <div className="top-panel-caption room-invite-panel__hint">상대방에게 이 코드를 알려주세요</div>
           </div>
         </div>
       )}
 
       {/* 테마 패널 */}
       {showTheme && (
-        <div className={`top-panel-backdrop${closingTheme ? ' settings-backdrop-closing' : ''}`} style={{ position: 'fixed', inset: 0, zIndex: 80, display: 'flex', justifyContent: 'flex-end', background: 'rgba(0,0,0,0.24)' }} onClick={closeThemePanel}>
-          <div className={`top-panel-sheet settings-page-drawer${closingTheme ? ' is-closing' : ''}`} style={{ background: t.bg, padding: 'max(20px, env(safe-area-inset-top)) 18px calc(26px + env(safe-area-inset-bottom))', borderLeft: `1px solid color-mix(in srgb, ${t.border} 55%, transparent)`, maxWidth: 480, marginLeft: 'auto', width: '100%', height: '100%', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 17, fontWeight: 600, color: t.theirText }}>대화방 설정</div>
-                <div style={{ marginTop: 3, overflow: 'hidden', color: t.subText, fontSize: 11, textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{room?.name}</div>
+        <div className={`top-panel-backdrop top-panel-backdrop--drawer${closingTheme ? ' is-closing' : ''}`} onClick={closeThemePanel}>
+          <div className="top-panel-sheet top-panel-sheet--drawer room-settings-panel" onClick={e => e.stopPropagation()}>
+            <div className="top-panel-heading room-settings-panel__heading">
+              <div className="top-panel-heading__text">
+                <div className="top-panel-title">대화방 설정</div>
+                <div className="top-panel-caption room-settings-panel__room-name">{room?.name}</div>
               </div>
-              <button onClick={closeThemePanel} aria-label="설정 닫기" style={{ width: 38, height: 38, display: 'grid', placeItems: 'center', flexShrink: 0, border: 0, borderRadius: '50%', background: `color-mix(in srgb, ${t.panel} 74%, transparent)`, color: t.subText, cursor: 'pointer' }}><X size={17} /></button>
+              <IconButton className="room-settings-panel__close" onClick={closeThemePanel} label="설정 닫기"><X size={17} /></IconButton>
             </div>
-            <div style={{ marginBottom: 20, padding: '13px 14px', borderRadius: 14, background: `color-mix(in srgb, ${t.panel} 62%, transparent)` }}>
-              <div style={{ fontSize: 10, color: t.subText }}>초대 코드</div>
-              <button onClick={copyInviteCode} style={{ marginTop: 3, display: 'flex', alignItems: 'center', gap: 7, padding: 0, border: 0, background: 'none', color: t.point, letterSpacing: 2, cursor: 'pointer' }}>
+            <Card className="room-settings-panel__invite">
+              <div className="top-panel-caption">초대 코드</div>
+              <Button variant="ghost" className="room-invite-code" onClick={copyInviteCode}>
                 {room?.invite_code}
                 <Copy size={13} />
-              </button>
-            </div>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-              <button
+              </Button>
+            </Card>
+            <div className="room-settings-panel__actions">
+              <Button
+                variant="secondary"
                 onClick={() => {
                   closeThemePanel()
                   setShowCalendar(true)
-                }}
-                style={{ flex: 1, minHeight: 42, padding: '10px 12px', borderRadius: 12, border: 0, background: `color-mix(in srgb, ${t.panel} 62%, transparent)`, color: t.theirText, cursor: 'pointer' }}>
+                }}>
                 날짜로 이동
-              </button>
-              <button onClick={exportChat} style={{ flex: 1, minHeight: 42, padding: '10px 12px', borderRadius: 12, border: 0, background: `color-mix(in srgb, ${t.panel} 62%, transparent)`, color: t.theirText, cursor: 'pointer' }}>
+              </Button>
+              <Button variant="secondary" onClick={exportChat}>
                 채팅 내보내기
-              </button>
+              </Button>
             </div>
-            <button onClick={() => { closeThemePanel(); navigate(`/room/${roomId}/characters`) }} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, marginBottom: 26, padding: '13px 14px', border: 0, borderRadius: 14, background: `color-mix(in srgb, ${t.panel} 62%, transparent)`, color: t.theirText, textAlign: 'left', cursor: 'pointer' }}>
-              <span style={{ width: 34, height: 34, display: 'grid', placeItems: 'center', flexShrink: 0, borderRadius: 11, background: `color-mix(in srgb, ${t.point} 16%, transparent)`, color: t.point }}><UsersRound size={17} /></span>
-              <span style={{ flex: 1, minWidth: 0 }}>
-                <span style={{ display: 'block', fontSize: 13, fontWeight: 600 }}>방 캐릭터 목록</span>
-                <span style={{ display: 'block', marginTop: 3, color: t.subText, fontSize: 10 }}>이 방에서 사용할 캐릭터와 순서를 관리해요.</span>
+            <Button variant="secondary" block className="room-settings-panel__characters" onClick={() => { closeThemePanel(); navigate(`/room/${roomId}/characters`) }}>
+              <span className="room-settings-panel__characters-icon"><UsersRound size={17} /></span>
+              <span className="top-panel-heading__text">
+                <span className="room-settings-panel__characters-title">방 캐릭터 목록</span>
+                <span className="top-panel-caption room-settings-panel__help">이 방에서 사용할 캐릭터와 순서를 관리해요.</span>
               </span>
-              <ChevronRight size={16} color={t.subText} />
-            </button>
-            <div style={{ marginBottom: 14, color: t.subText, fontSize: 11, fontWeight: 600 }}>화면과 대화</div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, padding: '13px 14px', background: `color-mix(in srgb, ${t.panel} 54%, transparent)`, borderRadius: 14 }}>
+              <ChevronRight size={16} className="room-settings-panel__chevron" />
+            </Button>
+            <div className="top-panel-caption room-settings-panel__section-title">화면과 대화</div>
+            <Card className="room-settings-panel__row room-settings-panel__row--follow">
               <div>
-                <div style={{ fontSize: 12, color: t.theirText }}>공유 테마 따라가기</div>
-                <div style={{ fontSize: 10, color: t.subText, marginTop: 2 }}>방장이 설정한 테마로 보기</div>
+                <div className="room-settings-panel__label">공유 테마 따라가기</div>
+                <div className="top-panel-caption room-settings-panel__help">방장이 설정한 테마로 보기</div>
               </div>
-              <button type="button" role="switch" aria-label="공유 테마 따라가기" aria-checked={followShared} onClick={() => toggleFollow(!followShared)} style={{ width: 40, height: 22, appearance: 'none', padding: 0, border: 0, borderRadius: 11, cursor: 'pointer', transition: 'background 0.2s', background: followShared ? t.point : t.border, position: 'relative', flexShrink: 0 }}>
-                <span style={{ position: 'absolute', top: 3, left: 3, transform: followShared ? 'translateX(17px)' : 'translateX(0)', width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'transform 0.2s' }} />
-              </button>
-            </div>
+              <Toggle label="공유 테마 따라가기" checked={followShared} onChange={toggleFollow} />
+            </Card>
             {isOwner && (
-              <div style={{ marginBottom: 22 }}>
-                <div style={{ fontSize: 11, color: t.subText, marginBottom: 10 }}>
-                  공유 테마 <span style={{ fontSize: 10, opacity: 0.6 }}>(방장만 변경 가능)</span>
+              <div className="room-settings-panel__themes">
+                <div className="top-panel-caption room-settings-panel__themes-title">
+                  공유 테마 <span>(방장만 변경 가능)</span>
                 </div>
-                <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
+                <div className="room-settings-panel__theme-list">
                   {THEMES.map(th => (
-                    <div key={th.id} onClick={() => saveSharedTheme(th.id)} style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-                      <div style={{ width: 48, height: 48, borderRadius: 13, overflow: 'hidden', border: sharedThemeId === th.id ? `2px solid ${th.point}` : `1px solid color-mix(in srgb, ${th.border} 65%, transparent)` }}>
-                        <div style={{ height: '40%', background: th.panel, borderBottom: `0.5px solid ${th.border}` }} />
-                        <div style={{ height: '60%', background: th.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
-                          <div style={{ width: 10, height: 8, borderRadius: '1px 5px 5px 5px', background: th.theirBubble, border: `0.5px solid ${th.theirBorder}` }} />
-                          <div style={{ width: 10, height: 8, borderRadius: '5px 1px 5px 5px', background: th.myBubble }} />
-                        </div>
-                      </div>
-                      <div style={{ fontSize: 10, color: sharedThemeId === th.id ? th.point : t.subText, whiteSpace: 'nowrap' }}>{th.name}</div>
-                    </div>
+                    <Button
+                      key={th.id}
+                      variant="ghost"
+                      className="room-theme-preview"
+                      aria-pressed={sharedThemeId === th.id}
+                      onClick={() => saveSharedTheme(th.id)}>
+                      <span className="room-theme-preview__sample" style={{ borderColor: sharedThemeId === th.id ? th.point : `color-mix(in srgb, ${th.border} 65%, transparent)` }}>
+                        <span className="room-theme-preview__header" style={{ background: th.panel, borderColor: th.border }} />
+                        <span className="room-theme-preview__conversation" style={{ background: th.bg }}>
+                          <span className="room-theme-preview__bubble room-theme-preview__bubble--their" style={{ background: th.theirBubble, borderColor: th.theirBorder }} />
+                          <span className="room-theme-preview__bubble room-theme-preview__bubble--mine" style={{ background: th.myBubble }} />
+                        </span>
+                      </span>
+                      <span style={{ color: sharedThemeId === th.id ? th.point : undefined }}>{th.name}</span>
+                    </Button>
                   ))}
                 </div>
               </div>
             )}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 14, padding: '11px 13px', borderRadius: 13, background: `color-mix(in srgb, ${t.panel} 54%, transparent)` }}>
-              <div style={{ fontSize: 12, color: t.subText, width: 70 }}>읽음 확인</div>
-              <div style={{ display: 'flex', gap: 6 }}>
+            <Card className="room-settings-panel__row">
+              <div className="room-settings-panel__label room-settings-panel__choice-label">읽음 확인</div>
+              <div className="room-settings-panel__choices">
                 {['text', 'number', 'none'].map(s => (
-                  <button
+                  <Button
                     key={s}
+                    variant="ghost"
+                    size="sm"
+                    className="room-settings-panel__choice"
+                    aria-pressed={readReceipt === s}
                     onClick={async () => {
                       setReadReceipt(s)
                       const { error } = await supabase.from('rooms').update({ read_receipt_style: s }).eq('id', roomId)
                       showToast(error ? '읽음 확인 설정을 저장하지 못했어요.' : '읽음 확인 설정이 저장됐어요.', error ? 'error' : 'success')
-                    }}
-                    style={{ minHeight: 34, padding: '6px 11px', borderRadius: 10, fontSize: 11, cursor: 'pointer', border: 0, background: readReceipt === s ? `color-mix(in srgb, ${t.point} 17%, transparent)` : 'transparent', color: readReceipt === s ? t.point : t.subText }}>
+                    }}>
                     {s === 'text' ? '읽음' : s === 'number' ? '1' : '없음'}
-                  </button>
+                  </Button>
                 ))}
               </div>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12, padding: '11px 13px', borderRadius: 13, background: `color-mix(in srgb, ${t.panel} 54%, transparent)` }}>
-              <div style={{ fontSize: 12, color: t.subText, width: 70 }}>지문 크기</div>
-              <div style={{ display: 'flex', gap: 6 }}>
+            </Card>
+            <Card className="room-settings-panel__row">
+              <div className="room-settings-panel__label room-settings-panel__choice-label">지문 크기</div>
+              <div className="room-settings-panel__choices">
                 {[
                   { val: 'small', label: '작게' },
                   { val: 'large', label: '크게' },
                 ].map(s => (
-                  <button
+                  <Button
                     key={s.val}
+                    variant="ghost"
+                    size="sm"
+                    className="room-settings-panel__choice"
+                    aria-pressed={actionSize === s.val}
                     onClick={async () => {
                       setActionSize(s.val)
                       const { error } = await supabase.from('rooms').update({ action_style: s.val }).eq('id', roomId)
                       showToast(error ? '지문 크기를 저장하지 못했어요.' : '지문 크기가 저장됐어요.', error ? 'error' : 'success')
-                    }}
-                    style={{ minHeight: 36, padding: '5px 13px', borderRadius: 10, fontSize: 11, cursor: 'pointer', border: 0, background: actionSize === s.val ? `color-mix(in srgb, ${t.point} 17%, transparent)` : 'transparent', color: actionSize === s.val ? t.point : t.subText }}>
+                    }}>
                     {s.label}
-                  </button>
+                  </Button>
                 ))}
               </div>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginTop: 12, padding: '13px 14px', background: `color-mix(in srgb, ${t.panel} 54%, transparent)`, borderRadius: 14 }}>
+            </Card>
+            <Card className="room-settings-panel__row">
               <div>
-                <div style={{ fontSize: 12, color: t.theirText }}>입력 중 표시</div>
-                <div style={{ marginTop: 2, fontSize: 10, color: t.subText }}>{isOwner ? '이 방에서 작성 중 상태를 표시합니다.' : '방장만 변경할 수 있습니다.'}</div>
+                <div className="room-settings-panel__label">입력 중 표시</div>
+                <div className="top-panel-caption room-settings-panel__help">{isOwner ? '이 방에서 작성 중 상태를 표시합니다.' : '방장만 변경할 수 있습니다.'}</div>
               </div>
-              <button
-                type="button"
+              <Toggle
                 disabled={!isOwner}
-                role="switch"
-                aria-label="입력 중 표시 전환"
-                aria-checked={showTypingIndicator}
-                onClick={async () => {
+                label="입력 중 표시 전환"
+                checked={showTypingIndicator}
+                className="room-settings-panel__typing-switch"
+                onChange={async next => {
                   if (!isOwner) return
-                  const next = !showTypingIndicator
                   setShowTypingIndicator(next)
                   if (!next) setTypingInfo(null)
                   const { error } = await supabase.from('rooms').update({ show_typing_indicator: next }).eq('id', roomId)
                   if (error) setShowTypingIndicator(!next)
                   showToast(error ? '입력 중 표시 설정을 저장하지 못했어요.' : '입력 중 표시 설정이 저장됐어요.', error ? 'error' : 'success')
                 }}
-                style={{ position: 'relative', width: 40, height: 22, flexShrink: 0, appearance: 'none', padding: 0, border: 0, borderRadius: 11, cursor: isOwner ? 'pointer' : 'default', opacity: isOwner ? 1 : 0.55, background: showTypingIndicator ? t.point : t.border }}>
-                <span style={{ position: 'absolute', top: 3, left: 3, transform: showTypingIndicator ? 'translateX(18px)' : 'translateX(0)', width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'transform 0.2s' }} />
-              </button>
-            </div>
+              />
+            </Card>
             {isOwner && (
-              <div style={{ marginTop: 22, paddingTop: 20, borderTop: `1px solid color-mix(in srgb, ${t.border} 60%, transparent)` }}>
-                <div style={{ fontSize: 12, color: t.subText, marginBottom: 10 }}>방 이름</div>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <input value={roomNameText} onChange={e => setRoomNameText(e.target.value)} onFocus={() => setRoomNameText(room?.name || '')} onKeyDown={e => e.key === 'Enter' && saveRoomName()} placeholder={room?.name} style={{ flex: 1, minHeight: 40, background: `color-mix(in srgb, ${t.panel} 65%, transparent)`, border: 0, borderRadius: 12, padding: '8px 12px', color: t.inputText, fontSize: 13, outline: 'none' }} />
-                  <button onClick={saveRoomName} style={{ background: t.point, border: 'none', borderRadius: 12, padding: '8px 15px', color: '#fff', fontSize: 12, cursor: 'pointer' }}>
+              <div className="room-settings-panel__owner">
+                <div className="room-settings-panel__label room-settings-panel__field-label">방 이름</div>
+                <div className="room-settings-panel__field">
+                  <TextInput className="room-settings-panel__name-input" value={roomNameText} onChange={e => setRoomNameText(e.target.value)} onFocus={() => setRoomNameText(room?.name || '')} onKeyDown={e => e.key === 'Enter' && saveRoomName()} placeholder={room?.name} />
+                  <Button size="sm" onClick={saveRoomName}>
                     저장
-                  </button>
+                  </Button>
                 </div>
-                <div style={{ marginTop: 20 }}>
-                  <div style={{ fontSize: 12, color: t.subText, marginBottom: 10 }}>대표 이미지</div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <div className="squircle-media" style={{ width: 53, height: 53, background: t.bg, border: `0.5px solid ${t.border}`, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, color: t.subText, flexShrink: 0 }}>{room?.cover_image ? <img src={room.cover_image} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '✦'}</div>
-                    <label style={{ flex: 1, minHeight: 40, display: 'grid', placeItems: 'center', background: `color-mix(in srgb, ${t.panel} 65%, transparent)`, border: 0, borderRadius: 12, padding: '8px 12px', color: t.subText, fontSize: 12, cursor: 'pointer', textAlign: 'center' }}>
+                <div className="room-settings-panel__cover-field">
+                  <div className="room-settings-panel__label room-settings-panel__field-label">대표 이미지</div>
+                  <div className="room-settings-panel__field">
+                    <div className="squircle-media room-settings-panel__cover">{room?.cover_image ? <img src={room.cover_image} alt="" /> : '✦'}</div>
+                    <label className="room-settings-panel__file-label">
                       이미지 선택
                       <input
                         type="file"
                         accept="image/*"
-                        style={{ display: 'none' }}
+                        hidden
                         onChange={async e => {
                           const file = e.target.files[0]
                           if (!file) return
@@ -2138,14 +2110,16 @@ export default function Room() {
                       />
                     </label>
                     {room?.cover_image && (
-                      <button
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="room-settings-panel__delete-cover"
                         onClick={async () => {
                           await supabase.from('rooms').update({ cover_image: null }).eq('id', roomId)
                           setRoom(prev => ({ ...prev, cover_image: null }))
-                        }}
-                        style={{ background: 'none', border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '5px 10px', color: t.subText, fontSize: 12, cursor: 'pointer' }}>
+                        }}>
                         삭제
-                      </button>
+                      </Button>
                     )}
                   </div>
                 </div>
@@ -2155,40 +2129,36 @@ export default function Room() {
         </div>
       )}
 
-      {/* 검색 패널 */}
+      {/* 북마크 패널 */}
       {showBookmarks && (
         <div
-          className={`top-panel-backdrop${closingBookmarks ? ' settings-backdrop-closing' : ''}`}
-          style={{ position: 'fixed', inset: 0, zIndex: 80, display: 'flex', justifyContent: 'flex-end', background: 'rgba(0,0,0,0.24)' }}
+          className={`top-panel-backdrop top-panel-backdrop--drawer${closingBookmarks ? ' is-closing' : ''}`}
           onClick={() => closeBookmarksPanel()}>
-          <div
-            className={`top-panel-sheet settings-page-drawer${closingBookmarks ? ' is-closing' : ''}`}
-            style={{ background: t.panel, padding: 14, borderLeft: `0.5px solid ${t.border}`, maxWidth: 480, marginLeft: 'auto', width: '100%', height: '100%', overflowY: 'auto' }}
-            onClick={event => event.stopPropagation()}>
-            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 14 }}>
-              <div style={{ flex: 1, fontSize: 15, color: t.theirText }}>중요 대사 북마크</div>
-              <div style={{ marginRight: 10, color: t.subText, fontSize: 11 }}>{bookmarkedMessages.length}개</div>
-              <button onClick={() => closeBookmarksPanel()} style={{ border: 0, borderRadius: 9, background: 'none', color: t.subText, padding: '6px 8px' }}>닫기</button>
+          <div className="top-panel-sheet top-panel-sheet--drawer" onClick={event => event.stopPropagation()}>
+            <div className="top-panel-heading">
+              <div className="top-panel-title top-panel-heading__text">중요 대사 북마크</div>
+              <div className="top-panel-caption">{bookmarkedMessages.length}개</div>
+              <Button variant="ghost" size="sm" className="top-panel-close" onClick={() => closeBookmarksPanel()}>닫기</Button>
             </div>
             {bookmarkedMessages.length === 0 ? (
-              <div style={{ padding: '52px 12px', color: t.subText, fontSize: 12, lineHeight: 1.7, textAlign: 'center' }}>
+              <div className="top-panel-empty">
                 아직 북마크한 메시지가 없어요.<br />메시지를 꾹 눌러 중요 대사로 저장할 수 있어요.
               </div>
             ) : (
-              <div style={{ display: 'grid', gap: 8 }}>
+              <div className="room-bookmarks">
                 {bookmarkedMessages.map(message => (
-                  <div key={message.id} style={{ display: 'flex', alignItems: 'stretch', overflow: 'hidden', borderRadius: 12, border: `1px solid ${t.border}`, background: t.bg }}>
-                    <button onClick={() => jumpToBookmarkedMessage(message.id)} style={{ flex: 1, minWidth: 0, padding: '11px 12px', border: 0, background: 'transparent', color: t.theirText, textAlign: 'left', cursor: 'pointer' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 5 }}>
-                        <span style={{ color: t.point, fontSize: 10 }}>{message.type === 'narration' ? '나레이션' : message.characters?.name || '기록'}</span>
-                        <span style={{ color: t.subText, fontSize: 9 }}>{new Date(message.created_at).toLocaleDateString('ko-KR')}</span>
-                      </div>
-                      <div style={{ overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', color: t.theirText, fontSize: 12, lineHeight: 1.5 }}>{bookmarkPreview(message)}</div>
-                    </button>
-                    <button onClick={() => toggleMessageBookmark(message)} aria-label="북마크 해제" style={{ width: 44, flexShrink: 0, border: 0, borderLeft: `1px solid ${t.border}`, background: 'transparent', color: t.point, cursor: 'pointer' }}>
+                  <Card key={message.id} className="room-bookmarks__item">
+                    <Button variant="ghost" className="room-bookmarks__jump" onClick={() => jumpToBookmarkedMessage(message.id)}>
+                      <span className="top-panel-caption room-bookmarks__meta">
+                        <span>{message.type === 'narration' ? '나레이션' : message.characters?.name || '기록'}</span>
+                        <span>{new Date(message.created_at).toLocaleDateString('ko-KR')}</span>
+                      </span>
+                      <span className="room-bookmarks__preview">{bookmarkPreview(message)}</span>
+                    </Button>
+                    <IconButton className="room-bookmarks__remove" onClick={() => toggleMessageBookmark(message)} label="북마크 해제">
                       <Bookmark size={15} fill="currentColor" />
-                    </button>
-                  </div>
+                    </IconButton>
+                  </Card>
                 ))}
               </div>
             )}
@@ -2196,39 +2166,36 @@ export default function Room() {
         </div>
       )}
 
+      {/* 갤러리 패널 */}
       {showGallery && (
         <div
-          className={`top-panel-backdrop${closingGallery ? ' settings-backdrop-closing' : ''}`}
-          style={{ position: 'fixed', inset: 0, zIndex: 80, display: 'flex', justifyContent: 'flex-end', background: 'rgba(0,0,0,0.24)' }}
+          className={`top-panel-backdrop top-panel-backdrop--drawer${closingGallery ? ' is-closing' : ''}`}
           onClick={closeGalleryPanel}>
-          <div
-            className={`top-panel-sheet settings-page-drawer${closingGallery ? ' is-closing' : ''}`}
-            style={{ background: t.panel, padding: 14, borderLeft: `0.5px solid ${t.border}`, maxWidth: 480, marginLeft: 'auto', width: '100%', height: '100%', overflowY: 'auto' }}
-            onClick={event => event.stopPropagation()}>
-            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 14 }}>
-              <div style={{ flex: 1, fontSize: 15, color: t.theirText }}>대화방 갤러리</div>
-              <div style={{ marginRight: 10, color: t.subText, fontSize: 11 }}>{galleryItems.length}장</div>
-              <button onClick={closeGalleryPanel} style={{ border: 0, borderRadius: 9, background: 'none', color: t.subText, padding: '6px 8px' }}>닫기</button>
+          <div className="top-panel-sheet top-panel-sheet--drawer" onClick={event => event.stopPropagation()}>
+            <div className="top-panel-heading">
+              <div className="top-panel-title top-panel-heading__text">대화방 갤러리</div>
+              <div className="top-panel-caption">{galleryItems.length}장</div>
+              <Button variant="ghost" size="sm" className="top-panel-close" onClick={closeGalleryPanel}>닫기</Button>
             </div>
             {galleryItems.length === 0 ? (
-              <div style={{ padding: '48px 12px', color: t.subText, fontSize: 12, textAlign: 'center' }}>아직 전송된 이미지가 없어요.</div>
+              <div className="top-panel-empty">아직 전송된 이미지가 없어요.</div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+              <div className="room-gallery">
                 {galleryGroups.map(group => (
                   <section key={group.date}>
-                    <div style={{ marginBottom: 7, color: t.subText, fontSize: 11 }}>{group.date}</div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 4 }}>
+                    <div className="top-panel-caption room-gallery__date">{group.date}</div>
+                    <div className="room-gallery__images">
                       {group.items.map(item => {
                         const index = galleryItems.findIndex(candidate => candidate.message.id === item.message.id && candidate.imageIndex === item.imageIndex)
                         return (
-                          <div key={`${item.message.id}-${item.imageIndex}`} style={{ position: 'relative', aspectRatio: '1 / 1', overflow: 'hidden', borderRadius: 8, background: t.bg }}>
-                            <button
-                              onClick={() => setProfilePreview({ url: item.url, urls: galleryUrls, items: galleryPreviewItems, index, name: '' })}
-                              aria-label={`${group.date} 이미지 크게 보기`}
-                              style={{ width: '100%', height: '100%', padding: 0, border: 0, background: 'none', cursor: 'pointer' }}>
-                              <img src={item.url} alt="" loading="lazy" style={{ width: '100%', height: '100%', display: 'block', objectFit: 'cover' }} />
-                            </button>
-                          </div>
+                          <Button
+                            key={`${item.message.id}-${item.imageIndex}`}
+                            variant="ghost"
+                            className="room-gallery__image"
+                            onClick={() => setProfilePreview({ url: item.url, urls: galleryUrls, items: galleryPreviewItems, index, name: '' })}
+                            aria-label={`${group.date} 이미지 크게 보기`}>
+                            <img src={item.url} alt="" loading="lazy" />
+                          </Button>
                         )
                       })}
                     </div>
@@ -2236,34 +2203,40 @@ export default function Room() {
                 ))}
               </div>
             )}
-            <button
+            <Button
+              variant="secondary"
+              size="sm"
+              block
+              className="room-gallery__leave"
               onClick={leaveRoom}
-              disabled={isOwner}
-              style={{ width: '100%', marginTop: 18, padding: '9px 12px', borderRadius: 10, border: `1px solid ${isOwner ? t.border : '#f87171'}`, background: 'none', color: isOwner ? t.subText : '#f87171', fontSize: 12, cursor: isOwner ? 'default' : 'pointer', opacity: isOwner ? 0.48 : 1 }}>
+              disabled={isOwner}>
               {isOwner ? '방장은 대화방을 나갈 수 없어요' : '대화방 나가기'}
-            </button>
+            </Button>
           </div>
         </div>
       )}
 
+      {/* 검색 패널 */}
       {showSearch && (
-        <div className="top-panel-backdrop" style={{ position: 'fixed', top: 49, left: 0, right: 0, bottom: 0, zIndex: 50, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }} onClick={() => setShowSearch(false)}>
-          <div className="top-panel-sheet" style={{ background: t.panel, padding: '10px 14px', borderBottom: `0.5px solid ${t.border}`, maxWidth: 480, margin: '0 auto', width: '100%' }} onClick={e => e.stopPropagation()}>
-            <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="대사 검색..." autoFocus style={{ width: '100%', background: t.bg, border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '8px 12px', color: t.inputText, fontSize: 16, outline: 'none', boxSizing: 'border-box' }} />
-            {searchQuery && <div style={{ marginTop: 8, fontSize: 11, color: t.subText }}>{filteredMessages.length}개 검색됨</div>}
+        <div className="top-panel-backdrop" onClick={() => setShowSearch(false)}>
+          <div className="top-panel-sheet" onClick={e => e.stopPropagation()}>
+            <TextInput className="room-search-input" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="대사 검색..." autoFocus />
+            {searchQuery && <div className="top-panel-caption room-search-count">{filteredMessages.length}개 검색됨</div>}
           </div>
         </div>
       )}
 
       {/* 날짜 이동 패널 */}
       {showCalendar && (
-        <div className="top-panel-backdrop" style={{ position: 'fixed', top: 49, left: 0, right: 0, bottom: 0, zIndex: 50, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }} onClick={() => setShowCalendar(false)}>
-          <div className="top-panel-sheet" style={{ background: t.panel, padding: '10px 14px', borderBottom: `0.5px solid ${t.border}`, maxWidth: 480, margin: '0 auto', width: '100%' }} onClick={e => e.stopPropagation()}>
-            <div style={{ fontSize: 11, color: t.subText, marginBottom: 8 }}>날짜로 이동</div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+        <div className="top-panel-backdrop" onClick={() => setShowCalendar(false)}>
+          <div className="top-panel-sheet" onClick={e => e.stopPropagation()}>
+            <div className="top-panel-caption">날짜로 이동</div>
+            <div className="room-calendar-dates">
               {availableDates.map(date => (
-                <button
+                <Button
                   key={date}
+                  variant="secondary"
+                  size="sm"
                   onClick={() => {
                     const target = messages.find(m => new Date(m.created_at).toLocaleDateString('ko-KR') === date)
                     if (target) {
@@ -2273,10 +2246,9 @@ export default function Room() {
                       })
                       setShowCalendar(false)
                     }
-                  }}
-                  style={{ padding: '4px 10px', borderRadius: 10, fontSize: 11, cursor: 'pointer', border: `0.5px solid ${t.border}`, background: 'none', color: t.subText }}>
+                  }}>
                   {date}
-                </button>
+                </Button>
               ))}
             </div>
           </div>
@@ -2291,15 +2263,19 @@ export default function Room() {
       )}
 
       {/* 메시지 목록 */}
-      <div ref={messageListRef} onScroll={handleScroll} className={`chat-scroll${hideScroll ? ' hide-scroll' : ''}`} style={{ position: 'relative', flex: 1, minHeight: 0, padding: `58px 10px ${showCharList && myChars.length > 0 ? 156 : 106}px`, scrollPaddingTop: 58, display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto', backgroundColor: t.bg, backgroundImage: `url("${import.meta.env.BASE_URL}branding/idea-logo-background-tile-light.png")`, backgroundRepeat: 'repeat', backgroundPosition: 'center top', backgroundSize: '450px 450px', transition: 'padding-bottom 210ms cubic-bezier(0.2, 0.8, 0.2, 1)' }}>
+      <div
+        ref={messageListRef}
+        onScroll={handleScroll}
+        className={`chat-scroll${hideScroll ? ' hide-scroll' : ''}${showCharList && myChars.length > 0 ? ' chat-scroll--with-characters' : ''}`}
+        style={{ backgroundImage: `url("${import.meta.env.BASE_URL}branding/idea-logo-background-tile-light.png")` }}>
         {hasOlderMessages && (
-          <button
-            type="button"
+          <Button
+            variant="secondary"
             onClick={loadOlderMessages}
             disabled={loadingOlderMessages}
-            style={{ alignSelf: 'center', margin: '0 0 4px', padding: '7px 13px', borderRadius: 16, border: `1px solid ${t.border}`, background: t.panel, color: t.subText, fontSize: 11, cursor: loadingOlderMessages ? 'wait' : 'pointer', opacity: loadingOlderMessages ? 0.65 : 1 }}>
+            className="message-load-older">
             {loadingOlderMessages ? '불러오는 중…' : '이전 메시지 불러오기'}
-          </button>
+          </Button>
         )}
         {filteredMessages.map((msg, messageIndex) => {
           const isMine = msg.user_id === userId
@@ -2314,19 +2290,19 @@ export default function Room() {
           const showUnreadDivider = msg.id === initialUnreadId
           const timelineMarkerHeight = (showDateDivider ? 30 : 0) + (showUnreadDivider ? 28 : 0)
           const timelineMarkers = timelineMarkerHeight > 0 && (
-            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: timelineMarkerHeight, display: 'flex', flexDirection: 'column', justifyContent: 'space-around', pointerEvents: 'none' }}>
+            <div className="message-timeline" style={{ height: timelineMarkerHeight }}>
               {showDateDivider && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-                  <span style={{ flex: 1, height: 1, background: t.border, opacity: 0.55 }} />
-                  <span style={{ padding: '3px 9px', borderRadius: 10, color: t.subText, background: `${t.panel}cc`, border: `1px solid ${t.border}`, fontSize: 10 }}>{currentDateKey}</span>
-                  <span style={{ flex: 1, height: 1, background: t.border, opacity: 0.55 }} />
+                <div className="message-divider">
+                  <span className="message-divider__line" />
+                  <span className="message-divider__date">{currentDateKey}</span>
+                  <span className="message-divider__line" />
                 </div>
               )}
               {showUnreadDivider && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 9, color: t.point, fontSize: 10, fontWeight: 600 }}>
-                  <span style={{ flex: 1, height: 1, background: t.point, opacity: 0.65 }} />
+                <div className="message-divider message-divider--unread">
+                  <span className="message-divider__line" />
                   <span>여기부터 안 읽은 메시지</span>
-                  <span style={{ flex: 1, height: 1, background: t.point, opacity: 0.65 }} />
+                  <span className="message-divider__line" />
                 </div>
               )}
             </div>
@@ -2353,11 +2329,11 @@ export default function Room() {
 
           if (msg.type === 'chapter')
             return (
-              <div key={renderKey} id={'msg-' + msg.id} style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 10, padding: `${timelineMarkerHeight + 8}px 8px 8px` }}>
+              <div key={renderKey} id={'msg-' + msg.id} className="message-divider message-divider--chapter" style={{ paddingTop: `calc(${timelineMarkerHeight}px + var(--sp-2))` }}>
                 {timelineMarkers}
-                <span style={{ flex: 1, height: 1, background: t.border }} />
-                <span style={{ color: t.subText, fontSize: 10 }}>{msg.content || '구분선'}</span>
-                <span style={{ flex: 1, height: 1, background: t.border }} />
+                <span className="message-divider__line" />
+                <span>{msg.content || '구분선'}</span>
+                <span className="message-divider__line" />
               </div>
             )
 
@@ -2379,20 +2355,21 @@ export default function Room() {
                 onPointerCancel={cancelLongPress}
                 onContextMenu={event => event.preventDefault()}
                 onSelectStart={event => event.preventDefault()}
-                style={{ position: 'relative', padding: `${timelineMarkerHeight + 7}px 8px 5px`, userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none' }}>
+                className="message-scene"
+                style={{ paddingTop: `calc(${timelineMarkerHeight}px + var(--sp-2))` }}>
                 {timelineMarkers}
-                <div style={{ width: 'min(88%, 340px)', margin: '0 auto', overflow: 'hidden', borderRadius: 16, border: `1px solid ${t.border}`, background: `linear-gradient(135deg, ${t.point}22, ${t.panel})`, boxShadow: '0 9px 24px rgba(0,0,0,.16)' }}>
-                  <div style={{ height: 3, background: t.point, opacity: 0.75 }} />
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '13px 14px' }}>
-                    <div style={{ width: 38, height: 38, display: 'grid', placeItems: 'center', flexShrink: 0, borderRadius: 12, background: `${t.point}25`, color: t.point }}><MapPin size={19} /></div>
-                    <div style={{ minWidth: 0, flex: 1 }}>
-                      <div style={{ color: t.subText, fontSize: 9, letterSpacing: 1.4 }}>SCENE CHANGE</div>
-                      <div style={{ marginTop: 2, color: t.theirText, fontSize: 15, fontWeight: 650 }}>{scene?.name || '새로운 장소'}</div>
-                      {scene?.description && <div style={{ marginTop: 4, color: t.subText, fontSize: 10, lineHeight: 1.45 }}>{scene.description}</div>}
+                <Card className="message-card message-scene__card">
+                  <div className="message-scene__stripe" />
+                  <div className="message-card__row message-scene__body">
+                    <div className="message-card__icon message-scene__icon"><MapPin size={19} /></div>
+                    <div className="message-card__details">
+                      <div className="message-card__caption message-scene__caption">SCENE CHANGE</div>
+                      <div className="message-scene__name">{scene?.name || '새로운 장소'}</div>
+                      {scene?.description && <div className="message-card__caption message-scene__description">{scene.description}</div>}
                     </div>
                   </div>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'center' }}>{renderMessageActions(msg, false)}</div>
+                </Card>
+                <div className="message-actions-centered">{renderMessageActions(msg, false)}</div>
               </div>
             )
           }
@@ -2414,17 +2391,58 @@ export default function Room() {
                 onPointerCancel={cancelLongPress}
                 onContextMenu={event => event.preventDefault()}
                 onSelectStart={event => event.preventDefault()}
-                style={{ position: 'relative', padding: `${timelineMarkerHeight + 5}px 8px`, userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none' }}>
+                className="message-result"
+                style={{ paddingTop: `calc(${timelineMarkerHeight}px + var(--sp-1))` }}>
                 {timelineMarkers}
-                <div style={{ width: 'min(88%, 340px)', margin: '0 auto', padding: 13, borderRadius: 16, border: `1px solid ${t.border}`, background: `linear-gradient(145deg, ${t.point}1b, ${t.panel})`, boxShadow: '0 8px 22px rgba(0,0,0,.14)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: t.point }}><ResultIcon size={17} /><strong style={{ flex: 1, fontSize: 12 }}>{title}</strong><span style={{ color: t.subText, fontSize: 9 }}>{msg.characters?.name || '기록'}</span></div>
-                  {result.kind === 'dice' && <div style={{ marginTop: 10, textAlign: 'center' }}><div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 5 }}>{(result.rolls || []).map((roll, index) => <span key={index} style={{ width: 30, height: 30, display: 'grid', placeItems: 'center', borderRadius: 8, background: t.bg, color: t.theirText, fontWeight: 650 }}>{roll}</span>)}</div><div style={{ marginTop: 7, color: t.subText, fontSize: 10 }}>합계 <strong style={{ color: t.theirText, fontSize: 15 }}>{result.total}</strong></div></div>}
-                  {result.kind === 'chance' && <div style={{ marginTop: 11, textAlign: 'center' }}><strong style={{ color: result.success ? '#6ee7a8' : '#f87171', fontSize: 22 }}>{result.success ? '성공' : '실패'}</strong></div>}
-                  {result.kind === 'character' && <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, marginTop: 11 }}><img src={result.character?.image_url || DEFAULT_AVATAR} alt="" className="squircle-media" style={{ width: 42, height: 42, objectFit: 'cover' }} /><strong style={{ color: t.theirText, fontSize: 16 }}>{result.character?.name}</strong></div>}
-                  {result.kind === 'king' && <div style={{ marginTop: 10 }}><div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, color: t.theirText }}><Crown size={17} color={t.point} /><strong>왕 · {result.king?.name}</strong></div><div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 5, marginTop: 8 }}>{(result.assignments || []).map(item => <span key={item.number} style={{ padding: '5px 7px', borderRadius: 8, background: t.bg, color: t.subText, fontSize: 10 }}><b style={{ color: t.point }}>{item.number}번</b> {item.character?.name}</span>)}</div>{result.command && <div style={{ marginTop: 9, padding: 8, borderRadius: 9, background: `${t.point}16`, color: t.theirText, textAlign: 'center', fontSize: 11 }}>{result.command}</div>}</div>}
-                  {result.kind === 'rps' && <div style={{ marginTop: 10 }}><div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 6 }}>{(result.plays || []).map(play => <span key={play.character?.id} style={{ padding: '6px 8px', borderRadius: 9, background: t.bg, color: t.subText, fontSize: 10 }}><b style={{ color: t.theirText }}>{play.character?.name}</b> · {play.hand}</span>)}</div><div style={{ marginTop: 9, color: result.winners?.length ? t.point : t.subText, textAlign: 'center', fontSize: 12, fontWeight: 650 }}>{result.winners?.length ? `승자 · ${result.winners.map(character => character.name).join(', ')}` : '무승부'}</div></div>}
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'center' }}>{renderMessageActions(msg, false)}</div>
+                <Card className="message-card message-result__card">
+                  <div className="message-card__row message-result__header">
+                    <ResultIcon size={17} />
+                    <strong className="message-card__details">{title}</strong>
+                    <span className="message-card__caption">{msg.characters?.name || '기록'}</span>
+                  </div>
+                  {result.kind === 'dice' && (
+                    <div className="message-result__details">
+                      <div className="message-result__items">
+                        {(result.rolls || []).map((roll, index) => <span key={index} className="message-result__roll">{roll}</span>)}
+                      </div>
+                      <div className="message-card__caption message-result__total">합계 <strong>{result.total}</strong></div>
+                    </div>
+                  )}
+                  {result.kind === 'chance' && (
+                    <div className="message-result__feature">
+                      <strong className={result.success ? 'message-result__success' : 'message-result__failure'}>{result.success ? '성공' : '실패'}</strong>
+                    </div>
+                  )}
+                  {result.kind === 'character' && (
+                    <div className="message-card__row message-result__feature message-result__character">
+                      <img src={result.character?.image_url || DEFAULT_AVATAR} alt="" className="squircle-media" />
+                      <strong>{result.character?.name}</strong>
+                    </div>
+                  )}
+                  {result.kind === 'king' && (
+                    <div className="message-result__details">
+                      <div className="message-card__row message-result__king">
+                        <Crown size={17} />
+                        <strong>왕 · {result.king?.name}</strong>
+                      </div>
+                      <div className="message-result__items message-result__assignments">
+                        {(result.assignments || []).map(item => <span key={item.number} className="message-result__chip"><b>{item.number}번</b> {item.character?.name}</span>)}
+                      </div>
+                      {result.command && <div className="message-result__command">{result.command}</div>}
+                    </div>
+                  )}
+                  {result.kind === 'rps' && (
+                    <div className="message-result__details">
+                      <div className="message-result__items">
+                        {(result.plays || []).map(play => <span key={play.character?.id} className="message-result__chip"><b>{play.character?.name}</b> · {play.hand}</span>)}
+                      </div>
+                      <div className={result.winners?.length ? 'message-result__outcome message-result__outcome--winner' : 'message-result__outcome'}>
+                        {result.winners?.length ? `승자 · ${result.winners.map(character => character.name).join(', ')}` : '무승부'}
+                      </div>
+                    </div>
+                  )}
+                </Card>
+                <div className="message-actions-centered">{renderMessageActions(msg, false)}</div>
                 {renderDeliveryStatus(msg)}
               </div>
             )
@@ -2432,12 +2450,12 @@ export default function Room() {
 
           if (msg.type === 'member_joined' || msg.type === 'member_left')
             return (
-              <div key={renderKey} id={'msg-' + msg.id} style={{ position: 'relative', paddingTop: timelineMarkerHeight }}>
+              <div key={renderKey} id={'msg-' + msg.id} className="message-row" style={{ paddingTop: timelineMarkerHeight }}>
                 {timelineMarkers}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', color: t.subText, fontSize: 10 }}>
-                  <span style={{ flex: 1, height: 1, background: t.border, opacity: 0.55 }} />
+                <div className="message-divider message-divider--membership">
+                  <span className="message-divider__line" />
                   <span>{msg.content}</span>
-                  <span style={{ flex: 1, height: 1, background: t.border, opacity: 0.55 }} />
+                  <span className="message-divider__line" />
                 </div>
               </div>
             )
@@ -2452,27 +2470,27 @@ export default function Room() {
             if (!invite?.roomId) return null
             const alreadyJoined = joinedRoomIds.includes(invite.roomId)
             return (
-              <div key={renderKey} id={'msg-' + msg.id} style={{ position: 'relative', paddingTop: timelineMarkerHeight }}>
+              <div key={renderKey} id={'msg-' + msg.id} className="message-row" style={{ paddingTop: timelineMarkerHeight }}>
                 {timelineMarkers}
-                <div style={{ margin: '2px auto', width: 'min(88%, 330px)', padding: 12, borderRadius: 14, border: `1px solid ${t.border}`, background: t.panel, boxShadow: '0 8px 22px rgba(0,0,0,0.15)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div style={{ width: 36, height: 36, display: 'grid', placeItems: 'center', flexShrink: 0, borderRadius: 11, background: `${t.point}22`, color: t.point }}><DoorOpen size={18} /></div>
-                    <div style={{ minWidth: 0, flex: 1 }}>
-                      <div style={{ color: t.subText, fontSize: 10 }}>{alreadyJoined ? '연결된 장소' : `${msg.characters?.name || '사용자'}의 대화방 초대`}</div>
-                      <div style={{ marginTop: 2, color: t.theirText, fontSize: 13, fontWeight: 600, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{invite.roomName}</div>
+                <Card className="message-card message-invite">
+                  <div className="message-card__row">
+                    <div className="message-card__icon"><DoorOpen size={18} /></div>
+                    <div className="message-card__details">
+                      <div className="message-card__caption">{alreadyJoined ? '연결된 장소' : `${msg.characters?.name || '사용자'}의 대화방 초대`}</div>
+                      <div className="message-invite__name">{invite.roomName}</div>
                     </div>
-                    <button onClick={() => enterInvitedRoom(invite)} style={{ flexShrink: 0, padding: '7px 11px', border: 0, borderRadius: 9, background: t.point, color: '#fff', fontSize: 11, cursor: 'pointer' }}>
+                    <Button className="message-invite__button" onClick={() => enterInvitedRoom(invite)}>
                       {alreadyJoined ? '입장' : '초대 수락'}
-                    </button>
+                    </Button>
                   </div>
-                </div>
+                </Card>
               </div>
             )
           }
 
           if (msg.type === 'communication')
             return (
-              <div key={renderKey} id={'msg-' + msg.id} style={{ position: 'relative', paddingTop: timelineMarkerHeight }}>
+              <div key={renderKey} id={'msg-' + msg.id} className="message-row message-communication" style={{ paddingTop: timelineMarkerHeight }}>
                 {timelineMarkers}
                 <CommunicationRecord message={msg} theme={t} onOpenSession={() => setShowCommunication(true)} />
               </div>
@@ -2481,7 +2499,7 @@ export default function Room() {
           if (msg.type === 'narration')
             return (
               <div
-                className={messageEntranceClass}
+                className={`message-narration ${messageEntranceClass}`}
                 onAnimationEnd={event => event.currentTarget === event.target && messageEntranceClass && finishMessageEntrance(msg.id)}
                 key={renderKey}
                 id={'msg-' + msg.id}
@@ -2492,20 +2510,20 @@ export default function Room() {
                 onPointerLeave={cancelLongPress}
                 onContextMenu={event => event.preventDefault()}
                 onSelectStart={event => event.preventDefault()}
-                style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: `${timelineMarkerHeight + 2}px 0 2px`, touchAction: 'pan-y', ...ownMessageLongPressStyle }}>
+                style={{ paddingTop: `calc(${timelineMarkerHeight}px + 2px)`, ...ownMessageLongPressStyle }}>
                 {timelineMarkers}
-                <div style={{ display: 'flex', gap: 3 }}>
+                <div className="message-narration__dots">
                   {[0, 1, 2].map(i => (
-                    <div key={i} style={{ width: 3, height: 3, borderRadius: '50%', background: t.narrColor }} />
+                    <div key={i} />
                   ))}
                 </div>
                 {editingId === msg.id ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
-                    <input value={editText} onChange={event => setEditText(event.target.value)} onKeyDown={event => event.key === 'Enter' && editMessage(msg.id)} style={{ minWidth: 210, background: t.bg, border: `0.5px solid ${t.point}`, borderRadius: 8, padding: '7px 10px', color: t.inputText, fontSize: 16, outline: 'none' }} />
-                    <div style={{ display: 'flex', alignItems: 'center', border: `1px solid ${t.border}`, borderRadius: 9, overflow: 'hidden', background: t.panel, boxShadow: '0 3px 10px rgba(0,0,0,0.2)' }}>
-                      <button onClick={() => editMessage(msg.id)} style={{ border: 0, background: 'none', color: t.theirText, padding: '7px 13px', fontSize: 11, cursor: 'pointer' }}>저장</button>
-                      <div style={{ width: 1, alignSelf: 'stretch', background: t.border }} />
-                      <button onClick={() => setEditingId(null)} style={{ border: 0, background: 'none', color: '#f87171', padding: '7px 13px', fontSize: 11, cursor: 'pointer' }}>취소</button>
+                  <div className="message-edit">
+                    <TextInput className="message-edit__input" value={editText} onChange={event => setEditText(event.target.value)} onKeyDown={event => event.key === 'Enter' && editMessage(msg.id)} />
+                    <div className="message-controls">
+                      <Button variant="ghost" onClick={() => editMessage(msg.id)}>저장</Button>
+                      <div className="message-control-divider" />
+                      <Button variant="ghost" className="message-control--danger" onClick={() => setEditingId(null)}>취소</Button>
                     </div>
                   </div>
                 ) : (
@@ -2516,19 +2534,20 @@ export default function Room() {
                     canReplay={allowMessageEffectReplay}
                     onEffectPlay={playMessageStageEffect}
                     indicatorSide="right"
-                    style={{ color: t.narrColor, fontStyle: 'italic', textAlign: 'center', padding: '1px 16px', lineHeight: 1.6, cursor: msg.effect_key ? 'pointer' : 'default' }}>
+                    className="message-narration__body"
+                    style={{ cursor: msg.effect_key ? 'pointer' : 'default' }}>
                     <AnimatedMessageText
                       text={msg.content}
                       settings={msg.text_effect_settings}
                       messageId={renderKey}
                       animateOnMount={Boolean(messageEntranceClass)}
-                      renderFinal={() => msg.content.split('\n').map((line, i) => <div key={i} style={{ fontSize: 11 }}>{line}</div>)}
+                      renderFinal={() => msg.content.split('\n').map((line, i) => <div key={i}>{line}</div>)}
                     />
                   </MessageEffectBubble>
                 )}
-                <div style={{ display: 'flex', gap: 3 }}>
+                <div className="message-narration__dots">
                   {[0, 1, 2].map(i => (
-                    <div key={i} style={{ width: 3, height: 3, borderRadius: '50%', background: t.narrColor }} />
+                    <div key={i} />
                   ))}
                 </div>
                 {renderMessageActions(msg)}
@@ -2545,7 +2564,7 @@ export default function Room() {
             }
             return (
               <div
-                className={messageEntranceClass}
+                className={`message-row message-row--chat${isMine ? ' message-row--mine' : ''} ${messageEntranceClass}`}
                 onAnimationEnd={() => messageEntranceClass && finishMessageEntrance(msg.id)}
                 key={renderKey}
                 id={'msg-' + msg.id}
@@ -2556,14 +2575,14 @@ export default function Room() {
                 onPointerLeave={cancelLongPress}
                 onContextMenu={event => event.preventDefault()}
                 onSelectStart={event => event.preventDefault()}
-                style={{ position: 'relative', display: 'flex', flexDirection: isMine ? 'row-reverse' : 'row', alignItems: 'flex-start', gap: 6, paddingTop: timelineMarkerHeight, touchAction: 'pan-y', ...ownMessageLongPressStyle }}>
+                style={{ paddingTop: timelineMarkerHeight, ...ownMessageLongPressStyle }}>
                 {timelineMarkers}
-                <div style={{ flexShrink: 0, width: 43, height: showMessageIdentity ? 43 : 0 }}>
-                  {showMessageIdentity && <div style={{ width: 43, height: 43, overflow: 'hidden' }}><img className="squircle-media" src={talkingAvatarUrl(msg)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>}
+                <div className="message-avatar-slot">
+                  {showMessageIdentity && <div className="message-avatar"><img className="squircle-media" src={talkingAvatarUrl(msg)} alt="" /></div>}
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMine ? 'flex-end' : 'flex-start', maxWidth: '76%' }}>
-                  {showMessageIdentity && char?.name && <div style={{ marginBottom: 4, color: t.subText, fontSize: 11 }}>{char.name}</div>}
-                  <div className="message-bubble" style={{ width: 190, display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 3, overflow: 'hidden', borderRadius: 11 }}>
+                <div className="message-content message-content--gallery">
+                  {showMessageIdentity && char?.name && <div className="message-name">{char.name}</div>}
+                  <div className="message-bubble message-gallery">
                     {imageUrls.map((url, imageIndex) => (
                       <img
                         key={`${url}-${imageIndex}`}
@@ -2577,13 +2596,13 @@ export default function Room() {
                         onContextMenu={event => event.preventDefault()}
                         onSelectStart={event => event.preventDefault()}
                         onClick={() => openImageMessage(url, imageUrls, imageIndex)}
-                        style={{ display: 'block', width: '100%', height: 92, objectFit: 'cover', cursor: 'pointer', userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none', gridColumn: imageUrls.length % 2 === 1 && imageIndex === imageUrls.length - 1 ? '1 / -1' : undefined }}
+                        style={{ gridColumn: imageUrls.length % 2 === 1 && imageIndex === imageUrls.length - 1 ? '1 / -1' : undefined }}
                       />
                     ))}
                   </div>
                   {imageMenuTarget?.message.id === msg.id ? (
-                    <div className="message-action-menu" data-message-menu="true" onPointerDown={event => event.stopPropagation()} style={{ display: 'flex', alignItems: 'center', marginTop: 5, border: `1px solid ${t.border}`, borderRadius: 9, overflow: 'hidden', background: t.panel, boxShadow: '0 3px 10px rgba(0,0,0,0.2)' }}>
-                      <button onClick={() => deleteGalleryImage({ message: msg, imageIndex: imageMenuTarget.imageIndex })} style={{ border: 0, background: 'none', color: '#f87171', padding: '7px 13px', fontSize: 11, cursor: 'pointer' }}>삭제</button>
+                    <div className="message-action-menu message-controls" data-message-menu="true" onPointerDown={event => event.stopPropagation()}>
+                      <Button variant="ghost" className="message-control--danger" onClick={() => deleteGalleryImage({ message: msg, imageIndex: imageMenuTarget.imageIndex })}>삭제</Button>
                     </div>
                   ) : renderMessageActions(msg, false)}
                   {renderDeliveryStatus(msg)}
@@ -2595,7 +2614,7 @@ export default function Room() {
           if (msg.type === 'image')
             return (
               <div
-                className={messageEntranceClass}
+                className={`message-row message-row--chat${isMine ? ' message-row--mine' : ''} ${messageEntranceClass}`}
                 onAnimationEnd={() => messageEntranceClass && finishMessageEntrance(msg.id)}
                 key={renderKey}
                 id={'msg-' + msg.id}
@@ -2606,26 +2625,24 @@ export default function Room() {
                 onPointerLeave={cancelLongPress}
                 onContextMenu={event => event.preventDefault()}
                 onSelectStart={event => event.preventDefault()}
-                style={{ position: 'relative', display: 'flex', flexDirection: isMine ? 'row-reverse' : 'row', alignItems: 'flex-start', gap: 6, paddingTop: timelineMarkerHeight, touchAction: 'pan-y', ...ownMessageLongPressStyle }}>
+                style={{ paddingTop: timelineMarkerHeight, ...ownMessageLongPressStyle }}>
                 {timelineMarkers}
-                <div style={{ flexShrink: 0, width: 43, height: showMessageIdentity ? 43 : 0 }}>
-                  {showMessageIdentity && <div role="button" tabIndex={0} aria-label={`${char?.name || '프로필'} 사진 크게 보기`} onPointerDown={event => event.stopPropagation()} onClick={() => setProfilePreview({ url: char?.image_url || DEFAULT_AVATAR, name: char?.name, characterId: isMine ? msg.character_id : null })} onKeyDown={event => (event.key === 'Enter' || event.key === ' ') && setProfilePreview({ url: char?.image_url || DEFAULT_AVATAR, name: char?.name, characterId: isMine ? msg.character_id : null })} style={{ width: 43, height: 43, background: 'transparent', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 500, color: char?.text_color || t.subText, cursor: 'zoom-in' }}><img className="squircle-media" src={talkingAvatarUrl(msg)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>}
+                <div className="message-avatar-slot">
+                  {showMessageIdentity && <div className="message-avatar" role="button" tabIndex={0} aria-label={`${char?.name || '프로필'} 사진 크게 보기`} onPointerDown={event => event.stopPropagation()} onClick={() => setProfilePreview({ url: char?.image_url || DEFAULT_AVATAR, name: char?.name, characterId: isMine ? msg.character_id : null })} onKeyDown={event => (event.key === 'Enter' || event.key === ' ') && setProfilePreview({ url: char?.image_url || DEFAULT_AVATAR, name: char?.name, characterId: isMine ? msg.character_id : null })} style={{ color: char?.text_color }}><img className="squircle-media" src={talkingAvatarUrl(msg)} alt="" /></div>}
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMine ? 'flex-end' : 'flex-start', maxWidth: '72%' }}>
-                  {showMessageIdentity && char?.name && <div style={{ maxWidth: '100%', marginBottom: 4, color: t.subText, fontSize: 11, lineHeight: 1.35, overflowWrap: 'anywhere', textAlign: isMine ? 'right' : 'left' }}>{char.name}</div>}
-                  <img className="message-bubble" src={msg.content} style={{ maxWidth: 180, borderRadius: 10, cursor: 'pointer' }} onClick={() => openImageMessage(msg.content)} />
-                  {showMessageTimestamp && <div style={{ fontSize: 10, color: t.subText, marginTop: 2, opacity: 0.72 }}>{new Date(msg.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}</div>}
+                <div className="message-content">
+                  {showMessageIdentity && char?.name && <div className="message-name">{char.name}</div>}
+                  <img className="message-bubble message-image" src={msg.content} onClick={() => openImageMessage(msg.content)} />
+                  {showMessageTimestamp && <div className="message-timestamp message-timestamp--image">{new Date(msg.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}</div>}
                   {renderMessageActions(msg, false)}
                   {renderDeliveryStatus(msg)}
                 </div>
               </div>
             )
 
-          const bubbleBg = isMine ? t.myBubble : t.theirBubble
-          const bubbleColor = isMine ? t.myText : t.theirText
           return (
-              <div
-              className={messageEntranceClass}
+            <div
+              className={`message-row message-row--chat${isMine ? ' message-row--mine' : ''} ${messageEntranceClass}`}
               onAnimationEnd={event => event.currentTarget === event.target && messageEntranceClass && finishMessageEntrance(msg.id)}
               key={renderKey}
               id={'msg-' + msg.id}
@@ -2636,20 +2653,20 @@ export default function Room() {
               onPointerLeave={cancelLongPress}
               onContextMenu={event => event.preventDefault()}
               onSelectStart={event => event.preventDefault()}
-              style={{ position: 'relative', display: 'flex', flexDirection: isMine ? 'row-reverse' : 'row', alignItems: 'flex-start', gap: 6, paddingTop: timelineMarkerHeight, touchAction: 'pan-y', ...ownMessageLongPressStyle }}>
+              style={{ paddingTop: timelineMarkerHeight, ...ownMessageLongPressStyle }}>
               {timelineMarkers}
-              <div style={{ flexShrink: 0, width: 43, height: showMessageIdentity ? 43 : 0 }}>
-                {showMessageIdentity && <div role="button" tabIndex={0} aria-label={`${char?.name || '프로필'} 사진 크게 보기`} onPointerDown={event => event.stopPropagation()} onClick={() => setProfilePreview({ url: char?.image_url || DEFAULT_AVATAR, name: char?.name, characterId: isMine ? msg.character_id : null })} onKeyDown={event => (event.key === 'Enter' || event.key === ' ') && setProfilePreview({ url: char?.image_url || DEFAULT_AVATAR, name: char?.name, characterId: isMine ? msg.character_id : null })} style={{ width: 43, height: 43, background: 'transparent', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 500, color: char?.text_color || t.subText, cursor: 'zoom-in' }}><img className="squircle-media" src={talkingAvatarUrl(msg)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>}
+              <div className="message-avatar-slot">
+                {showMessageIdentity && <div className="message-avatar" role="button" tabIndex={0} aria-label={`${char?.name || '프로필'} 사진 크게 보기`} onPointerDown={event => event.stopPropagation()} onClick={() => setProfilePreview({ url: char?.image_url || DEFAULT_AVATAR, name: char?.name, characterId: isMine ? msg.character_id : null })} onKeyDown={event => (event.key === 'Enter' || event.key === ' ') && setProfilePreview({ url: char?.image_url || DEFAULT_AVATAR, name: char?.name, characterId: isMine ? msg.character_id : null })} style={{ color: char?.text_color }}><img className="squircle-media" src={talkingAvatarUrl(msg)} alt="" /></div>}
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMine ? 'flex-end' : 'flex-start', maxWidth: '72%' }}>
-                {showMessageIdentity && char?.name && <div style={{ maxWidth: '100%', marginBottom: 4, color: t.subText, fontSize: 11, lineHeight: 1.35, overflowWrap: 'anywhere', textAlign: isMine ? 'right' : 'left' }}>{char.name}</div>}
+              <div className="message-content">
+                {showMessageIdentity && char?.name && <div className="message-name">{char.name}</div>}
                 {editingId === msg.id ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMine ? 'flex-end' : 'flex-start', gap: 5 }}>
-                    <input value={editText} onChange={e => setEditText(e.target.value)} onKeyDown={e => e.key === 'Enter' && editMessage(msg.id)} style={{ width: 'min(62vw, 280px)', background: t.bg, border: `0.5px solid ${t.point}`, borderRadius: 8, padding: '7px 10px', color: t.inputText, fontSize: 16, outline: 'none', boxSizing: 'border-box' }} />
-                    <div style={{ display: 'flex', alignItems: 'center', border: `1px solid ${t.border}`, borderRadius: 9, overflow: 'hidden', background: t.panel, boxShadow: '0 3px 10px rgba(0,0,0,0.2)' }}>
-                      <button onClick={() => editMessage(msg.id)} style={{ border: 0, background: 'none', color: t.theirText, padding: '7px 13px', fontSize: 11, cursor: 'pointer' }}>저장</button>
-                      <div style={{ width: 1, alignSelf: 'stretch', background: t.border }} />
-                      <button onClick={() => setEditingId(null)} style={{ border: 0, background: 'none', color: '#f87171', padding: '7px 13px', fontSize: 11, cursor: 'pointer' }}>취소</button>
+                  <div className="message-edit">
+                    <TextInput className="message-edit__input" value={editText} onChange={e => setEditText(e.target.value)} onKeyDown={e => e.key === 'Enter' && editMessage(msg.id)} />
+                    <div className="message-controls">
+                      <Button variant="ghost" onClick={() => editMessage(msg.id)}>저장</Button>
+                      <div className="message-control-divider" />
+                      <Button variant="ghost" className="message-control--danger" onClick={() => setEditingId(null)}>취소</Button>
                     </div>
                   </div>
                 ) : (
@@ -2660,7 +2677,8 @@ export default function Room() {
                     canReplay={allowMessageEffectReplay}
                     onEffectPlay={playMessageStageEffect}
                     indicatorSide={isMine ? 'left' : 'right'}
-                    style={{ background: hideMessageBubbles ? 'transparent' : bubbleBg, color: bubbleColor, padding: hideMessageBubbles ? '3px 0' : '8px 12px', borderRadius: hideMessageBubbles ? 0 : 13, fontSize: 'calc(14px * var(--idea-font-scale, 1))', lineHeight: 1.55, border: 'none', cursor: msg.effect_key || isMine ? 'pointer' : 'default' }}>
+                    className={hideMessageBubbles ? 'message-text-bubble message-text-bubble--transparent' : 'message-text-bubble'}
+                    style={{ cursor: msg.effect_key || isMine ? 'pointer' : 'default' }}>
                     <AnimatedMessageText
                       text={msg.content}
                       settings={msg.text_effect_settings}
@@ -2668,15 +2686,15 @@ export default function Room() {
                       animateOnMount={Boolean(messageEntranceClass)}
                       renderFinal={() => parseContent(msg.content, actionSize)}
                     />
-                    {msg.edited && showEditedLabel && <span style={{ fontSize: 9, opacity: 0.5, marginLeft: 4 }}>수정됨</span>}
+                    {msg.edited && showEditedLabel && <span className="message-edited">수정됨</span>}
                   </MessageEffectBubble>
                 )}
                 {renderMessageActions(msg)}
-                {showMessageMeta && <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 2 }}>
+                {showMessageMeta && <div className="message-meta">
                   {showReadReceipt && (readReceipt === 'number'
-                    ? <span aria-label={`${lastReadCount}명 읽음`} style={{ fontSize: 10, color: t.subText, opacity: 0.75 }}>{lastReadCount}명 읽음</span>
-                    : <span aria-label="읽음" style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10, color: t.subText, opacity: 0.75 }}><Eye size={11} />읽음</span>)}
-                  {showMessageTimestamp && <div style={{ fontSize: 10, color: t.subText, opacity: 0.72 }}>{searchQuery ? new Date(msg.created_at).toLocaleDateString('ko-KR') + ' ' + new Date(msg.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : new Date(msg.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}</div>}
+                    ? <span aria-label={`${lastReadCount}명 읽음`} className="message-receipt">{lastReadCount}명 읽음</span>
+                    : <span aria-label="읽음" className="message-receipt"><Eye size={11} />읽음</span>)}
+                  {showMessageTimestamp && <div className="message-timestamp">{searchQuery ? new Date(msg.created_at).toLocaleDateString('ko-KR') + ' ' + new Date(msg.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : new Date(msg.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}</div>}
                   {renderDeliveryStatus(msg)}
                 </div>}
               </div>
@@ -2687,15 +2705,15 @@ export default function Room() {
         {/* 입력중 표시 */}
         {showTypingIndicator && typingInfo && typingInfo.expiresAt > Date.now() && (
           typingInfo.characterId ? (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '2px 0' }}>
-              <div style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
-                {[0, 1, 2].map(index => <div key={index} style={{ width: 5, height: 5, borderRadius: '50%', background: t.subText, opacity: 0.6, animation: 'typing-dot 1.2s infinite', animationDelay: `${index * 0.2}s` }} />)}
+            <div className="message-typing">
+              <div className="message-typing__dots">
+                {[0, 1, 2].map(index => <div key={index} style={{ animationDelay: `${index * 0.2}s` }} />)}
               </div>
-              <span style={{ fontSize: 11, color: t.subText, opacity: 0.7 }}>{typingInfo.charName}{subjectParticle(typingInfo.charName)} 말하는 중...</span>
+              <span className="message-typing__label">{typingInfo.charName}{subjectParticle(typingInfo.charName)} 말하는 중...</span>
             </div>
           ) : (
-            <div aria-label="나레이션 입력 중" style={{ display: 'flex', justifyContent: 'center', gap: 8, padding: '4px 0', color: t.narrColor, fontSize: 13, lineHeight: 1 }}>
-              {[0, 1, 2, 3, 4].map(index => <span key={index} aria-hidden="true" style={{ opacity: 0, animation: 'narration-typing-dot 2.6s infinite', animationDelay: `${index * 0.34}s` }}>.</span>)}
+            <div aria-label="나레이션 입력 중" className="message-typing message-typing--narration">
+              {[0, 1, 2, 3, 4].map(index => <span key={index} aria-hidden="true" style={{ animationDelay: `${index * 0.34}s` }}>.</span>)}
             </div>
           )
         )}
@@ -2704,24 +2722,15 @@ export default function Room() {
       </div>
 
       {/* 입력 영역 */}
-      <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 15, padding: '8px 10px calc(10px + env(safe-area-inset-bottom))', touchAction: 'none', pointerEvents: 'none' }}>
-        <div
-          aria-hidden="true"
-          style={{
-            position: 'absolute',
-            inset: '-34px 0 0',
-            background: `linear-gradient(to bottom, transparent 0%, color-mix(in srgb, ${t.bg} 30%, transparent) 34%, color-mix(in srgb, ${t.bg} 82%, transparent) 100%)`,
-            backdropFilter: 'blur(10px)',
-            WebkitBackdropFilter: 'blur(10px)',
-            maskImage: 'linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.35) 34%, #000 100%)',
-            WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.35) 34%, #000 100%)',
-            pointerEvents: 'none',
-          }}
-        />
+      <div className="room-composer">
+        <div className="room-composer__scrim" aria-hidden="true" />
         {((myChars.length > 0 && !topCharacterPickerEnabled) || selectedMessageEffect) && (
           <div className="composer-context-row">
-          {myChars.length > 0 && !topCharacterPickerEnabled && <button
+          {myChars.length > 0 && !topCharacterPickerEnabled && <Button
+            variant="ghost"
+            size="sm"
             className="composer-identity"
+            data-narration={isNarrActive}
             onMouseDown={e => e.preventDefault()}
             onPointerDown={event => {
               preserveComposerFocus(event)
@@ -2757,61 +2766,63 @@ export default function Room() {
               else openCharList()
             }}
             aria-label={`현재 화자 ${isNarrActive ? '나레이션' : activeChar?.name || '미선택'}. 눌러서 변경`}
-            aria-expanded={showCharList}
-            style={{ background: 'transparent', border: 0, color: isNarrActive ? t.narrColor : t.theirText, touchAction: 'none' }}>
-            <span className="composer-identity__avatar" style={{ background: activeChar?.color || t.point }}>
-              <img src={activeChar?.image_url || DEFAULT_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            aria-expanded={showCharList}>
+            <span className="composer-identity__avatar" style={{ '--character-color': activeChar?.color }}>
+              <img src={activeChar?.image_url || DEFAULT_AVATAR} alt="" />
             </span>
             <span className="composer-identity__text">
               <strong>{isNarrActive ? '나레이션' : activeChar?.name || '캐릭터 선택'}</strong>
             </span>
-            {showCharList ? <ChevronDown size={15} color={t.subText} /> : <ChevronUp size={15} color={t.subText} />}
-          </button>}
+            {showCharList ? <ChevronDown size={15} /> : <ChevronUp size={15} />}
+          </Button>}
           <MessageEffectChip effectKey={selectedMessageEffect} onClear={() => setSelectedMessageEffect(null)} theme={t} />
           </div>
         )}
         {myChars.length > 0 && !topCharacterPickerEnabled && showCharList && (
-          <div className={`profile-picker-reveal${closingCharList ? ' is-closing' : ''}`} style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, marginBottom: 9, padding: '2px 4px', pointerEvents: closingCharList ? 'none' : 'auto' }}>
-            <div role="group" aria-label="캐릭터 선택" className="character-strip" style={{ display: 'flex', alignItems: 'center', gap: 7, flex: 1, minWidth: 0, flexWrap: 'nowrap', overflowX: 'auto', overflowY: 'hidden', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', touchAction: 'pan-x', padding: '2px 1px' }}>
+          <div className={`profile-picker-reveal${closingCharList ? ' is-closing' : ''}`}>
+            <div role="group" aria-label="캐릭터 선택" className="character-strip room-composer__characters">
               {myChars.map(c => (
                 <button
                   key={c.id}
+                  className="room-composer__character"
                   onMouseDown={e => e.preventDefault()}
                   onPointerDown={preserveComposerFocus}
                   onClick={() => chooseCharacter(c)}
                   aria-label={`${c.name} 선택`}
                   aria-pressed={activeChar?.id === c.id && mode === 'chat'}
-                  title={c.name}
-                  style={{ width: 36, height: 36, padding: 0, borderRadius: '50%', flex: '0 0 36px', overflow: 'hidden', cursor: 'pointer', background: c.color || t.point, border: `${activeChar?.id === c.id && mode === 'chat' ? 2 : 1}px solid ${activeChar?.id === c.id && mode === 'chat' ? t.point : t.border}`, boxShadow: activeChar?.id === c.id && mode === 'chat' ? `0 0 0 2px color-mix(in srgb, ${t.point} 24%, transparent)` : 'none' }}>
-                  <img src={c.image_url || DEFAULT_AVATAR} alt="" style={{ display: 'block', width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                  title={c.name}>
+                  <span style={{ '--character-color': c.color }}>
+                    <img src={c.image_url || DEFAULT_AVATAR} alt="" />
+                  </span>
                 </button>
               ))}
             </div>
-            <button
+            <Button
+              variant="ghost"
+              className="room-composer__character-settings"
               onMouseDown={e => e.preventDefault()}
-              onClick={() => navigate(`/room/${roomId}/characters`)}
-              style={{ flexShrink: 0, background: 'transparent', border: 0, borderRadius: 0, padding: '5px 4px', color: t.subText, fontSize: 10, cursor: 'pointer' }}>
+              onClick={() => navigate(`/room/${roomId}/characters`)}>
               설정
-            </button>
+            </Button>
           </div>
         )}
         {myChars.length === 0 && !topCharacterPickerEnabled && (
-          <button onClick={() => navigate('/characters')} style={{ width: '100%', background: `color-mix(in srgb, ${t.panel} 76%, transparent)`, backdropFilter: 'blur(16px)', border: `0.5px dashed ${t.border}`, borderRadius: 12, padding: '8px', color: t.subText, fontSize: 12, cursor: 'pointer', marginBottom: 8, pointerEvents: 'auto' }}>
+          <Button variant="ghost" block className="room-composer__add-character" onClick={() => navigate('/characters')}>
             + 캐릭터 추가하기
-          </button>
+          </Button>
         )}
         {showRoleplayMenu && (
-          <div style={{ transform: `translateY(${toolSheetOffset}px)`, transition: draggingToolSheet ? 'none' : 'transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1)', pointerEvents: 'auto', willChange: 'transform' }}>
-          <div className={`room-tool-sheet${closingRoleplayMenu ? ' is-closing' : ''}`} style={{ maxHeight: '58vh', overflowY: 'auto', marginBottom: 0, padding: '4px 12px 12px', borderRadius: '20px 20px 0 0', background: `color-mix(in srgb, ${t.panel} 88%, transparent)`, backdropFilter: 'blur(22px)', WebkitBackdropFilter: 'blur(22px)', border: `1px solid color-mix(in srgb, ${t.border} 65%, transparent)`, borderBottom: 0, boxShadow: '0 -6px 20px rgba(0,0,0,0.12)', pointerEvents: closingRoleplayMenu ? 'none' : 'auto' }}>
+          <div className="room-composer__tool-sheet-position" data-dragging={draggingToolSheet} style={{ transform: `translateY(${toolSheetOffset}px)` }}>
+          <Card className={`room-tool-sheet${closingRoleplayMenu ? ' is-closing' : ''}`}>
             <button
+              className="room-tool-sheet__handle"
               aria-label="아래로 끌어 도구 메뉴 닫기"
               onPointerDown={startToolSheetDrag}
               onPointerMove={moveToolSheetDrag}
               onPointerUp={finishToolSheetDrag}
               onPointerCancel={finishToolSheetDrag}
-              onKeyDown={event => (event.key === 'Escape' || event.key === 'ArrowDown') && closeRoleplayMenu()}
-              style={{ width: '100%', height: 28, display: 'grid', placeItems: 'center', border: 0, background: 'transparent', cursor: 'grab', touchAction: 'none' }}>
-              <span style={{ width: 38, height: 4, borderRadius: 2, background: t.border }} />
+              onKeyDown={event => (event.key === 'Escape' || event.key === 'ArrowDown') && closeRoleplayMenu()}>
+              <span />
             </button>
             {toolPanel === 'effects' ? (
               <MessageEffectPicker
@@ -2825,34 +2836,36 @@ export default function Room() {
                 }}
               />
             ) : <>
-            {roomToolGroups.map((group, groupIndex) => (
-              <section key={group.id} style={{ marginTop: groupIndex === 0 ? 0 : 10, paddingTop: groupIndex === 0 ? 0 : 8, borderTop: groupIndex === 0 ? 0 : `1px solid color-mix(in srgb, ${t.border} 52%, transparent)` }}>
-                <div style={{ margin: '0 5px 4px', color: t.subText, fontSize: 10, fontWeight: 600, letterSpacing: '0.035em' }}>{group.label}</div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 3 }}>
+            {roomToolGroups.map(group => (
+              <section key={group.id} className="room-tool-sheet__group">
+                <div className="room-tool-sheet__group-label">{group.label}</div>
+                <div className="room-tool-sheet__grid">
                   {group.tools.map(toolId => roomTools.find(tool => tool.id === toolId)).filter(Boolean).map(tool => {
                     const ToolIcon = tool.icon
                     const selected = favoriteTools.includes(tool.id)
                     const active = (tool.id === 'narration' && isNarrActive) || (tool.id === 'effects' && Boolean(selectedMessageEffect))
                     return (
-                      <div key={tool.id} style={{ minWidth: 0, minHeight: 42, display: 'flex', alignItems: 'center', borderRadius: 11, background: active ? `color-mix(in srgb, ${t.point} 13%, transparent)` : 'transparent', transition: 'background 150ms ease' }}>
-                        <button
+                      <div key={tool.id} className="room-tool-sheet__tool" data-active={active}>
+                        <Button
+                          variant="ghost"
+                          className="room-tool-sheet__run"
                           onMouseDown={event => event.preventDefault()}
                           onClick={() => runRoomTool(tool.id)}
-                          aria-pressed={active}
-                          style={{ flex: 1, minWidth: 0, minHeight: 42, display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 9, padding: '5px 6px 5px 9px', border: 0, borderRadius: 11, background: 'transparent', color: active ? t.point : t.theirText, textAlign: 'left', cursor: 'pointer' }}>
-                          <ToolIcon size={17} style={{ flexShrink: 0, opacity: active ? 1 : 0.82 }} />
-                          <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 11 }}>{tool.label}</span>
-                        </button>
-                        <button
+                          aria-pressed={active}>
+                          <ToolIcon size={17} />
+                          <span>{tool.label}</span>
+                        </Button>
+                        <IconButton
+                          className="room-tool-sheet__favorite"
+                          active={selected}
                           onMouseDown={event => event.preventDefault()}
                           onClick={event => {
                             event.stopPropagation()
                             toggleQuickToolFavorite(tool.id)
                           }}
-                          aria-label={`${tool.label} 즐겨찾기 ${selected ? '해제' : '추가'}`}
-                          style={{ width: 30, height: 34, flexShrink: 0, display: 'grid', placeItems: 'center', padding: 0, border: 0, borderRadius: 9, background: selected ? `color-mix(in srgb, ${t.point} 13%, transparent)` : 'transparent', color: selected ? t.point : t.subText, cursor: 'pointer' }}>
+                          label={`${tool.label} 즐겨찾기 ${selected ? '해제' : '추가'}`}>
                           <Star size={13} fill={selected ? 'currentColor' : 'none'} />
-                        </button>
+                        </IconButton>
                       </div>
                     )
                   })}
@@ -2860,8 +2873,9 @@ export default function Room() {
               </section>
             ))}
             {toolPanel === 'divider' && (
-              <div className="inline-panel-reveal" style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 9 }}>
-                <input
+              <div className="inline-panel-reveal room-tool-sheet__divider">
+                <TextInput
+                  className="room-tool-sheet__divider-input"
                   autoFocus
                   value={dividerText}
                   onChange={event => setDividerText(event.target.value)}
@@ -2872,41 +2886,48 @@ export default function Room() {
                     }
                   }}
                   placeholder="구분선 문구"
-                  style={{ flex: 1, minWidth: 0, padding: '9px 10px', borderRadius: 10, border: `1px solid ${t.border}`, background: t.bg, color: t.inputText, outline: 'none' }}
                 />
-                <button onMouseDown={event => event.preventDefault()} onClick={sendDivider} style={{ flexShrink: 0, padding: '9px 12px', borderRadius: 10, border: 0, background: t.point, color: '#fff' }}>
+                <Button onMouseDown={event => event.preventDefault()} onClick={sendDivider}>
                   추가
-                </button>
+                </Button>
               </div>
             )}
             {showRoomInvitePicker && (
-              <div className="inline-panel-reveal" style={{ display: 'grid', gap: 5, paddingTop: 9 }}>
-                <div style={{ color: t.subText, fontSize: 10 }}>초대할 방을 선택하세요.</div>
+              <div className="inline-panel-reveal room-tool-sheet__invites">
+                <div>초대할 방을 선택하세요.</div>
                 {invitableRooms.length === 0 ? (
-                  <div style={{ padding: 9, borderRadius: 9, background: t.bg, color: t.subText, fontSize: 11, textAlign: 'center' }}>초대할 수 있는 다른 방이 없어요.</div>
+                  <div className="room-tool-sheet__invites-empty">초대할 수 있는 다른 방이 없어요.</div>
                 ) : (
                   invitableRooms.map(targetRoom => (
-                    <button key={targetRoom.id} onMouseDown={event => event.preventDefault()} onClick={() => sendRoomInvite(targetRoom)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 9, border: `1px solid ${t.border}`, background: t.bg, color: t.theirText, textAlign: 'left' }}>
-                      <span style={{ flex: 1, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{targetRoom.name}</span>
-                      <Send size={13} color={t.point} />
-                    </button>
+                    <Button key={targetRoom.id} variant="secondary" className="room-tool-sheet__invite" onMouseDown={event => event.preventDefault()} onClick={() => sendRoomInvite(targetRoom)}>
+                      <span>{targetRoom.name}</span>
+                      <Send size={13} />
+                    </Button>
                   ))
                 )}
               </div>
             )}
             </>}
-          </div>
+          </Card>
           </div>
         )}
         {showQuickToolPicker && (
-          <QuickToolPicker tools={favoriteRoomTools} activeId={quickTool} theme={t} onSelect={selectQuickTool} />
+          <QuickToolPicker tools={favoriteRoomTools} activeId={quickTool} onSelect={selectQuickTool} />
         )}
-        <div style={{ position: 'relative', display: 'flex', gap: 2, alignItems: 'center', width: '100%', minHeight: 42, padding: '0 2px', borderRadius: showRoleplayMenu ? '0 0 22px 22px' : 22, background: `color-mix(in srgb, ${t.panel} 88%, transparent)`, backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)', border: `1px solid color-mix(in srgb, ${t.border} 65%, transparent)`, borderTop: showRoleplayMenu ? 0 : `1px solid color-mix(in srgb, ${t.border} 65%, transparent)`, boxShadow: showRoleplayMenu ? '0 8px 20px rgba(0,0,0,0.12)' : '0 8px 24px rgba(0,0,0,0.22)', pointerEvents: 'auto' }}>
-          <button className="ui-touch-target" onMouseDown={e => e.preventDefault()} onClick={() => { setShowQuickToolPicker(false); if (showRoleplayMenu) closeRoleplayMenu(); else openRoleplayMenu() }} aria-label="대화 도구 메뉴" aria-expanded={showRoleplayMenu} style={{ width: 44, height: 44, padding: 0, border: 0, background: 'transparent', cursor: 'pointer', flexShrink: 0, display: 'grid', placeItems: 'center' }}>
-            <span style={{ width: 34, height: 34, display: 'grid', placeItems: 'center', borderRadius: '50%', border: `1px solid ${showRoleplayMenu ? t.point : 'transparent'}`, background: showRoleplayMenu ? `${t.point}2f` : `${t.border}66` }}><Grid2X2 size={16} color={showRoleplayMenu ? t.point : t.subText} /></span>
-          </button>
-          <input type="file" multiple accept="image/jpeg,image/png,image/webp,image/gif" ref={fileInputRef} onChange={e => sendImages(e.target.files)} style={{ display: 'none' }} />
-          <textarea
+        <div className="room-composer__row" data-sheet-open={showRoleplayMenu}>
+          <IconButton
+            className="room-composer__button"
+            active={showRoleplayMenu}
+            onMouseDown={e => e.preventDefault()}
+            onClick={() => { setShowQuickToolPicker(false); if (showRoleplayMenu) closeRoleplayMenu(); else openRoleplayMenu() }}
+            label="대화 도구 메뉴"
+            aria-expanded={showRoleplayMenu}>
+            <span><Grid2X2 size={16} /></span>
+          </IconButton>
+          <input type="file" multiple accept="image/jpeg,image/png,image/webp,image/gif" ref={fileInputRef} onChange={e => sendImages(e.target.files)} hidden />
+          <TextArea
+              className="room-composer__input"
+              data-narration={isNarrActive}
               ref={inputRef}
               value={input}
               onChange={e => {
@@ -2934,14 +2955,14 @@ export default function Room() {
               placeholder={isNarrActive ? '나레이션 입력...' : activeChar ? `${activeChar.name}${instrumentalParticle(activeChar.name)} 입력...` : '캐릭터를 먼저 추가해주세요'}
               enterKeyHint="enter"
               rows={1}
-              style={{ flex: 1, minWidth: 0, minHeight: 34, maxHeight: 120, overflowY: 'auto', background: 'transparent', border: 'none', borderRadius: 0, padding: '6px 5px', color: isNarrActive ? t.narrColor : t.inputText, fontSize: 'max(16px, calc(14px * var(--idea-font-scale, 1)))', outline: 'none', resize: 'none', lineHeight: 1.35, fontStyle: isNarrActive ? 'italic' : 'normal' }}
             />
             {myChars.length > 0 && selectedQuickTool && (() => {
               const QuickToolIcon = selectedQuickTool.icon
               const quickActive = quickTool === 'narration' && isNarrActive
               return (
-                <button
-                  className="ui-touch-target"
+                <IconButton
+                  className="room-composer__button room-composer__button--quick"
+                  active={quickActive}
                   onMouseDown={e => e.preventDefault()}
                   onPointerDown={event => {
                     quickToolGestureRef.current = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY }
@@ -2988,25 +3009,24 @@ export default function Room() {
                       setShowQuickToolPicker(false)
                     }
                   }}
-                  aria-label={`${selectedQuickTool.label} 빠른 실행${favoriteRoomTools.length > 1 ? '. 위로 밀어 즐겨찾기 선택' : ''}`}
+                  label={`${selectedQuickTool.label} 빠른 실행${favoriteRoomTools.length > 1 ? '. 위로 밀어 즐겨찾기 선택' : ''}`}
                   aria-expanded={showQuickToolPicker}
-                  title={selectedQuickTool.label}
-                  style={{ width: 44, height: 44, flexShrink: 0, padding: 0, border: 0, background: 'transparent', cursor: 'pointer', display: 'grid', placeItems: 'center', touchAction: 'none' }}>
-                  <span style={{ width: 34, height: 34, display: 'grid', placeItems: 'center', borderRadius: '50%', border: `1px solid ${quickActive ? t.point : 'transparent'}`, background: quickActive ? `${t.point}2f` : `${t.border}55` }}><QuickToolIcon size={16} color={quickActive ? t.narrColor : t.subText} /></span>
-                </button>
+                  title={selectedQuickTool.label}>
+                  <span><QuickToolIcon size={16} /></span>
+                </IconButton>
               )
             })()}
-          {showSendActionMenu && <div data-send-action-menu="true" role="menu" aria-label="전송 옵션" onKeyDown={event => event.key === 'Escape' && setShowSendActionMenu(false)} style={{ position: 'absolute', right: 0, bottom: 51, width: 210, padding: 7, borderRadius: 16, background: `color-mix(in srgb, ${t.panel} 96%, transparent)`, backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', border: `1px solid ${t.border}`, boxShadow: '0 10px 28px rgba(0,0,0,0.35)', zIndex: 30 }}>
-            <button role="menuitem" onMouseDown={event => event.preventDefault()} onPointerDown={preserveComposerFocus} onClick={openMessageEffectPicker} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 11, padding: '11px 12px', border: 0, borderRadius: 10, background: 'transparent', color: t.theirText, textAlign: 'left', cursor: 'pointer' }}>
-              <Sparkles size={17} color={t.point} />
-              <span style={{ minWidth: 0 }}>
-                <span style={{ display: 'block', fontSize: 13, fontWeight: 600 }}>대사 연출</span>
-                <span style={{ display: 'block', marginTop: 2, fontSize: 10, color: t.subText }}>{selectedMessageEffect ? '연출을 바꾸거나 해제해요.' : '보낼 대사에 효과를 적용해요.'}</span>
+          {showSendActionMenu && <Card className="room-composer__send-menu" data-send-action-menu="true" role="menu" aria-label="전송 옵션" onKeyDown={event => event.key === 'Escape' && setShowSendActionMenu(false)}>
+            <Button variant="ghost" block className="room-composer__send-option" role="menuitem" onMouseDown={event => event.preventDefault()} onPointerDown={preserveComposerFocus} onClick={openMessageEffectPicker}>
+              <Sparkles size={17} />
+              <span>
+                <strong>대사 연출</strong>
+                <small>{selectedMessageEffect ? '연출을 바꾸거나 해제해요.' : '보낼 대사에 효과를 적용해요.'}</small>
               </span>
-            </button>
-          </div>}
-          <button
-            className="ui-touch-target"
+            </Button>
+          </Card>}
+          <IconButton
+            className="room-composer__button room-composer__button--send"
             disabled={!input.trim() || (!activeChar && !isNarrActive)}
             onMouseDown={event => event.preventDefault()}
             onPointerDown={event => {
@@ -3018,30 +3038,14 @@ export default function Room() {
             onPointerCancel={cancelSendButtonPress}
             onContextMenu={event => event.preventDefault()}
             onClick={handleSendButtonClick}
-            aria-label="전송. 길게 눌러 추가 옵션 열기"
+            label="전송. 길게 눌러 추가 옵션 열기"
             aria-haspopup="menu"
-            aria-expanded={showSendActionMenu}
-            style={{ width: 44, height: 44, padding: 0, border: 'none', background: 'transparent', cursor: 'pointer', flexShrink: 0, display: 'grid', placeItems: 'center', touchAction: 'none' }}>
-            <span style={{ width: 34, height: 34, display: 'grid', placeItems: 'center', borderRadius: '50%', background: t.point }}><ArrowUp size={18} color="#fff" strokeWidth={2.5} /></span>
-          </button>
+            aria-expanded={showSendActionMenu}>
+            <span><ArrowUp size={18} strokeWidth={2.5} /></span>
+          </IconButton>
         </div>
       </div>
 
-      <style>{`
-            @keyframes slide-in-right {
-                from { transform: translateX(100%); }
-                to { transform: translateX(0); }
-            }
-            @keyframes typing-dot {
-                0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
-                30% { transform: translateY(-4px); opacity: 1; }
-            }
-            @keyframes narration-typing-dot {
-                0%, 12% { opacity: 0; }
-                20%, 72% { opacity: 0.8; }
-                88%, 100% { opacity: 0; }
-            }
-            `}</style>
     </div>
   )
 }

@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react'
 import { Check, MapPin, Plus, Save, StickyNote, Trash2, X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { createClientMessageId, sendRoomMessage } from '../features/messages/messageApi'
+import { Button, Card, IconButton, TextArea, TextInput } from './ui'
 
-export default function RoomWorldPanel({ open, initialTab = 'locations', roomId, userId, activeCharacter, theme, onClose, onSceneChange }) {
+export default function RoomWorldPanel({ open, initialTab = 'locations', roomId, userId, activeCharacter, onClose, onSceneChange }) {
   const [tab, setTab] = useState(initialTab)
   const [locations, setLocations] = useState([])
   const [playlists, setPlaylists] = useState([])
@@ -13,7 +14,6 @@ export default function RoomWorldPanel({ open, initialTab = 'locations', roomId,
   const [note, setNote] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const t = theme
 
   useEffect(() => {
     if (!open) return undefined
@@ -115,51 +115,55 @@ export default function RoomWorldPanel({ open, initialTab = 'locations', roomId,
   }
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 180, maxWidth: 480, margin: '0 auto', background: `${t.bg}88`, backdropFilter: 'blur(8px)' }} onPointerDown={event => event.target === event.currentTarget && onClose()}>
-      <section className="settings-page-drawer" style={{ position: 'absolute', inset: 0, left: '8%', display: 'flex', flexDirection: 'column', background: t.bg, borderLeft: `1px solid ${t.border}`, boxShadow: '-18px 0 42px rgba(0,0,0,.28)' }}>
-        <header style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '14px 14px 10px' }}>
-          <strong style={{ flex: 1, color: t.theirText, fontSize: 16 }}>장면과 기록</strong>
-          <button onClick={onClose} aria-label="닫기" style={{ width: 34, height: 34, display: 'grid', placeItems: 'center', border: 0, borderRadius: '50%', background: 'transparent', color: t.subText }}><X size={20} /></button>
+    <div className="room-world-backdrop" onPointerDown={event => event.target === event.currentTarget && onClose()}>
+      <section className="room-world-panel">
+        <header className="room-panel-header room-world-panel__header">
+          <strong className="room-panel-title">장면과 기록</strong>
+          <IconButton type="button" label="닫기" className="room-panel-icon" onClick={onClose}><X size={20} /></IconButton>
         </header>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 5, padding: '0 14px 12px' }}>
+        <div className="room-panel-tabs room-world-panel__tabs">
           {[['locations', '장소', MapPin], ['notes', '공유 메모', StickyNote]].map(([id, label, Icon]) => (
-            <button key={id} onClick={() => setTab(id)} style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6, padding: 9, borderRadius: 11, border: `1px solid ${tab === id ? t.point : t.border}`, background: tab === id ? `${t.point}22` : t.panel, color: tab === id ? t.point : t.subText }}><Icon size={15} />{label}</button>
+            <Button key={id} variant="secondary" className="room-panel-tab" data-selected={tab === id} onClick={() => setTab(id)}>
+              <Icon size={15} />{label}
+            </Button>
           ))}
         </div>
-        {error && <div style={{ margin: '0 14px 10px', padding: 9, borderRadius: 9, background: '#ef44441c', color: '#f87171', fontSize: 11 }}>{error}</div>}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '0 14px 18px' }}>
+        {error && <div className="room-panel-error room-world-panel__error">{error}</div>}
+        <div className="room-world-panel__body">
           {tab === 'locations' ? (
             <>
-              <div style={{ display: 'grid', gap: 7, padding: 10, marginBottom: 12, borderRadius: 13, border: `1px solid ${t.border}`, background: t.panel }}>
-                <input value={newName} onChange={event => setNewName(event.target.value)} placeholder="새 장소 이름" maxLength={80} style={{ padding: 9, borderRadius: 9, border: `1px solid ${t.border}`, background: t.bg, color: t.inputText, outline: 'none' }} />
-                <input value={newDescription} onChange={event => setNewDescription(event.target.value)} placeholder="장면 설명 (선택)" maxLength={160} style={{ padding: 9, borderRadius: 9, border: `1px solid ${t.border}`, background: t.bg, color: t.inputText, outline: 'none' }} />
-                <button disabled={saving || !newName.trim()} onClick={addLocation} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, padding: 9, border: 0, borderRadius: 9, background: t.point, color: '#fff' }}><Plus size={15} />장소 추가</button>
-              </div>
-              <div style={{ display: 'grid', gap: 7 }}>
-                {locations.length === 0 && <div style={{ padding: 24, textAlign: 'center', color: t.subText, fontSize: 12 }}>등록된 장소가 없어요.</div>}
+              <Card className="room-panel-stack room-world-panel__form">
+                <TextInput value={newName} onChange={event => setNewName(event.target.value)} placeholder="새 장소 이름" maxLength={80} />
+                <TextInput value={newDescription} onChange={event => setNewDescription(event.target.value)} placeholder="장면 설명 (선택)" maxLength={160} />
+                <Button disabled={saving || !newName.trim()} onClick={addLocation}><Plus size={15} />장소 추가</Button>
+              </Card>
+              <div className="room-panel-stack">
+                {locations.length === 0 && <div className="room-panel-empty">등록된 장소가 없어요.</div>}
                 {locations.map(location => {
                   const current = location.id === currentLocationId
-                  return <div key={location.id} style={{ display: 'grid', gap: 7, padding: 10, borderRadius: 12, border: `1px solid ${current ? t.point : t.border}`, background: current ? `${t.point}18` : t.panel }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <button disabled={saving} onClick={() => activateLocation(location)} style={{ flex: 1, minWidth: 0, textAlign: 'left', border: 0, background: 'transparent', color: t.theirText }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 13 }}>{current && <Check size={13} color={t.point} />}{location.name}</div>
-                        {location.description && <div style={{ marginTop: 4, color: t.subText, fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{location.description}</div>}
-                      </button>
-                      <button onClick={() => deleteLocation(location)} aria-label="장소 삭제" style={{ width: 30, height: 30, display: 'grid', placeItems: 'center', border: 0, background: 'transparent', color: t.subText }}><Trash2 size={14} /></button>
-                    </div>
-                    <select value={location.background_audio_playlist_id || ''} onChange={event => connectLocationPlaylist(location, event.target.value)} style={{ width: '100%', padding: 7, borderRadius: 8, border: `1px solid ${t.border}`, background: t.bg, color: t.inputText, fontSize: 10 }}>
-                      <option value="">연결된 배경음 없음</option>
-                      {playlists.map(playlist => <option key={playlist.id} value={playlist.id}>{playlist.name}</option>)}
-                    </select>
-                  </div>
+                  return (
+                    <Card key={location.id} className="room-panel-stack room-world-panel__location" data-current={current}>
+                      <div className="room-panel-row">
+                        <Button variant="ghost" className="room-world-panel__activate" disabled={saving} onClick={() => activateLocation(location)}>
+                          <span>{current && <Check size={13} />}{location.name}</span>
+                          {location.description && <small>{location.description}</small>}
+                        </Button>
+                        <IconButton type="button" label="장소 삭제" className="room-panel-icon" onClick={() => deleteLocation(location)}><Trash2 size={14} /></IconButton>
+                      </div>
+                      <select className="ui-input" value={location.background_audio_playlist_id || ''} onChange={event => connectLocationPlaylist(location, event.target.value)}>
+                        <option value="">연결된 배경음 없음</option>
+                        {playlists.map(playlist => <option key={playlist.id} value={playlist.id}>{playlist.name}</option>)}
+                      </select>
+                    </Card>
+                  )
                 })}
               </div>
             </>
           ) : (
-            <div style={{ display: 'flex', minHeight: '100%', flexDirection: 'column', gap: 9 }}>
-              <div style={{ color: t.subText, fontSize: 11 }}>방에 참여한 모두가 같은 메모를 보고 수정할 수 있어요.</div>
-              <textarea value={note} onChange={event => setNote(event.target.value)} placeholder="인물 관계, 복선, 다음 장면에서 기억할 내용을 적어보세요." style={{ flex: 1, minHeight: 280, resize: 'none', padding: 12, borderRadius: 13, border: `1px solid ${t.border}`, background: t.panel, color: t.inputText, outline: 'none', lineHeight: 1.65 }} />
-              <button disabled={saving} onClick={saveNote} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: 10, border: 0, borderRadius: 10, background: t.point, color: '#fff' }}><Save size={15} />공유 메모 저장</button>
+            <div className="room-world-panel__notes">
+              <div className="room-panel-caption">방에 참여한 모두가 같은 메모를 보고 수정할 수 있어요.</div>
+              <TextArea value={note} onChange={event => setNote(event.target.value)} placeholder="인물 관계, 복선, 다음 장면에서 기억할 내용을 적어보세요." />
+              <Button disabled={saving} onClick={saveNote}><Save size={15} />공유 메모 저장</Button>
             </div>
           )}
         </div>

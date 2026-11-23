@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight, Settings, X } from 'lucide-react'
+import { Button, IconButton } from './ui'
 
 export default function ProfileImageModal({ profile, onClose, onEdit }) {
   if (!profile) return null
@@ -59,17 +60,18 @@ function ProfileImageViewer({ profile, urls, onClose, onEdit }) {
       aria-modal="true"
       aria-label={`${profile.name || '프로필'} 사진`}
       onClick={onClose}
-      style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(0,0,0,0.86)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-      <button
+      className="profile-image-viewer">
+      <IconButton
+        type="button"
         onClick={onClose}
-        aria-label="닫기"
-        style={{ position: 'absolute', top: 'max(18px, env(safe-area-inset-top))', left: 18, width: 38, height: 38, borderRadius: '50%', border: 'none', background: 'transparent', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+        label="닫기"
+        className="profile-image-viewer__control profile-image-viewer__close">
         <X size={22} />
-      </button>
+      </IconButton>
       {currentItem && (
-        <div onClick={event => event.stopPropagation()} style={{ position: 'absolute', top: 'max(22px, env(safe-area-inset-top))', left: 68, right: 24, color: '#fff', pointerEvents: 'none' }}>
-          <div style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.3 }}>{currentItem.uploader}</div>
-          <div style={{ marginTop: 2, fontSize: 10, opacity: 0.68 }}>{uploadedAt}</div>
+        <div onClick={event => event.stopPropagation()} className="profile-image-viewer__metadata">
+          <div>{currentItem.uploader}</div>
+          <small>{uploadedAt}</small>
         </div>
       )}
       <div
@@ -95,15 +97,15 @@ function ProfileImageViewer({ profile, urls, onClose, onEdit }) {
           setIsDragging(false)
           setDragOffset(0)
         }}
-        style={{ width: '100vw', maxWidth: '100vw', minHeight: 0, overflow: 'hidden', clipPath: 'inset(0)', overscrollBehavior: 'none', touchAction: 'pan-y', cursor: isDragging ? 'grabbing' : 'grab' }}>
-        <div style={{ width: '100%', display: 'flex', alignItems: 'center', transform: `translate3d(calc(${-currentIndex * 100}% + ${dragOffset}px), 0, 0)`, transition: isDragging ? 'none' : 'transform 280ms cubic-bezier(0.22, 0.72, 0, 1)', willChange: 'transform', backfaceVisibility: 'hidden' }}>
+        className="profile-image-viewer__viewport"
+        data-dragging={isDragging}>
+        <div className="profile-image-viewer__track" style={{ transform: `translate3d(calc(${-currentIndex * 100}% + ${dragOffset}px), 0, 0)` }}>
           {urls.map((url, index) => (
-            <div key={`${url}-${index}`} style={{ flex: '0 0 100%', minWidth: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 6vw', boxSizing: 'border-box', opacity: isDragging || index === currentIndex ? 1 : 0 }}>
+            <div key={`${url}-${index}`} className="profile-image-viewer__slide" data-visible={isDragging || index === currentIndex}>
               <img
                 src={url}
                 alt={`${profile.name || '이미지'} ${index + 1}`}
                 draggable={false}
-                style={{ display: 'block', maxWidth: 'min(88vw, 640px)', maxHeight: '78dvh', width: 'auto', height: 'auto', objectFit: 'contain', borderRadius: 16, boxShadow: '0 16px 48px rgba(0,0,0,0.45)', userSelect: 'none' }}
               />
             </div>
           ))}
@@ -111,16 +113,16 @@ function ProfileImageViewer({ profile, urls, onClose, onEdit }) {
       </div>
       {urls.length > 1 && (
         <>
-          <button onClick={event => { event.stopPropagation(); setCurrentIndex(index => Math.max(0, index - 1)) }} disabled={currentIndex === 0} aria-label="이전 이미지" style={{ position: 'absolute', left: 14, top: '50%', width: 38, height: 38, display: 'grid', placeItems: 'center', border: 0, borderRadius: '50%', color: '#fff', background: 'rgba(0,0,0,0.28)' }}><ChevronLeft size={23} /></button>
-          <button onClick={event => { event.stopPropagation(); setCurrentIndex(index => Math.min(urls.length - 1, index + 1)) }} disabled={currentIndex === urls.length - 1} aria-label="다음 이미지" style={{ position: 'absolute', right: 14, top: '50%', width: 38, height: 38, display: 'grid', placeItems: 'center', border: 0, borderRadius: '50%', color: '#fff', background: 'rgba(0,0,0,0.28)' }}><ChevronRight size={23} /></button>
-          <div style={{ position: 'absolute', bottom: 'max(18px, env(safe-area-inset-bottom))', padding: '5px 10px', borderRadius: 12, color: '#fff', background: 'rgba(0,0,0,0.3)', fontSize: 11 }}>{currentIndex + 1} / {urls.length}</div>
+          <IconButton type="button" className="profile-image-viewer__control profile-image-viewer__previous" onClick={event => { event.stopPropagation(); setCurrentIndex(index => Math.max(0, index - 1)) }} disabled={currentIndex === 0} label="이전 이미지"><ChevronLeft size={23} /></IconButton>
+          <IconButton type="button" className="profile-image-viewer__control profile-image-viewer__next" onClick={event => { event.stopPropagation(); setCurrentIndex(index => Math.min(urls.length - 1, index + 1)) }} disabled={currentIndex === urls.length - 1} label="다음 이미지"><ChevronRight size={23} /></IconButton>
+          <div className="profile-image-viewer__count">{currentIndex + 1} / {urls.length}</div>
         </>
       )}
-      {profile.name && <div style={{ marginTop: 14, color: '#fff', fontSize: 14, textAlign: 'center' }}>{profile.name}</div>}
+      {profile.name && <div className="profile-image-viewer__name">{profile.name}</div>}
       {onEdit && (
-        <button type="button" onClick={event => { event.stopPropagation(); onEdit() }} style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 16, padding: '10px 16px', border: '1px solid rgba(255,255,255,0.28)', borderRadius: 999, background: 'rgba(255,255,255,0.12)', color: '#fff', fontSize: 12, cursor: 'pointer' }}>
+        <Button variant="ghost" className="profile-image-viewer__edit" onClick={event => { event.stopPropagation(); onEdit() }}>
           <Settings size={15} /> 프로필 수정
-        </button>
+        </Button>
       )}
     </div>
   )

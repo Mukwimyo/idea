@@ -58,7 +58,7 @@
 
 | ID | 화면 | 인라인 style 수 | 비고 |
 |---|---|---|---|
-| C1 | 채팅방 `src/pages/Room.jsx` | 280 | 3,019줄. 터치 영역 44px 이상 |
+| C1 ✅ | 채팅방 `src/pages/Room.jsx` | 280 | 3,019줄. 터치 영역 44px 이상 |
 | C2 ✅ | 방 목록 `src/pages/RoomList.jsx` | 74 | |
 | C3 ✅ | 캐릭터 `Characters.jsx`, `CharacterEdit.jsx` | 152 | |
 | C4 ✅ | 설정 `src/pages/Settings.jsx` | 94 | |

@@ -15,6 +15,7 @@ import {
   getMessageEffect,
   getMessageEffectClassName,
 } from '../features/messages/messageEffects'
+import { Button, IconButton } from './ui'
 
 const EFFECT_ICONS = {
   whisper: Volume1,
@@ -24,19 +25,18 @@ const EFFECT_ICONS = {
   monologue: CloudMoon,
 }
 
-export function MessageEffectPicker({ selectedEffect, onSelect, onBack, theme }) {
+export function MessageEffectPicker({ selectedEffect, onSelect, onBack }) {
   return (
     <div className="message-effect-picker inline-panel-reveal">
       <div className="message-effect-picker__heading">
         {onBack && (
-          <button
+          <IconButton
             type="button"
-            aria-label="대화 화면으로 돌아가기"
+            label="대화 화면으로 돌아가기"
             onMouseDown={event => event.preventDefault()}
-            onClick={onBack}
-            style={{ color: theme.subText }}>
+            onClick={onBack}>
             <ChevronLeft size={16} />
-          </button>
+          </IconButton>
         )}
         <Sparkles size={14} />
         다음 메시지 연출
@@ -46,62 +46,49 @@ export function MessageEffectPicker({ selectedEffect, onSelect, onBack, theme })
           const Icon = EFFECT_ICONS[effect.key]
           const selected = selectedEffect === effect.key
           return (
-            <button
+            <Button variant="secondary"
               key={effect.key}
               type="button"
               aria-pressed={selected}
               onMouseDown={event => event.preventDefault()}
-              onClick={() => onSelect(effect.key)}
-              style={{
-                borderColor: selected ? theme.point : theme.border,
-                background: selected ? `${theme.point}22` : theme.bg,
-                color: selected ? theme.point : theme.theirText,
-              }}>
+              onClick={() => onSelect(effect.key)}>
               <Icon size={17} />
               <span>
                 <strong>{effect.label}</strong>
-                <small style={{ color: theme.subText }}>{effect.description}</small>
+                <small>{effect.description}</small>
               </span>
-            </button>
+            </Button>
           )
         })}
       </div>
       {selectedEffect && (
-        <button
+        <Button variant="ghost"
           type="button"
           className="message-effect-picker__clear"
           onMouseDown={event => event.preventDefault()}
-          onClick={() => onSelect(null)}
-          style={{ color: theme.subText }}>
+          onClick={() => onSelect(null)}>
           효과 없이 보내기
-        </button>
+        </Button>
       )}
     </div>
   )
 }
 
-export function MessageEffectChip({ effectKey, onClear, theme }) {
+export function MessageEffectChip({ effectKey, onClear }) {
   const effect = getMessageEffect(effectKey)
   if (!effect) return null
   const Icon = EFFECT_ICONS[effect.key]
   return (
-    <div
-      className="composer-effect-chip"
-      style={{
-        borderColor: `${theme.point}88`,
-        background: `color-mix(in srgb, ${theme.panel} 88%, transparent)`,
-        color: theme.point,
-      }}>
+    <div className="composer-effect-chip">
       <Icon size={13} />
       <span>{effect.label}</span>
-      <button
+      <IconButton
         type="button"
-        aria-label={`${effect.label} 효과 해제`}
+        label={`${effect.label} 효과 해제`}
         onMouseDown={event => event.preventDefault()}
-        onClick={onClear}
-        style={{ color: theme.subText }}>
+        onClick={onClear}>
         <X size={12} />
-      </button>
+      </IconButton>
     </div>
   )
 }
