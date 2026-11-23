@@ -147,6 +147,7 @@ easing (3종)
 | `--c-on-accent` | `point` 위 대비가 큰 쪽: `#ffffff` 또는 `#111111` (계산) | `background: t.point` 위 `#fff` |
 | `--c-accent-soft` | `color-mix(in srgb, var(--c-accent) 15%, transparent)` | `${t.point}22` 류 |
 | `--c-danger` | 다크 `#f87171` / 라이트 `#dc2626` | `#f87171`, `#ef7777`, `#e5484d` |
+| `--c-on-danger` | 다크 `#111111` / 라이트 `#ffffff` | danger 배경 위 글자 |
 | `--c-danger-soft` | `color-mix(in srgb, var(--c-danger) 12%, transparent)` | `#ef44441c`, `#f8717114` |
 | `--c-success` | 다크 `#4ade80` / 라이트 `#16a34a` | `#26a65b` 등 |
 | `--c-overlay` | `rgb(0 0 0 / 0.5)` | 모달 배경 rgba |
@@ -189,3 +190,21 @@ C 단계 각 화면 작업에서 함께 처리. 대응표는 B4 파생 변수 �
 3. 최소 글자 11px (현재 7~10px 사용처 약 90곳이 커짐)
 4. `--c-on-accent` 자동 계산(밝은 강조색 테마는 버튼 글자가 검정이 됨)
 5. 라이트 테마 `--c-danger` `#dc2626` (현재 `#f87171`은 라이트 배경에서 대비 약 2.8)
+
+---
+
+## C5. 공통 컴포넌트 명세 (`src/components/ui.jsx`)
+
+모든 컴포넌트는 `index.css`의 `.ui-*` 클래스 + 토큰으로 스타일을 정의하고, JSX 인라인 스타일은 쓰지 않는다(위치·크기 조정용 `style`/`className` 전달은 허용). 색은 `--c-*` 변수만 사용. 테마 객체 prop은 받지 않는다(기존 `IconButton`의 색 prop은 하위 호환으로 유지하되 없으면 변수 사용).
+
+| 컴포넌트 | 클래스 | 명세 |
+|---|---|---|
+| `Button` | `.ui-btn` + `--primary` / `--secondary` / `--ghost` / `--danger`, `--sm`, `--block` | 높이 `--control-h`(sm `--control-h-sm`, 터치 영역은 `::before`로 44px 확보), 좌우 `--sp-4`(sm `--sp-3`), `--radius-md`, 글자 `--fs-body`(sm `--fs-label`), primary `--fw-semibold` 나머지 `--fw-medium`. primary: 배경 `--c-accent`, 글자 `--c-on-accent`. secondary: 배경 `--c-surface`, 테두리 `--c-border`, 글자 `--c-text`. ghost: 투명, 글자 `--c-text`. danger: 배경 `--c-danger`, 글자 `--c-on-danger`(다크 `#111111` / 라이트 `#ffffff`, 파생 변수로 추가 — `#f87171` 위 흰 글자는 대비 2.8로 미달). disabled: opacity 0.5, 눌림 효과 없음. `type="button"` 기본 |
+| `IconButton` | `.ui-icon-btn` (+ `--active`) | 시각 40px, 터치 44px, `--radius-md`, 테두리 `--c-border`, 아이콘 색 `--c-text-sub`. active: 테두리·아이콘 `--c-accent`, 배경 `--c-accent-soft`. `label` 필수(aria-label) |
+| `TextInput`, `TextArea` | `.ui-input` | 배경 `--c-input-bg`, 글자 `--c-input-text`, 테두리 `--c-border`, `--radius-md`, 글자 `--fs-input`, 높이 `--control-h`(TextArea는 min-height만), 좌우 `--sp-3`. focus: 테두리 `--c-accent` + `box-shadow: 0 0 0 3px var(--c-accent-soft)`. placeholder `--c-text-sub` |
+| `Card` (기존 `Surface` 대체, `Surface`는 별칭 export 유지) | `.ui-card` (+ `--interactive`) | 배경 `--c-surface`, 테두리 1px `--c-border`, `--radius-lg`, 안쪽 여백 `--sp-4`. interactive: 눌림 피드백(A4 규칙에 포함) |
+| `Toggle` | `.ui-switch` | `<button role="switch" aria-checked>`. 트랙 40×22, `--radius-full`, 켬 `--c-accent` / 끔 `--c-border`. 손잡이 16px, 색 `#ffffff`(예외 허용), `transform` 이동, `--dur-fast` `--ease-in-out`. 터치 영역 44px. props: `checked`, `onChange(next)`, `label`(aria-label), `disabled` |
+| `Dialog` | `.ui-dialog-backdrop`, `.ui-dialog` (기존 클래스 재사용·토큰화) | 배경막 `--c-overlay`, 패널 `--c-surface`, `--radius-xl`, `--shadow-lg`, 여백 `--sp-5`. 제목 `--fs-title` `--fw-semibold` `--c-text`, 설명 `--fs-sub` `--c-text-sub`. 등장 `--dur-base` `--ease-out`. Esc 닫기, 열릴 때 포커스 이동·닫힐 때 복귀, 배경막 클릭 닫기(옵션) — 현 `ConfirmDialog` 동작 그대로 |
+
+- `ConfirmDialog`는 `Dialog` + `Button` 으로 재구성(외부 API·동작 동일). danger 확인 버튼은 `Button --danger`(현재 `#d84f57` → `--c-danger`).
+- 화면별 기존 마크업을 공통 컴포넌트로 바꾸는 작업은 C1~C4에서 한다.

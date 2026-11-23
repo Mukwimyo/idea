@@ -62,7 +62,7 @@
 | C2 | 방 목록 `src/pages/RoomList.jsx` | 74 | |
 | C3 | 캐릭터 `Characters.jsx`, `CharacterEdit.jsx` | 152 | |
 | C4 | 설정 `src/pages/Settings.jsx` | 94 | |
-| C5 | 공통 컴포넌트 `src/components/ui.jsx` | - | 버튼·입력·카드·모달·토글 통일 |
+| C5 ✅ | 공통 컴포넌트 `src/components/ui.jsx` | - | 버튼·입력·카드·모달·토글 통일 |
 
 컴포넌트 내 `<style>` 키프레임(`Room.jsx`, `Characters.jsx`)은 `index.css`로 이동.
 
