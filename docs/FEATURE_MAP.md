@@ -41,7 +41,7 @@
 
 | 컴포넌트 | 기능 |
 |---|---|
-| `MessageEffects.jsx` | 메시지 연출 선택·표시 (`MessageEffectPicker`, `MessageEffectBubble`) |
+| `MessageEffects.jsx` | 메시지 연출 선택·표시 (`MessageEffectPicker`, `MessageEffectBubble`). 연출은 외침(`shout`)·충격(`impact`)만. 속삭임·떨림·독백은 D4에서 제거(과거 메시지는 일반 표시, DB 허용값은 유지) |
 | `AnimatedMessageText.jsx` | 캐릭터별 텍스트 등장 효과 |
 | `RandomTools.jsx` | 주사위·확률 등 랜덤 도구 (`shareRandomResult`) |
 | `CommunicationSessions.jsx`, `CommunicationRecord.jsx` | 전화·문자 연출 |

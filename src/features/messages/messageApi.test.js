@@ -65,7 +65,7 @@ describe('message RPC API', () => {
     })
   })
 
-  it('passes a supported presentation effect through the guarded RPC', async () => {
+  it.each(['shout', 'impact'])('passes the selectable effect %s through the guarded RPC', async effectKey => {
     const rpc = vi.fn().mockResolvedValue({ data: { id: 'server-2' }, error: null })
     await sendRoomMessage(
       { rpc },
@@ -75,12 +75,12 @@ describe('message RPC API', () => {
         character_id: 'character-1',
         type: 'chat',
         content: 'listen',
-        effect_key: 'whisper',
+        effect_key: effectKey,
       }
     )
 
     expect(rpc).toHaveBeenCalledWith('send_room_message', expect.objectContaining({
-      p_effect_key: 'whisper',
+      p_effect_key: effectKey,
     }))
   })
 

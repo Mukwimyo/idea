@@ -1,11 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   ChevronLeft,
-  CloudMoon,
   Megaphone,
   Sparkles,
-  Vibrate,
-  Volume1,
   X,
   Zap,
 } from 'lucide-react'
@@ -18,11 +15,8 @@ import {
 import { Button, IconButton } from './ui'
 
 const EFFECT_ICONS = {
-  whisper: Volume1,
   shout: Megaphone,
-  tremble: Vibrate,
   impact: Zap,
-  monologue: CloudMoon,
 }
 
 export function MessageEffectPicker({ selectedEffect, onSelect, onBack }) {
