@@ -2240,7 +2240,7 @@ export default function Room() {
       {showSearch && (
         <div className="top-panel-backdrop" style={{ position: 'fixed', top: 49, left: 0, right: 0, bottom: 0, zIndex: 50, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }} onClick={() => setShowSearch(false)}>
           <div className="top-panel-sheet" style={{ background: t.panel, padding: '10px 14px', borderBottom: `0.5px solid ${t.border}`, maxWidth: 480, margin: '0 auto', width: '100%' }} onClick={e => e.stopPropagation()}>
-            <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="대사 검색..." autoFocus style={{ width: '100%', background: t.bg, border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '8px 12px', color: t.inputText, fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
+            <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="대사 검색..." autoFocus style={{ width: '100%', background: t.bg, border: `0.5px solid ${t.border}`, borderRadius: 8, padding: '8px 12px', color: t.inputText, fontSize: 16, outline: 'none', boxSizing: 'border-box' }} />
             {searchQuery && <div style={{ marginTop: 8, fontSize: 11, color: t.subText }}>{filteredMessages.length}개 검색됨</div>}
           </div>
         </div>
@@ -2489,7 +2489,7 @@ export default function Room() {
                 </div>
                 {editingId === msg.id ? (
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
-                    <input value={editText} onChange={event => setEditText(event.target.value)} onKeyDown={event => event.key === 'Enter' && editMessage(msg.id)} style={{ minWidth: 210, background: t.bg, border: `0.5px solid ${t.point}`, borderRadius: 8, padding: '7px 10px', color: t.inputText, fontSize: 12, outline: 'none' }} />
+                    <input value={editText} onChange={event => setEditText(event.target.value)} onKeyDown={event => event.key === 'Enter' && editMessage(msg.id)} style={{ minWidth: 210, background: t.bg, border: `0.5px solid ${t.point}`, borderRadius: 8, padding: '7px 10px', color: t.inputText, fontSize: 16, outline: 'none' }} />
                     <div style={{ display: 'flex', alignItems: 'center', border: `1px solid ${t.border}`, borderRadius: 9, overflow: 'hidden', background: t.panel, boxShadow: '0 3px 10px rgba(0,0,0,0.2)' }}>
                       <button onClick={() => editMessage(msg.id)} style={{ border: 0, background: 'none', color: t.theirText, padding: '7px 13px', fontSize: 11, cursor: 'pointer' }}>저장</button>
                       <div style={{ width: 1, alignSelf: 'stretch', background: t.border }} />
@@ -2633,7 +2633,7 @@ export default function Room() {
                 {showMessageIdentity && char?.name && <div style={{ maxWidth: '100%', marginBottom: 4, color: t.subText, fontSize: 11, lineHeight: 1.35, overflowWrap: 'anywhere', textAlign: isMine ? 'right' : 'left' }}>{char.name}</div>}
                 {editingId === msg.id ? (
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMine ? 'flex-end' : 'flex-start', gap: 5 }}>
-                    <input value={editText} onChange={e => setEditText(e.target.value)} onKeyDown={e => e.key === 'Enter' && editMessage(msg.id)} style={{ width: 'min(62vw, 280px)', background: t.bg, border: `0.5px solid ${t.point}`, borderRadius: 8, padding: '7px 10px', color: t.inputText, fontSize: 12, outline: 'none', boxSizing: 'border-box' }} />
+                    <input value={editText} onChange={e => setEditText(e.target.value)} onKeyDown={e => e.key === 'Enter' && editMessage(msg.id)} style={{ width: 'min(62vw, 280px)', background: t.bg, border: `0.5px solid ${t.point}`, borderRadius: 8, padding: '7px 10px', color: t.inputText, fontSize: 16, outline: 'none', boxSizing: 'border-box' }} />
                     <div style={{ display: 'flex', alignItems: 'center', border: `1px solid ${t.border}`, borderRadius: 9, overflow: 'hidden', background: t.panel, boxShadow: '0 3px 10px rgba(0,0,0,0.2)' }}>
                       <button onClick={() => editMessage(msg.id)} style={{ border: 0, background: 'none', color: t.theirText, padding: '7px 13px', fontSize: 11, cursor: 'pointer' }}>저장</button>
                       <div style={{ width: 1, alignSelf: 'stretch', background: t.border }} />

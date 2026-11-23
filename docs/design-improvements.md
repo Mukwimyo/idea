@@ -17,7 +17,7 @@
 |---|---|---|---|
 | A1 ✅ | 라이트 테마 대비 보정 | 나레이션(`narrColor`)·챕터(`chapColor`)·보조 텍스트(`subText`)를 배경 대비 4.5:1 이상으로. 대상: imessage, notion, twitter, cream, lavender, paper, cotton, kakao-blue + monochrome `chapColor`(1.9), gray `narrColor`/`chapColor` | `src/lib/themes.js` |
 | A2 ✅ | 입력창 자동 높이 | 34px 고정 해제, 내용에 따라 증가, 최대 높이 이후 스크롤 | `src/pages/Room.jsx` (메시지 textarea) |
-| A3 | iOS 확대 방지 | 메시지 입력·수정·검색 입력 글자 16px 이상 | `src/pages/Room.jsx` 입력 요소 |
+| A3 ✅ | iOS 확대 방지 | 메시지 입력·수정·검색 입력 글자 16px 이상 | `src/pages/Room.jsx` 입력 요소 |
 | A4 | 눌림 피드백 | 버튼·말풍선·카드에 `:active` 피드백(살짝 축소/어둡게) 일괄 적용 | `src/index.css` |
 | A5 | 토글 개선 | `<div onClick>` 토글을 `<button>`으로, 이동은 `left` 대신 `transform` | `src/pages/Room.jsx` 외 토글 |
 | A6 | body 배경 | `#1a1a2e` 고정 → 현재 테마 배경색 | `src/index.css`, `src/App.jsx` |
