@@ -159,6 +159,28 @@ function parseContent(text, actionSize) {
   return parts
 }
 
+function MessageSendingStatus({ sending }) {
+  const [visible, setVisible] = useState(sending)
+  if (sending && !visible) setVisible(true)
+  if (!visible) return null
+
+  return (
+    <div
+      className="message-sending"
+      data-exiting={!sending}
+      aria-hidden={!sending}
+      onAnimationEnd={event => {
+        if (event.target !== event.currentTarget || event.animationName !== 'message-sending-out') return
+        event.stopPropagation()
+        if (!sending) setVisible(false)
+      }}>
+      <div className="message-sending__clip">
+        <span className="message-sending__label">전송 중…</span>
+      </div>
+    </div>
+  )
+}
+
 export default function Room() {
   const { roomId } = useParams()
   const navigate = useNavigate()
@@ -1691,13 +1713,7 @@ export default function Room() {
       )
     }
     if (msg.delivery_state === 'upload_failed') return <span className="message-upload-failed">파일 업로드 실패</span>
-    if (msg.delivery_state === 'sending')
-      return (
-        <span className="message-sending">
-          전송 중…
-        </span>
-      )
-    if (msg.delivery_state !== 'failed') return null
+    if (msg.delivery_state !== 'failed') return <MessageSendingStatus sending={msg.delivery_state === 'sending'} />
     return (
       <Button
         variant="ghost"
@@ -2318,7 +2334,8 @@ export default function Room() {
           const nextMessageHasTime = nextMessage && nextMessage.type !== 'chapter' && nextMessage.type !== 'narration'
           const showMessageTimestamp = showMessageTime && (!nextMessageHasTime || Math.floor(currentMinute / 60000) !== Math.floor(nextMinute / 60000))
           const showReadReceipt = readReceipt !== 'none' && msg.id === lastReadMessageId
-          const showMessageMeta = showMessageTimestamp || showReadReceipt || Boolean(msg.delivery_state)
+          const hasOtherDeliveryStatus = Boolean(msg.delivery_state) && msg.delivery_state !== 'sending'
+          const showMessageMeta = showMessageTimestamp || showReadReceipt || hasOtherDeliveryStatus
           const ownMessageLongPressStyle = isMine
             ? {
                 userSelect: 'none',
@@ -2695,8 +2712,9 @@ export default function Room() {
                     ? <span aria-label={`${lastReadCount}명 읽음`} className="message-receipt">{lastReadCount}명 읽음</span>
                     : <span aria-label="읽음" className="message-receipt"><Eye size={11} />읽음</span>)}
                   {showMessageTimestamp && <div className="message-timestamp">{searchQuery ? new Date(msg.created_at).toLocaleDateString('ko-KR') + ' ' + new Date(msg.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : new Date(msg.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}</div>}
-                  {renderDeliveryStatus(msg)}
+                  {hasOtherDeliveryStatus && renderDeliveryStatus(msg)}
                 </div>}
+                {!hasOtherDeliveryStatus && renderDeliveryStatus(msg)}
               </div>
             </div>
           )

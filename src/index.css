@@ -3036,7 +3036,7 @@ button:disabled {
 }
 
 .message-upload__track {
-    height: 3px;
+    height: var(--sp-1);
     overflow: hidden;
     border-radius: var(--radius-full);
     background: var(--c-border);
@@ -3046,7 +3046,7 @@ button:disabled {
     height: 100%;
     border-radius: var(--radius-full);
     background: var(--c-accent);
-    transition: width var(--dur-fast) linear;
+    transition: width var(--dur-base) var(--ease-out);
 }
 
 .message-upload-failed,
@@ -3055,15 +3055,63 @@ button:disabled {
 }
 
 .message-sending {
-    position: absolute;
-    right: var(--touch-min);
-    bottom: calc(-1 * var(--sp-2));
-    line-height: 1;
-    opacity: 0.62;
+    display: grid;
+    grid-template-rows: 1fr;
+    opacity: 1;
     pointer-events: none;
 }
 
+.message-narration > .message-sending {
+    /* Keep the narration gap inside the height that collapses. */
+    margin-top: calc(-1 * var(--sp-1));
+}
+
+.message-sending[data-exiting="true"] {
+    animation: message-sending-out var(--dur-base) var(--ease-in) forwards;
+}
+
+.message-sending__clip {
+    min-height: 0;
+    overflow: hidden;
+}
+
+.message-sending__label {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-1);
+    padding-top: var(--sp-1);
+}
+
+.message-sending__label::before {
+    content: '';
+    flex: none;
+    width: var(--sp-2);
+    height: var(--sp-2);
+    box-sizing: border-box;
+    border: 2px solid currentColor;
+    border-inline-end-color: transparent;
+    border-radius: var(--radius-full);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .message-sending[data-exiting="false"] .message-sending__label::before {
+        animation: message-sending-spin 800ms var(--ease-in-out) infinite;
+    }
+}
+
+@keyframes message-sending-spin {
+    to { transform: rotate(1turn); }
+}
+
+@keyframes message-sending-out {
+    to {
+        grid-template-rows: 0fr;
+        opacity: 0;
+    }
+}
+
 .message-retry {
+    min-width: var(--touch-min);
     padding-inline: var(--sp-2);
     border-color: var(--c-danger);
     background: var(--c-danger-soft);
