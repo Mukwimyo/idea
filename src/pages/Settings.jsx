@@ -510,11 +510,18 @@ export default function Settings() {
               {pushEnabled ? <Bell size={15} color={t.subText} /> : <BellOff size={15} color={t.subText} />}
               <div style={{ fontSize: 13, color: t.theirText }}>새 메시지 푸시 알림</div>
             </div>
-            <div
+            <button
+              type="button"
+              role="switch"
+              aria-label="새 메시지 푸시 알림"
+              aria-checked={pushEnabled}
               onClick={togglePush}
               style={{
                 width: 40,
                 height: 22,
+                appearance: 'none',
+                padding: 0,
+                border: 0,
                 borderRadius: 11,
                 cursor: pushLoading ? 'wait' : 'pointer',
                 transition: 'background 0.2s',
@@ -523,26 +530,31 @@ export default function Settings() {
                 flexShrink: 0,
                 opacity: pushLoading ? 0.5 : 1,
               }}>
-              <div
+              <span
                 style={{
                   position: 'absolute',
                   top: 3,
-                  left: pushEnabled ? 20 : 3,
+                  left: 3,
+                  transform: pushEnabled ? 'translateX(17px)' : 'translateX(0)',
                   width: 16,
                   height: 16,
                   borderRadius: '50%',
                   background: '#fff',
-                  transition: 'left 0.2s',
+                  transition: 'transform 0.2s',
                 }}
               />
-            </div>
+            </button>
           </div>
         </div>
         <div className="settings-section" style={{ marginBottom: 28 }}>
           <div style={{ fontSize: 11, color: t.subText, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>채팅방</div>
           <div className="settings-row" style={{ background: t.panel, border: `0.5px solid ${t.border}`, borderRadius: 12, padding: '12px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ fontSize: 13, color: t.theirText }}>입장 룰렛 애니메이션</div>
-            <div
+            <button
+              type="button"
+              role="switch"
+              aria-label="입장 룰렛 애니메이션"
+              aria-checked={showEntering}
               onClick={async () => {
                 const next = !showEntering
                 setShowEntering(next)
@@ -552,20 +564,20 @@ export default function Settings() {
                 const { error } = await supabase.from('profiles').update({ show_entering: next }).eq('id', user.id)
                 showToast(error ? '입장 애니메이션 설정을 저장하지 못했어요.' : '입장 애니메이션 설정이 저장됐어요.', error ? 'error' : 'success')
               }}
-              style={{ width: 40, height: 22, borderRadius: 11, cursor: 'pointer', transition: 'background 0.2s', background: showEntering ? t.point : t.border, position: 'relative', flexShrink: 0 }}>
-              <div style={{ position: 'absolute', top: 3, left: showEntering ? 20 : 3, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
-            </div>
+              style={{ width: 40, height: 22, appearance: 'none', padding: 0, border: 0, borderRadius: 11, cursor: 'pointer', transition: 'background 0.2s', background: showEntering ? t.point : t.border, position: 'relative', flexShrink: 0 }}>
+              <span style={{ position: 'absolute', top: 3, left: 3, transform: showEntering ? 'translateX(17px)' : 'translateX(0)', width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'transform 0.2s' }} />
+            </button>
           </div>
           <div className="settings-row" style={{ background: t.panel, border: `0.5px solid ${t.border}`, borderRadius: 12, padding: '12px 14px', marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
             <div>
               <div style={{ fontSize: 13, color: t.theirText }}>캐릭터 선택 위치</div>
               <div style={{ fontSize: 10, color: t.subText, marginTop: 2 }}>켜면 채팅방 상단 사람 아이콘에서 바꿔요. 끄면 기존 하단 버튼을 사용해요.</div>
             </div>
-            <div
+            <button
+              type="button"
               role="switch"
               aria-label="상단바 캐릭터 선택 사용"
               aria-checked={topCharacterPicker}
-              tabIndex={0}
               onClick={async () => {
                 const next = !topCharacterPicker
                 setTopCharacterPicker(next)
@@ -574,22 +586,20 @@ export default function Settings() {
                 showToast(error ? '캐릭터 선택 위치를 저장하지 못했어요.' : '캐릭터 선택 위치가 저장됐어요.', error ? 'error' : 'success')
                 if (error) setTopCharacterPicker(!next)
               }}
-              onKeyDown={event => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                  event.preventDefault()
-                  event.currentTarget.click()
-                }
-              }}
-              style={{ width: 40, height: 22, borderRadius: 11, cursor: 'pointer', transition: 'background 0.2s', background: topCharacterPicker ? t.point : t.border, position: 'relative', flexShrink: 0 }}>
-              <div style={{ position: 'absolute', top: 3, left: topCharacterPicker ? 20 : 3, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
-            </div>
+              style={{ width: 40, height: 22, appearance: 'none', padding: 0, border: 0, borderRadius: 11, cursor: 'pointer', transition: 'background 0.2s', background: topCharacterPicker ? t.point : t.border, position: 'relative', flexShrink: 0 }}>
+              <span style={{ position: 'absolute', top: 3, left: 3, transform: topCharacterPicker ? 'translateX(17px)' : 'translateX(0)', width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'transform 0.2s' }} />
+            </button>
           </div>
           <div className="settings-row" style={{ background: t.panel, border: `0.5px solid ${t.border}`, borderRadius: 12, padding: '12px 14px', marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
               <div style={{ fontSize: 13, color: t.theirText }}>메시지 시간 표시</div>
               <div style={{ fontSize: 10, color: t.subText, marginTop: 2 }}>같은 분의 마지막 메시지에만 표시돼요.</div>
             </div>
-            <div
+            <button
+              type="button"
+              role="switch"
+              aria-label="메시지 시간 표시"
+              aria-checked={showMessageTime}
               onClick={async () => {
                 const next = !showMessageTime
                 setShowMessageTime(next)
@@ -599,16 +609,20 @@ export default function Settings() {
                 const { error } = await supabase.from('profiles').update({ show_message_time: next }).eq('id', user.id)
                 showToast(error ? '시간 표시 설정을 저장하지 못했어요.' : '시간 표시 설정이 저장됐어요.', error ? 'error' : 'success')
               }}
-              style={{ width: 40, height: 22, borderRadius: 11, cursor: 'pointer', transition: 'background 0.2s', background: showMessageTime ? t.point : t.border, position: 'relative', flexShrink: 0 }}>
-              <div style={{ position: 'absolute', top: 3, left: showMessageTime ? 20 : 3, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
-            </div>
+              style={{ width: 40, height: 22, appearance: 'none', padding: 0, border: 0, borderRadius: 11, cursor: 'pointer', transition: 'background 0.2s', background: showMessageTime ? t.point : t.border, position: 'relative', flexShrink: 0 }}>
+              <span style={{ position: 'absolute', top: 3, left: 3, transform: showMessageTime ? 'translateX(17px)' : 'translateX(0)', width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'transform 0.2s' }} />
+            </button>
           </div>
           <div className="settings-row" style={{ background: t.panel, border: `0.5px solid ${t.border}`, borderRadius: 12, padding: '12px 14px', marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
               <div style={{ fontSize: 13, color: t.theirText }}>수정됨 표시</div>
               <div style={{ fontSize: 10, color: t.subText, marginTop: 2 }}>편집한 메시지 옆의 수정 이력을 표시해요.</div>
             </div>
-            <div
+            <button
+              type="button"
+              role="switch"
+              aria-label="수정됨 표시"
+              aria-checked={showEditedLabel}
               onClick={async () => {
                 const next = !showEditedLabel
                 setShowEditedLabel(next)
@@ -618,26 +632,20 @@ export default function Settings() {
                 const { error } = await supabase.from('profiles').update({ show_edited_label: next }).eq('id', user.id)
                 showToast(error ? '수정됨 표시 설정을 저장하지 못했어요.' : '수정됨 표시 설정이 저장됐어요.', error ? 'error' : 'success')
               }}
-              role="switch"
-              aria-checked={showEditedLabel}
-              tabIndex={0}
-              onKeyDown={event => {
-                if (event.key === 'Enter' || event.key === ' ') event.currentTarget.click()
-              }}
-              style={{ width: 40, height: 22, borderRadius: 11, cursor: 'pointer', transition: 'background 0.2s', background: showEditedLabel ? t.point : t.border, position: 'relative', flexShrink: 0 }}>
-              <div style={{ position: 'absolute', top: 3, left: showEditedLabel ? 20 : 3, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
-            </div>
+              style={{ width: 40, height: 22, appearance: 'none', padding: 0, border: 0, borderRadius: 11, cursor: 'pointer', transition: 'background 0.2s', background: showEditedLabel ? t.point : t.border, position: 'relative', flexShrink: 0 }}>
+              <span style={{ position: 'absolute', top: 3, left: 3, transform: showEditedLabel ? 'translateX(17px)' : 'translateX(0)', width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'transform 0.2s' }} />
+            </button>
           </div>
           <div className="settings-row" style={{ background: t.panel, border: `0.5px solid ${t.border}`, borderRadius: 12, padding: '12px 14px', marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
             <div>
               <div style={{ fontSize: 13, color: t.theirText }}>말풍선 배경 숨기기</div>
               <div style={{ fontSize: 10, color: t.subText, marginTop: 2 }}>켜면 모든 대화방에서 말풍선 배경색을 투명하게 표시해요.</div>
             </div>
-            <div
+            <button
+              type="button"
               role="switch"
               aria-label="말풍선 배경 숨기기"
               aria-checked={hideMessageBubbles}
-              tabIndex={0}
               onClick={async () => {
                 const next = !hideMessageBubbles
                 setHideMessageBubbles(next)
@@ -646,15 +654,9 @@ export default function Settings() {
                 showToast(error ? '말풍선 설정을 저장하지 못했어요.' : '말풍선 설정이 저장됐어요.', error ? 'error' : 'success')
                 if (error) setHideMessageBubbles(!next)
               }}
-              onKeyDown={event => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                  event.preventDefault()
-                  event.currentTarget.click()
-                }
-              }}
-              style={{ width: 40, height: 22, borderRadius: 11, cursor: 'pointer', transition: 'background 0.2s', background: hideMessageBubbles ? t.point : t.border, position: 'relative', flexShrink: 0 }}>
-              <div style={{ position: 'absolute', top: 3, left: hideMessageBubbles ? 20 : 3, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
-            </div>
+              style={{ width: 40, height: 22, appearance: 'none', padding: 0, border: 0, borderRadius: 11, cursor: 'pointer', transition: 'background 0.2s', background: hideMessageBubbles ? t.point : t.border, position: 'relative', flexShrink: 0 }}>
+              <span style={{ position: 'absolute', top: 3, left: 3, transform: hideMessageBubbles ? 'translateX(17px)' : 'translateX(0)', width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'transform 0.2s' }} />
+            </button>
           </div>
         </div>
         <div style={{ marginBottom: 28 }}>

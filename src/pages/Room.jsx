@@ -2011,9 +2011,9 @@ export default function Room() {
                 <div style={{ fontSize: 12, color: t.theirText }}>공유 테마 따라가기</div>
                 <div style={{ fontSize: 10, color: t.subText, marginTop: 2 }}>방장이 설정한 테마로 보기</div>
               </div>
-              <div onClick={() => toggleFollow(!followShared)} style={{ width: 40, height: 22, borderRadius: 11, cursor: 'pointer', transition: 'background 0.2s', background: followShared ? t.point : t.border, position: 'relative', flexShrink: 0 }}>
-                <div style={{ position: 'absolute', top: 3, left: followShared ? 20 : 3, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
-              </div>
+              <button type="button" role="switch" aria-label="공유 테마 따라가기" aria-checked={followShared} onClick={() => toggleFollow(!followShared)} style={{ width: 40, height: 22, appearance: 'none', padding: 0, border: 0, borderRadius: 11, cursor: 'pointer', transition: 'background 0.2s', background: followShared ? t.point : t.border, position: 'relative', flexShrink: 0 }}>
+                <span style={{ position: 'absolute', top: 3, left: 3, transform: followShared ? 'translateX(17px)' : 'translateX(0)', width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'transform 0.2s' }} />
+              </button>
             </div>
             {isOwner && (
               <div style={{ marginBottom: 22 }}>
@@ -2081,8 +2081,9 @@ export default function Room() {
               <button
                 type="button"
                 disabled={!isOwner}
+                role="switch"
                 aria-label="입력 중 표시 전환"
-                aria-pressed={showTypingIndicator}
+                aria-checked={showTypingIndicator}
                 onClick={async () => {
                   if (!isOwner) return
                   const next = !showTypingIndicator
@@ -2092,8 +2093,8 @@ export default function Room() {
                   if (error) setShowTypingIndicator(!next)
                   showToast(error ? '입력 중 표시 설정을 저장하지 못했어요.' : '입력 중 표시 설정이 저장됐어요.', error ? 'error' : 'success')
                 }}
-                style={{ position: 'relative', width: 40, height: 22, flexShrink: 0, padding: 0, border: 0, borderRadius: 11, cursor: isOwner ? 'pointer' : 'default', opacity: isOwner ? 1 : 0.55, background: showTypingIndicator ? t.point : t.border }}>
-                <span style={{ position: 'absolute', top: 3, left: showTypingIndicator ? 21 : 3, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
+                style={{ position: 'relative', width: 40, height: 22, flexShrink: 0, appearance: 'none', padding: 0, border: 0, borderRadius: 11, cursor: isOwner ? 'pointer' : 'default', opacity: isOwner ? 1 : 0.55, background: showTypingIndicator ? t.point : t.border }}>
+                <span style={{ position: 'absolute', top: 3, left: 3, transform: showTypingIndicator ? 'translateX(18px)' : 'translateX(0)', width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'transform 0.2s' }} />
               </button>
             </div>
             {isOwner && (
