@@ -7,7 +7,7 @@
 
 `/auth` 인증 · `/` 방 목록 · `/room/:roomId` 채팅방 · `/room/:roomId/characters` 방 캐릭터 풀 · `/characters` 캐릭터 · `/characters/:id/edit` 캐릭터 편집 · `/characters/:id/text-effects` 텍스트 효과 · `/settings` 설정 · `/help` 도움말
 
-전역: `PwaPrompts`(설치·업데이트 안내), 글꼴 배율 `--idea-font-scale`, UI 모드(`lib/uiMode.js`): **modern 고정**, classic 폐지 (설정 토글 숨김, `UiModeToggleCard`는 미사용 상태로 남음)
+전역: `PwaPrompts`(설치·업데이트 안내), 글꼴 배율 `--idea-font-scale`, UI 모드(`lib/uiMode.js`): **modern 고정**, classic 폐지 (`UiModeToggleCard` 삭제, `data-ui-mode` 참조 CSS 없음 — `uiMode.js`는 부팅 호출만 남음). 디자인 토큰·테마 CSS 변수: `docs/design-tokens.md`, `lib/themeVars.js`(`useThemeVars`), 공통 UI `components/ui.jsx`
 
 ## 채팅방 `src/pages/Room.jsx`
 
@@ -54,7 +54,6 @@
 | `Toast.jsx` + `hooks/useToast.js` | 토스트 알림 |
 | `LoadingScreen.jsx` | 전체 화면 로딩 |
 | `ui.jsx` | 기본 UI: `IconButton`, `Surface` |
-| `UiModeToggleCard.jsx` | 클래식/모던 전환 (미사용, 정리 대상) |
 | `TextEffectConfigurator.jsx` | 텍스트 효과 설정 UI |
 | `hooks/useMessageStageEffects.js` | 충격 연출 화면 흔들림 |
 

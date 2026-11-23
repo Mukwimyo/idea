@@ -109,4 +109,4 @@
 ## 결정 사항
 
 - **classic UI 폐지, modern 고정** (2026-11-23). `normalizeUiMode`가 항상 modern 반환, 설정 토글 숨김. 모든 개선은 modern 기준
-- 후속 정리(C 단계와 함께): `UiModeToggleCard.jsx`와 테스트 삭제, `index.css`의 `:root[data-ui-mode="modern"]` 선택자를 일반 선택자로 단순화, classic 전용 스타일 제거
+- ✅ 후속 정리 완료(C 단계, 2026-11-23): `UiModeToggleCard.jsx`와 테스트 삭제, `index.css`의 `:root[data-ui-mode="modern"]` 선택자를 일반 선택자로 단순화, classic 전용 스타일 제거
