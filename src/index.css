@@ -56,10 +56,18 @@ body {
     --shadow-sm: 0 2px 8px rgb(0 0 0 / 0.15);
     --shadow-lg: 0 18px 50px rgb(0 0 0 / 0.3);
 
+    /* B3. Motion durations and easing */
+    --dur-fast: 120ms;
+    --dur-base: 200ms;
+    --dur-slow: 300ms;
+    --ease-out: cubic-bezier(0.2, 0, 0, 1);
+    --ease-in: cubic-bezier(0.4, 0, 1, 1);
+    --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+
     --ui-radius-sm: 8px;
     --ui-radius-md: 12px;
     --ui-control-height: var(--control-h);
-    --ui-motion-fast: 160ms;
+    --ui-motion-fast: var(--dur-fast);
     --ui-shadow-float: 0 12px 32px rgba(0, 0, 0, 0.28);
 }
 
