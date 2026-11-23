@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { MessageSquare, Phone, PhoneOff, Send, X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { prefersReducedMotion } from '../lib/motion'
 import { createClientMessageId, sendRoomMessage } from '../features/messages/messageApi'
 
 const DEFAULT_AVATAR = `${import.meta.env.BASE_URL}default-avatar.png`
@@ -156,7 +157,10 @@ export default function CommunicationSessions({ roomId, userId, myChars, theme, 
   useEffect(() => {
     const list = messageListRef.current
     if (!activeSessionId || !list || !isNearMessageBottomRef.current) return
-    window.requestAnimationFrame(() => list.scrollTo({ top: list.scrollHeight, behavior: 'smooth' }))
+    window.requestAnimationFrame(() => list.scrollTo({
+      top: list.scrollHeight,
+      behavior: prefersReducedMotion() ? 'auto' : 'smooth',
+    }))
   }, [activeSessionId, activeSessionMessageCount, remoteTypingExpiresAt])
 
   useEffect(() => {

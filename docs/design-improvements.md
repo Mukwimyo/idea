@@ -48,7 +48,7 @@
 | B3 ✅ | 모션 토큰 | 지속시간 120~500ms 12종, easing 10종 | 속도 3단계 + easing 2~3개 |
 | B4 | 테마 → CSS 변수 | JS 객체 15개 × 19키, 인라인으로 주입 | CSS 변수, 역할별 색 분리 |
 | B5 | 하드코딩 색 정리 | `#fff` 56, `#f87171` 16, rgba 51곳 등 | 토큰으로 교체 |
-| B6 | reduced-motion 전면화 | CSS 3블록만 대응 | 모든 애니메이션 대응 |
+| B6 ✅ | reduced-motion 전면화 | CSS 3블록만 대응 | 모든 애니메이션 대응 |
 
 참고: `src/index.css`의 `:root`에 `--ui-radius-*`, `--ui-control-height`, `--ui-motion-fast`가 이미 정의되어 있으나 거의 사용되지 않음. 이를 확장하는 방향.
 

@@ -2,6 +2,7 @@ import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase, uploadFile, validateImageFile } from '../lib/supabase'
 import { DEFAULT_THEME_ID, THEMES, getTheme } from '../lib/themes'
+import { prefersReducedMotion } from '../lib/motion'
 import { ChevronLeft, ChevronRight, Settings, Search, Images, ArrowUp, Eye, ArrowDown, ChevronDown, ChevronUp, Quote, RotateCcw, AlertCircle, Minus, Phone, Copy, DoorOpen, Send, Music, Grid2X2, ImagePlus, Star, Bookmark, MapPin, StickyNote, Dices, Crown, Percent, Scissors, Shuffle, Sparkles, UserRound, UsersRound, X } from 'lucide-react'
 import ProfileImageModal from '../components/ProfileImageModal'
 import CommunicationSessions from '../components/CommunicationSessions'
@@ -665,7 +666,12 @@ export default function Room() {
 
   useEffect(() => {
     if (isAtBottomRef.current) {
-      const behavior = messages.length > 0 && !initialScrollDone.current ? 'instant' : 'smooth'
+      const behavior =
+        messages.length > 0 && !initialScrollDone.current
+          ? 'instant'
+          : prefersReducedMotion()
+            ? 'auto'
+            : 'smooth'
       messagesEndRef.current?.scrollIntoView({ behavior })
       initialScrollDone.current = true
       window.requestAnimationFrame(() => markAsReadRef.current?.(messages))
@@ -1755,7 +1761,7 @@ export default function Room() {
   const jumpToBookmarkedMessage = messageId => {
     closeBookmarksPanel(() => {
       const target = document.getElementById(`msg-${messageId}`)
-      target?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      target?.scrollIntoView({ behavior: prefersReducedMotion() ? 'auto' : 'smooth', block: 'center' })
       target?.classList.add('bookmark-jump-highlight')
       window.setTimeout(() => target?.classList.remove('bookmark-jump-highlight'), 1500)
     })
@@ -2259,7 +2265,10 @@ export default function Room() {
                   onClick={() => {
                     const target = messages.find(m => new Date(m.created_at).toLocaleDateString('ko-KR') === date)
                     if (target) {
-                      document.getElementById('msg-' + target.id)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                      document.getElementById('msg-' + target.id)?.scrollIntoView({
+                        behavior: prefersReducedMotion() ? 'auto' : 'smooth',
+                        block: 'center',
+                      })
                       setShowCalendar(false)
                     }
                   }}
